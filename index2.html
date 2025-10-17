@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Minimalist Homepage</title>
 <style>
-  /* Basic Reset */
   * {
     margin: 0;
     padding: 0;
@@ -18,14 +17,14 @@
     overflow: hidden;
   }
 
-body {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  color: #ffffff;
-  text-align: center;
-  background: #092402;
-}
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #ffffff;
+    text-align: center;
+    background: #092402;
+  }
 
   canvas {
     position: fixed;
@@ -36,18 +35,16 @@ body {
     z-index: -1;
   }
 
-  /* Main content styling */
-.container {
-  backdrop-filter: blur(10px);
-  background: rgba(0,0,0,0.3);
-  padding: 50px;
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-  max-width: 800px;        /* limits card width */
-  width: 90%;              /* responsive on smaller screens */
-  margin: 0 auto;          /* center horizontally */
-  text-align: center;      /* keeps text centered */
-}
+  .container {
+    backdrop-filter: blur(10px);
+    background: rgba(0,0,0,0.3);
+    padding: 50px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    max-width: 800px;
+    width: 90%;
+    margin: 0 auto;
+  }
 
   h1 {
     font-size: 3em;
@@ -75,6 +72,60 @@ body {
     background: #ffffff;
     color: #1f1c2c;
   }
+
+  /* --- Icon buttons --- */
+  .icon-buttons {
+    margin-top: 40px;
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+  }
+
+  .icon-btn {
+    width: 50px;
+    height: 50px;
+    border: 2px solid white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s ease, border-color 0.3s ease;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .icon-btn:hover {
+    transform: scale(1.1);
+    border-color: #ccc;
+  }
+
+  .icon-btn img {
+    width: 24px;
+    height: 24px;
+    filter: invert(1);
+  }
+
+  /* Tooltip for Minecraft */
+  .tooltip {
+    position: absolute;
+    bottom: 65px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.9em;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .icon-btn.minecraft:hover .tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-5px);
+  }
 </style>
 </head>
 <body>
@@ -83,8 +134,22 @@ body {
 <div class="container">
   <h1>About Me</h1>
   <p>Hi! I’m FIRECATCHER303, a Minecraft player, experimenter, and editor. I'm usually either coding on my computer or playing Minecraft, but when I'm not on a computer I'm either reading or thinking of what to do when I get back on my computer. Other things I randomly make: 3D environments, edited versions of Minecraft, video games, and web pages.</p>
-  <a href="https://github.com/FIRECATCHER404">Github</a>
   <a href="index.html" class="btn">Back to Home</a>
+
+  <div class="icon-buttons">
+    <a href="https://github.com/FIRECATCHER404" target="_blank" class="icon-btn">
+      <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/github.svg" alt="GitHub">
+    </a>
+    <a href="https://youtube.com/@FIRECATCHER_303" target="_blank" class="icon-btn">
+      <img src="https://cdn.jsdelivr.net/gh/simple-icons/simple-icons/icons/youtube.svg" alt="YouTube">
+    </a>
+    <div class="icon-btn minecraft">
+      <img src="3410ca39-2f08-44f4-aec8-1a009aa85a45.png" alt="Minecraft">
+      <div class="tooltip">
+        Minecraft username:<br><strong>FIRECATCHER303</strong>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -94,12 +159,12 @@ const ctx = canvas.getContext('2d');
 let particlesArray;
 let mouse = { x: null, y: null };
 
-window.addEventListener('mousemove', function(e){
+window.addEventListener('mousemove', e => {
   mouse.x = e.x;
   mouse.y = e.y;
 });
 
-window.addEventListener('resize', function(){
+window.addEventListener('resize', () => {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   init();
@@ -153,15 +218,14 @@ function init(){
 }
 
 function connect(){
-  let opacityValue = 1;
   for(let a = 0; a < particlesArray.length; a++){
     for(let b = a; b < particlesArray.length; b++){
       let dx = particlesArray[a].x - particlesArray[b].x;
       let dy = particlesArray[a].y - particlesArray[b].y;
       let distance = Math.sqrt(dx*dx + dy*dy);
       if(distance < 120){
-        opacityValue = 1 - (distance/120);
-        ctx.strokeStyle = 'rgba(255,255,255,' + opacityValue + ')';
+        let opacity = 1 - (distance / 120);
+        ctx.strokeStyle = 'rgba(255,255,255,' + opacity + ')';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
@@ -186,4 +250,3 @@ animate();
 </script>
 </body>
 </html>
-
