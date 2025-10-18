@@ -1,614 +1,187 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Mini Messenger</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minimalist Homepage</title>
 <style>
-  :root{
-    --bg:#f4f6f8; --panel:#fff; --muted:#667; --accent:#0b84ff;
-    --left-width:220px; --left-small:92px; --gap:16px;
-  }
-  [data-theme="dark"]{
-    --bg:#0f1720; --panel:#0b1220; --muted:#9aa; --accent:#4aa3ff;
-  }
-  *{box-sizing:border-box; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
-  body{margin:0; height:100vh; background:var(--bg); color:var(--muted); display:flex; align-items:stretch;}
-  /* Layout: left small column, separator, main panel */
-  .left-small { width:var(--left-small); background:var(--panel); border-right:1px solid rgba(0,0,0,0.06); display:flex; flex-direction:column; gap:8px; padding:12px; }
-  .sep { width:1px; background:transparent; display:flex; align-items:stretch; }
-  .left { width:var(--left-width); background:var(--panel); border-right:1px solid rgba(0,0,0,0.06); padding:12px; display:flex; flex-direction:column; gap:8px; }
-  .main { flex:1; display:flex; flex-direction:column; gap:8px; }
-  /* Header */
-  header{height:64px; display:flex; align-items:center; justify-content:space-between; padding:8px 16px; background:linear-gradient(0deg, transparent, transparent); border-bottom:1px solid rgba(0,0,0,0.04);}
-  .title {display:flex; align-items:center; gap:12px;}
-  .profileCircle { width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700; }
-  .hamburger{cursor:pointer;padding:8px;border-radius:8px;}
-  .hamburger:hover{transform:scale(1.03);}
-
-  /* Group list */
-  .groups { display:flex; flex-direction:column; gap:6px; overflow:auto; padding-right:6px;}
-  .groupEntry { padding:8px;border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:8px; }
-  .groupEntry:hover{background:rgba(0,0,0,0.02);}
-  .groupEntry.selected{background:rgba(11,132,255,0.08); color:var(--accent)}
-
-  /* Main chat */
-  .chatWindow { padding:16px; flex:1; overflow:auto; display:flex; flex-direction:column; gap:10px; }
-  .message { max-width:65%; padding:10px 12px; border-radius:12px; background:#e9f1ff; color:#063; align-self:flex-start; }
-  .message.me { align-self:flex-end; background:linear-gradient(90deg,var(--accent), #6fb8ff); color:#fff; }
-  .msgMeta{ font-size:12px; color:rgba(0,0,0,0.45); margin-bottom:6px;}
-  .composer { padding:8px; border-top:1px solid rgba(0,0,0,0.06); display:flex; gap:8px; align-items:center; background:var(--panel); }
-  .composer input[type="text"]{flex:1;padding:12px;border-radius:20px;border:1px solid rgba(0,0,0,0.06); outline:none; font-size:15px;}
-  .btn { border:none; background:var(--accent); color:white;padding:10px 12px;border-radius:12px; cursor:pointer;}
-  .btn.secondary{ background:transparent; color:var(--accent); border:1px solid rgba(11,132,255,0.12); }
-
-  /* Controls */
-  .controls { display:flex; gap:8px; align-items:center;}
-  .small { font-size:13px; padding:6px 8px; border-radius:8px; }
-
-  /* Modal */
-  .modalBackdrop { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:50; }
-  .modal { background:var(--panel); padding:20px; border-radius:12px; width:min(520px,94%); color:var(--muted); }
-  label{display:block;margin-top:8px;font-size:13px;color:var(--muted); margin-bottom:6px;}
-  input[type="text"], input[type="password"]{width:100%; padding:10px;border-radius:8px;border:1px solid rgba(0,0,0,0.08); outline:none;}
-  .metaLine{font-size:13px;color:var(--muted); margin-top:8px;}
-
-  /* small screens: stack */
-  @media (max-width:900px){
-    .left { display:none; }
-    .left-small { width:64px; }
+  /* Basic Reset */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
   }
 
-  /* visual tweaks */
-  .muted{color:var(--muted); font-size:13px;}
-  .tiny{font-size:12px; color:rgba(0,0,0,0.45);}
-  .inviteBadge{background:#fff1c6;padding:4px 8px;border-radius:999px;font-size:12px;}
-  .groupActions{display:flex; gap:6px; margin-left:auto;}
-  .danger{background:#ffebee;color:#a00}
+  html, body {
+    height: 100%;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #ffffff;
+    text-align: center;
+    background: #021E2B;
+  }
+
+  canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+  }
+
+  /* Main content styling */
+  .container {
+    backdrop-filter: blur(10px);
+    background: rgba(0,0,0,0.3);
+    padding: 50px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+
+  h1 {
+    font-size: 3em;
+    font-weight: 300;
+    margin-bottom: 20px;
+  }
+
+  p {
+    font-size: 1.2em;
+    color: #e0e0e0;
+  }
+
+  .btn {
+    display: inline-block;
+    margin-top: 30px;
+    padding: 12px 30px;
+    border: 2px solid #ffffff;
+    color: #ffffff;
+    text-decoration: none;
+    border-radius: 50px;
+    transition: 0.3s;
+  }
+
+  .btn:hover {
+    background: #ffffff;
+    color: #1f1c2c;
+  }
 </style>
 </head>
 <body>
-  <div class="left-small" id="leftSmall">
-    <button class="btn small" id="btnNewGroup" title="Create group">＋</button>
-    <div id="miniGroups" style="display:flex;flex-direction:column;gap:8px;margin-top:8px;"></div>
-  </div>
+<canvas id="bg"></canvas>
 
-  <div class="sep"></div>
-
-  <div class="left" id="leftPanel">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <strong>Groups</strong>
-      <div class="controls">
-        <button class="btn small" id="btnCreateGroup">New</button>
-        <button class="btn small secondary" id="btnRefresh">Refresh</button>
-      </div>
-    </div>
-    <div class="groups" id="groupList"></div>
-    <hr/>
-    <div>
-      <div style="display:flex;justify-content:space-between;"><span class="tiny">Your info</span></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-        <div id="leftProfile" class="profileCircle" style="width:36px;height:36px;"></div>
-        <div>
-          <div id="displayName" style="font-weight:700"></div>
-          <div id="displayHandle" class="tiny"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="main">
-    <header>
-      <div class="title">
-        <div style="display:flex;flex-direction:column;">
-          <div id="currentGroupName" style="font-weight:700">—</div>
-          <div id="currentGroupMeta" class="tiny">Select a group to start</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div id="unreadBadge" class="inviteBadge" style="display:none;">0</div>
-        <div id="rightProfile" style="display:flex;align-items:center;gap:8px;">
-          <div id="profileCircleTop" class="profileCircle" style="width:40px;height:40px;"></div>
-          <div class="hamburger" id="settingsToggle">☰</div>
-        </div>
-      </div>
-    </header>
-
-    <div id="chat" class="chatWindow"></div>
-
-    <div class="composer">
-      <input id="messageInput" type="text" placeholder="Message..." autocomplete="off" />
-      <button class="btn" id="sendBtn">Send</button>
-    </div>
-  </div>
-
-  <!-- Modals and UI panels (hidden by default) -->
-  <div id="loginModal" class="modalBackdrop" style="display:none;">
-    <div class="modal">
-      <h2>Welcome — set your name & password</h2>
-      <div class="metaLine">Enter your full name (how you want it displayed) and a password. We'll generate a short username for you.</div>
-      <label>Full name</label><input id="fullNameInput" type="text" placeholder="e.g., Jane Doe" />
-      <label>Password</label><input id="passwordInput" type="password" />
-      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-        <button class="btn" id="createProfileBtn">Create</button>
-      </div>
-      <div id="createProfileMsg" class="metaLine"></div>
-    </div>
-  </div>
-
-  <div id="createGroupModal" class="modalBackdrop" style="display:none;">
-    <div class="modal">
-      <h3>Create group</h3>
-      <label>Group name</label><input id="grpName" type="text" />
-      <label>Description (optional)</label><input id="grpDesc" type="text" />
-      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-        <input id="grpInviteOnly" type="checkbox" /><label style="margin:0">Invite-only</label>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-        <button class="btn secondary" id="cancelCreateGrp">Cancel</button>
-        <button class="btn" id="confirmCreateGrp">Create</button>
-      </div>
-      <div id="createGrpMsg" class="metaLine"></div>
-    </div>
-  </div>
-
-  <div id="joinGroupModal" class="modalBackdrop" style="display:none;">
-    <div class="modal">
-      <h3>Join group</h3>
-      <div id="joinGroupName" class="tiny"></div>
-      <label id="joinLabel">Invite code</label><input id="joinCode" type="text" />
-      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-        <button class="btn secondary" id="cancelJoinGrp">Cancel</button>
-        <button class="btn" id="confirmJoinGrp">Join</button>
-      </div>
-      <div id="joinGrpMsg" class="metaLine"></div>
-    </div>
-  </div>
-
-  <div id="settingsPanel" class="modalBackdrop" style="display:none;">
-    <div class="modal">
-      <h3>Settings</h3>
-      <label>Profile circle background</label>
-      <input id="profileColor" type="color" value="#0b84ff" />
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-        <input id="darkMode" type="checkbox" /><label>Dark mode</label>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-        <button class="btn secondary" id="closeSettings">Close</button>
-      </div>
-    </div>
-  </div>
+<div class="container">
+  <h1>Welcome</h1>
+  <p>This is the home page.</p>
+  <a href="index2.html" class="btn">About me</a>
+</div>
 
 <script>
-/* -------------------------
-  Utilities: cookies / storage
-   ------------------------- */
-function setCookie(name, value, days=365){
-  const d = new Date();
-  d.setTime(d.getTime() + days*24*60*60*1000);
-  document.cookie = name + "=" + encodeURIComponent(value) + ";path=/;expires=" + d.toUTCString();
-}
-function getCookie(name){
-  const m = document.cookie.match(new RegExp('(?:^|; )'+name+'=([^;]*)'));
-  return m ? decodeURIComponent(m[1]) : null;
-}
-function delCookie(name){ document.cookie = name + "=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT"; }
+const canvas = document.getElementById('bg');
+const ctx = canvas.getContext('2d');
 
-function saveState(key, obj){ localStorage.setItem(key, JSON.stringify(obj)); }
-function loadState(key, fallback){ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+let particlesArray;
+let mouse = { x: null, y: null };
 
-/* Simple SHA-256 hex for password storage using SubtleCrypto */
-async function sha256Hex(str){
-  const enc = new TextEncoder();
-  const data = enc.encode(str);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  const h = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
-  return h;
-}
+window.addEventListener('mousemove', function(e){
+  mouse.x = e.x;
+  mouse.y = e.y;
+});
 
-/* -------------------------
-  Username generation per rule
-   - username initials logic
-   - ensure uniqueness by appending numeric suffix if necessary
-   ------------------------- */
-function initialsFromFullName(full){
-  if(!full) return "U";
-  const parts = full.trim().split(/\s+/).filter(Boolean);
-  if(parts.length === 1) return parts[0][0].toUpperCase();
-  if(parts.length === 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  // 3+ -> first letter of first and first letter of last
-  return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
-}
-function makeUniqueUsername(base){
-  // users stored in localStorage under 'users' map key => {username, fullName, hash}
-  const users = loadState('mm_users', []);
-  let candidate = base;
-  let i = 1;
-  const existing = new Set(users.map(u => u.username));
-  while(existing.has(candidate)){
-    i++;
-    candidate = base + i;
+window.addEventListener('resize', function(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  init();
+});
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+class Particle {
+  constructor(x, y, directionX, directionY, size, color){
+    this.x = x;
+    this.y = y;
+    this.directionX = directionX;
+    this.directionY = directionY;
+    this.size = size;
+    this.color = color;
   }
-  return candidate;
-}
 
-/* -------------------------
-  Models in localStorage:
-  - mm_users: array of {username, fullName, passHash, color}
-  - mm_groups: array of group objects:
-    { id, name, desc, owner (username), inviteOnly(bool), inviteCode, members:[], banned:[] }
-  - mm_messages: array of {id, groupId, sender (username), text, ts}
-  ------------------------- */
+  draw(){
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+  }
 
-function ensureDefaults(){
-  if(!localStorage.getItem('mm_users')) saveState('mm_users', []);
-  if(!localStorage.getItem('mm_groups')) saveState('mm_groups', []);
-  if(!localStorage.getItem('mm_messages')) saveState('mm_messages', []);
-}
-
-/* -------------------------
-  UI wiring and functions
-   ------------------------- */
-const state = {
-  currentUser: null,
-  currentGroupId: null
-};
-
-async function init(){
-  ensureDefaults();
-  // check cookies
-  let username = getCookie('username');
-  let passHash = getCookie('password');
-  if(!username || !passHash){
-    // show login modal
-    document.getElementById('loginModal').style.display = 'flex';
-  } else {
-    // find user in mm_users; if not present create a stub with the cookie values (in case)
-    const users = loadState('mm_users', []);
-    const u = users.find(x => x.username === username);
-    if(!u){
-      // unknown user — create a minimal entry
-      users.push({username, fullName:username, passHash, color:'#0b84ff'});
-      saveState('mm_users', users);
+  update(){
+    if(this.x + this.size > canvas.width || this.x - this.size < 0){
+      this.directionX = -this.directionX;
     }
-    state.currentUser = username;
-    applyUserToUI();
-    loadAll();
-  }
-
-  // wire up events
-  document.getElementById('createProfileBtn').addEventListener('click', createProfile);
-  document.getElementById('btnCreateGroup').addEventListener('click', ()=>showCreateGroup());
-  document.getElementById('btnNewGroup').addEventListener('click', ()=>showCreateGroup());
-  document.getElementById('confirmCreateGrp').addEventListener('click', confirmCreateGroup);
-  document.getElementById('cancelCreateGrp').addEventListener('click', ()=>closeModal('createGroupModal'));
-  document.getElementById('settingsToggle').addEventListener('click', ()=>document.getElementById('settingsPanel').style.display='flex');
-  document.getElementById('closeSettings').addEventListener('click', ()=>closeModal('settingsPanel'));
-  document.getElementById('sendBtn').addEventListener('click', sendMessage);
-  document.getElementById('messageInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendMessage(); });
-  document.getElementById('confirmJoinGrp').addEventListener('click', confirmJoinGroup);
-  document.getElementById('cancelJoinGrp').addEventListener('click', ()=>closeModal('joinGroupModal'));
-  document.getElementById('btnRefresh').addEventListener('click', loadAll);
-  document.getElementById('profileColor').addEventListener('change', updateProfileColor);
-  document.getElementById('darkMode').addEventListener('change', toggleDarkMode);
-
-  // populate settings from cookies
-  const color = getCookie('profileColor') || '#0b84ff';
-  document.getElementById('profileColor').value = color;
-  const dm = getCookie('darkMode') === '1';
-  document.getElementById('darkMode').checked = dm;
-  document.documentElement.setAttribute('data-theme', dm ? 'dark' : 'light');
-}
-
-function closeModal(id){ document.getElementById(id).style.display = 'none'; }
-
-function applyUserToUI(){
-  const users = loadState('mm_users', []);
-  const u = users.find(x=>x.username === state.currentUser);
-  const fullname = u?.fullName || state.currentUser;
-  document.getElementById('displayName').textContent = fullname;
-  document.getElementById('displayHandle').textContent = '@' + state.currentUser;
-  const initials = initialsFromFullName(fullname);
-  const color = u?.color || getCookie('profileColor') || '#0b84ff';
-  document.getElementById('leftProfile').style.background = color;
-  document.getElementById('leftProfile').textContent = initials;
-  document.getElementById('profileCircleTop').style.background = color;
-  document.getElementById('profileCircleTop').textContent = initials;
-}
-
-async function createProfile(){
-  const full = document.getElementById('fullNameInput').value.trim();
-  const pass = document.getElementById('passwordInput').value;
-  if(!full || !pass){ document.getElementById('createProfileMsg').textContent = 'Please enter a name and password.'; return; }
-  const base = initialsFromFullName(full);
-  const username = makeUniqueUsername(base);
-  const hash = await sha256Hex(pass);
-  // save user
-  const users = loadState('mm_users', []);
-  users.push({username, fullName: full, passHash: hash, color: getCookie('profileColor') || '#0b84ff'});
-  saveState('mm_users', users);
-  // set cookies
-  setCookie('username', username);
-  setCookie('password', hash);
-  state.currentUser = username;
-  applyUserToUI();
-  document.getElementById('loginModal').style.display = 'none';
-  loadAll();
-}
-
-/* -------------------------
-  Groups
-   ------------------------- */
-function showCreateGroup(){
-  document.getElementById('grpName').value = '';
-  document.getElementById('grpDesc').value = '';
-  document.getElementById('grpInviteOnly').checked = false;
-  document.getElementById('createGroupModal').style.display = 'flex';
-}
-function confirmCreateGroup(){
-  const name = document.getElementById('grpName').value.trim();
-  if(!name){ document.getElementById('createGrpMsg').textContent = 'Group name required'; return; }
-  const desc = document.getElementById('grpDesc').value.trim();
-  const inviteOnly = document.getElementById('grpInviteOnly').checked;
-  const id = 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-  const code = inviteOnly ? Math.random().toString(36).slice(2,8).toUpperCase() : null;
-  const groups = loadState('mm_groups', []);
-  const g = { id, name, desc, owner: state.currentUser, inviteOnly, inviteCode: code, members: [state.currentUser], banned: [] };
-  groups.push(g);
-  saveState('mm_groups', groups);
-  closeModal('createGroupModal');
-  loadAll();
-  selectGroup(id);
-}
-
-/* list groups UI */
-function renderGroups(){
-  const groups = loadState('mm_groups', []);
-  const container = document.getElementById('groupList');
-  const mini = document.getElementById('miniGroups');
-  container.innerHTML = '';
-  mini.innerHTML = '';
-  groups.forEach(g=>{
-    const el = document.createElement('div');
-    el.className = 'groupEntry' + (state.currentGroupId === g.id ? ' selected' : '');
-    el.title = g.desc || '';
-    el.innerHTML = `<div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#89c9ff);display:flex;align-items:center;justify-content:center;color:white;font-weight:700">${g.name[0]||'G'}</div>
-      <div style="display:flex;flex-direction:column;">
-        <div style="font-weight:700">${g.name}</div>
-        <div class="tiny">${g.owner}${g.inviteOnly ? ' · invite-only' : ''}</div>
-      </div>`;
-    el.addEventListener('click', ()=> selectGroup(g.id));
-    container.appendChild(el);
-
-    // mini
-    const m = document.createElement('div');
-    m.style.cursor='pointer';
-    m.style.display='flex';
-    m.style.alignItems='center';
-    m.style.justifyContent='center';
-    m.style.width='36px';
-    m.style.height='36px';
-    m.style.borderRadius='8px';
-    m.style.background='linear-gradient(135deg,var(--accent),#89c9ff)';
-    m.style.color='white';
-    m.textContent=g.name[0]||'G';
-    m.title = g.name;
-    m.addEventListener('click', ()=> selectGroup(g.id));
-    mini.appendChild(m);
-  });
-
-  // option to join group by id/name; also show public groups
-  // (for simplicity, joining is by clicking; invite-only opens join modal)
-}
-
-/* select group and render messages */
-function selectGroup(groupId){
-  const groups = loadState('mm_groups', []);
-  const g = groups.find(x=>x.id===groupId);
-  if(!g){ alert('Group not found'); return; }
-  // if invite-only and user is not a member -> show join modal
-  if(g.inviteOnly && !g.members.includes(state.currentUser)){
-    document.getElementById('joinGroupModal').style.display = 'flex';
-    document.getElementById('joinGroupName').textContent = `Joining: ${g.name} — invite-only`;
-    document.getElementById('joinGroupModal').dataset.groupId = groupId;
-    document.getElementById('joinCode').value = '';
-    return;
-  }
-  if(g.banned && g.banned.includes(state.currentUser)){
-    alert('You are banned from this group.');
-    return;
-  }
-  state.currentGroupId = groupId;
-  document.getElementById('currentGroupName').textContent = g.name;
-  document.getElementById('currentGroupMeta').textContent = `${g.members.length} member(s) · ${g.inviteOnly ? 'Invite-only' : 'Public'}`;
-  renderMessages();
-  renderGroups();
-}
-
-/* join group confirm */
-function confirmJoinGroup(){
-  const gid = document.getElementById('joinGroupModal').dataset.groupId;
-  const groups = loadState('mm_groups', []);
-  const g = groups.find(x=>x.id===gid);
-  if(!g) { document.getElementById('joinGrpMsg').textContent = 'Group not found'; return; }
-  if(g.banned && g.banned.includes(state.currentUser)){ document.getElementById('joinGrpMsg').textContent = 'You are banned from this group'; return; }
-  if(!g.inviteOnly){
-    // add directly
-    g.members = g.members || [];
-    if(!g.members.includes(state.currentUser)) g.members.push(state.currentUser);
-    saveState('mm_groups', groups);
-    closeModal('joinGroupModal');
-    selectGroup(gid);
-    return;
-  }
-  // check code
-  const code = document.getElementById('joinCode').value.trim().toUpperCase();
-  if(code === g.inviteCode){
-    g.members = g.members || [];
-    if(!g.members.includes(state.currentUser)) g.members.push(state.currentUser);
-    saveState('mm_groups', groups);
-    closeModal('joinGroupModal');
-    selectGroup(gid);
-  } else {
-    document.getElementById('joinGrpMsg').textContent = 'Invalid invite code.';
+    if(this.y + this.size > canvas.height || this.y - this.size < 0){
+      this.directionY = -this.directionY;
+    }
+    this.x += this.directionX;
+    this.y += this.directionY;
+    this.draw();
   }
 }
 
-/* -------------------------
-  Messages
-   ------------------------- */
-function sendMessage(){
-  const text = document.getElementById('messageInput').value.trim();
-  if(!text) return;
-  if(!state.currentGroupId){ alert('Select a group first'); return; }
-  const groups = loadState('mm_groups', []);
-  const g = groups.find(x=>x.id===state.currentGroupId);
-  if(!g){ alert('Group gone'); return; }
-  if(g.banned && g.banned.includes(state.currentUser)){ alert('You are banned from this group.'); return; }
-  if(g.inviteOnly && !g.members.includes(state.currentUser)){ alert('You are not a member of this invite-only group.'); return; }
-  const messages = loadState('mm_messages', []);
-  const m = { id:'m_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), groupId: g.id, sender: state.currentUser, text, ts: Date.now() };
-  messages.push(m);
-  saveState('mm_messages', messages);
-  document.getElementById('messageInput').value = '';
-  renderMessages();
-}
-
-/* render messages for selected group */
-function renderMessages(){
-  const messages = loadState('mm_messages', []);
-  const groups = loadState('mm_groups', []);
-  const g = groups.find(x=>x.id===state.currentGroupId);
-  const chat = document.getElementById('chat');
-  chat.innerHTML = '';
-  if(!g){ chat.innerHTML = '<div class="tiny">Select a group to see messages.</div>'; return; }
-  // show group header controls
-  const headerControls = document.createElement('div');
-  headerControls.style.display='flex';
-  headerControls.style.alignItems='center';
-  headerControls.style.gap='8px';
-  headerControls.style.marginBottom='6px';
-  const ownerBadge = document.createElement('div'); ownerBadge.className='tiny'; ownerBadge.textContent = 'Owner: ' + g.owner;
-  headerControls.appendChild(ownerBadge);
-  if(g.inviteOnly){
-    const codeBad = document.createElement('div'); codeBad.className='inviteBadge'; codeBad.textContent = 'Invite: ' + g.inviteCode;
-    headerControls.appendChild(codeBad);
-  }
-  // if current user is owner, show ban controls
-  if(g.owner === state.currentUser){
-    const banBtn = document.createElement('button'); banBtn.className='btn small secondary'; banBtn.textContent='Manage';
-    banBtn.addEventListener('click', ()=>manageGroup(g.id));
-    headerControls.appendChild(banBtn);
-  } else {
-    // show leave option
-    const leaveBtn = document.createElement('button'); leaveBtn.className='btn small secondary'; leaveBtn.textContent='Leave';
-    leaveBtn.addEventListener('click', ()=>leaveGroup(g.id));
-    headerControls.appendChild(leaveBtn);
-  }
-  chat.appendChild(headerControls);
-
-  // messages rendering
-  const groupMessages = messages.filter(m=>m.groupId === g.id).sort((a,b)=>a.ts - b.ts);
-  const users = loadState('mm_users', []);
-  groupMessages.forEach(m=>{
-    const el = document.createElement('div');
-    el.className = 'message' + (m.sender === state.currentUser ? ' me' : '');
-    const name = users.find(u=>u.username===m.sender)?.fullName || m.sender;
-    const meta = document.createElement('div'); meta.className='msgMeta'; meta.textContent = `${name} · ${new Date(m.ts).toLocaleString()}`;
-    el.appendChild(meta);
-    const body = document.createElement('div'); body.textContent = m.text;
-    el.appendChild(body);
-    chat.appendChild(el);
-  });
-
-  // scroll to bottom
-  setTimeout(()=> chat.scrollTop = chat.scrollHeight, 50);
-}
-
-/* group management by owner: ban/unban */
-function manageGroup(groupId){
-  const groups = loadState('mm_groups', []);
-  const g = groups.find(x=>x.id===groupId);
-  if(!g) return;
-  // prompt a simple management UI using prompt() to avoid heavy UI building
-  let action = prompt('Manage group "'+g.name+'": type "ban" to ban a user, "unban" to unban, "members" to list members.');
-  if(!action) return;
-  action = action.trim().toLowerCase();
-  if(action === 'members'){
-    alert('Members: ' + (g.members || []).join(', '));
-    return;
-  }
-  if(action === 'ban'){
-    const who = prompt('Username to ban (exact):');
-    if(!who) return;
-    if(!g.banned) g.banned = [];
-    if(!g.banned.includes(who)){
-      g.banned.push(who);
-      // also remove from members
-      g.members = (g.members || []).filter(x=>x!==who);
-      saveState('mm_groups', groups);
-      alert(who + ' banned.');
-      loadAll();
-      return;
-    } else alert(who + ' already banned.');
-  }
-  if(action === 'unban'){
-    const who = prompt('Username to unban (exact):');
-    if(!who) return;
-    if(g.banned && g.banned.includes(who)){
-      g.banned = g.banned.filter(x=>x!==who);
-      saveState('mm_groups', groups);
-      alert(who + ' unbanned.');
-      loadAll();
-      return;
-    } else alert(who + ' not found in ban list.');
+function init(){
+  particlesArray = [];
+  let numberOfParticles = (canvas.width * canvas.height) / 9000;
+  for(let i = 0; i < numberOfParticles; i++){
+    let size = Math.random() * 3 + 1;
+    let x = Math.random() * (canvas.width - size * 2) + size;
+    let y = Math.random() * (canvas.height - size * 2) + size;
+    let directionX = (Math.random() - 0.5) * 1;
+    let directionY = (Math.random() - 0.5) * 1;
+    let color = '#ffffff';
+    particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
   }
 }
 
-/* leave group */
-function leaveGroup(groupId){
-  const groups = loadState('mm_groups', []);
-  const g = groups.find(x=>x.id===groupId);
-  if(!g) return;
-  if(confirm('Leave ' + g.name + '?')){
-    g.members = (g.members || []).filter(x => x !== state.currentUser);
-    saveState('mm_groups', groups);
-    state.currentGroupId = null;
-    loadAll();
+function connect(){
+  let opacityValue = 1;
+  for(let a = 0; a < particlesArray.length; a++){
+    for(let b = a; b < particlesArray.length; b++){
+      let dx = particlesArray[a].x - particlesArray[b].x;
+      let dy = particlesArray[a].y - particlesArray[b].y;
+      let distance = Math.sqrt(dx*dx + dy*dy);
+      if(distance < 120){
+        opacityValue = 1 - (distance/120);
+        ctx.strokeStyle = 'rgba(255,255,255,' + opacityValue + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+        ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+        ctx.stroke();
+      }
+    }
   }
 }
 
-/* -------------------------
-  Settings
-   ------------------------- */
-function updateProfileColor(e){
-  const c = e.target.value;
-  setCookie('profileColor', c);
-  // update current user color
-  const users = loadState('mm_users', []);
-  const u = users.find(x=>x.username===state.currentUser);
-  if(u){ u.color = c; saveState('mm_users', users); applyUserToUI(); }
+function animate(){
+  requestAnimationFrame(animate);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let i = 0; i < particlesArray.length; i++){
+    particlesArray[i].update();
+  }
+  connect();
 }
 
-function toggleDarkMode(e){
-  const on = e.target.checked;
-  setCookie('darkMode', on ? '1' : '0');
-  document.documentElement.setAttribute('data-theme', on ? 'dark' : 'light');
-}
-
-/* -------------------------
-  Load everything
-   ------------------------- */
-function loadAll(){
-  renderGroups();
-  renderMessages();
-}
-
-/* -------------------------
-  Initialization
-   ------------------------- */
-init().catch(e=>console.error(e));
-
+init();
+animate();
 </script>
 </body>
 </html>
+
+
+
