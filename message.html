@@ -350,10 +350,13 @@ if (cookieUser) {
   currentUser = cookieUser;
   document.getElementById('loginModal').style.display = 'none';
   loadGroups();
+} else {
+  document.getElementById('loginModal').style.display = 'flex';
 }
 </script>
 </body>
 </html>
+
 
 
 
