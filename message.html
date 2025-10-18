@@ -180,12 +180,11 @@
       </div>
     </div>
   </div>
-  
-<script type="module">
-import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, get, push, onValue, child, update } from "firebase/database";
 
-// Your existing Firebase config
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js';
+import { getDatabase, ref, set, push, onValue, get } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
+
 const firebaseConfig = {
   apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
   authDomain: "website-11b5c.firebaseapp.com",
@@ -196,281 +195,121 @@ const firebaseConfig = {
   appId: "1:821866548441:web:00a08e534699a6f97902c8"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* -------------------------
-  Utilities: cookies
-------------------------- */
-function setCookie(name, value, days=365){
-  const d = new Date();
-  d.setTime(d.getTime() + days*24*60*60*1000);
-  document.cookie = name + "=" + encodeURIComponent(value) + ";path=/;expires=" + d.toUTCString();
+// DOM Elements
+const loginScreen = document.getElementById('login-screen');
+const messages = document.getElementById('messages');
+const msgInput = document.getElementById('msg-input');
+const sendBtn = document.getElementById('send-btn');
+const settings = document.getElementById('settings');
+const settingsMenu = document.getElementById('settings-menu');
+const darkModeToggle = document.getElementById('darkMode');
+const pfpColor = document.getElementById('pfpColor');
+const usernameInput = document.getElementById('name');
+const passwordInput = document.getElementById('pass');
+const joinBtn = document.getElementById('join-btn');
+const groupListDiv = document.getElementById('group-list');
+const createGroupBtn = document.getElementById('create-group-btn');
+const joinGroupBtn = document.getElementById('join-group-btn');
+
+let currentUser = null;
+let currentGroupId = null;
+
+function getInitials(name){
+  const words = name.trim().split(' ');
+  return words.length===1 ? words[0][0].toUpperCase() : (words[0][0]+words[words.length-1][0]).toUpperCase();
+}
+
+function setCookie(name,value,days=365){
+  const d=new Date(); d.setTime(d.getTime()+days*24*60*60*1000);
+  document.cookie = name+'='+encodeURIComponent(value)+';path=/;expires='+d.toUTCString();
 }
 function getCookie(name){
   const m = document.cookie.match(new RegExp('(?:^|; )'+name+'=([^;]*)'));
   return m ? decodeURIComponent(m[1]) : null;
 }
-function delCookie(name){ document.cookie = name + "=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT"; }
 
-/* SHA-256 for password storage */
-async function sha256Hex(str){
-  const enc = new TextEncoder();
-  const data = enc.encode(str);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+// Login handling
+joinBtn.onclick = async () => {
+  const name = usernameInput.value.trim();
+  const pass = passwordInput.value.trim();
+  if(!name||!pass) return alert('Enter both fields');
+  currentUser = name;
+  setCookie('username', name);
+  setCookie('password', pass);
+  await set(ref(db,'users/'+name),{ color: localStorage.getItem('pfpColor')||'#4c8bf5' });
+  loginScreen.style.display='none';
+  loadGroups();
 }
 
-/* -------------------------
-  Username helpers
-------------------------- */
-function initialsFromFullName(full){
-  if(!full) return "U";
-  const parts = full.trim().split(/\s+/).filter(Boolean);
-  if(parts.length === 1) return parts[0][0].toUpperCase();
-  if(parts.length === 2) return (parts[0][0]+parts[1][0]).toUpperCase();
-  return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
-}
-
-/* -------------------------
-  State
-------------------------- */
-const state = {
-  currentUser: null,
-  currentGroupId: null,
-  users: {},
-  groups: {},
-  messages: {}
-};
-
-/* -------------------------
-  Init
-------------------------- */
-async function init(){
-  // Check cookies
-  let username = getCookie('username');
-  let passHash = getCookie('password');
-  if(!username || !passHash){
-    document.getElementById('loginModal').style.display='flex';
-  } else {
-    state.currentUser = username;
-    // Ensure user exists in Firebase
-    const userRef = ref(db, 'users/' + username);
-    const snap = await get(userRef);
-    if(!snap.exists()){
-      await set(userRef, { fullName: username, passHash, color:'#0b84ff' });
+// Load groups
+function loadGroups(){
+  const groupsRef = ref(db,'groups');
+  onValue(groupsRef, snapshot=>{
+    const data = snapshot.val()||{};
+    groupListDiv.innerHTML='';
+    for(const id in data){
+      const g=data[id];
+      const div=document.createElement('div');
+      div.textContent=g.name;
+      div.style.cursor='pointer';
+      div.onclick=()=> selectGroup(id);
+      groupListDiv.appendChild(div);
     }
-    applyUserToUI();
-  }
-
-  // Event wiring
-  document.getElementById('createProfileBtn').addEventListener('click', createProfile);
-  document.getElementById('btnCreateGroup').addEventListener('click', ()=>showCreateGroup());
-  document.getElementById('btnNewGroup').addEventListener('click', ()=>showCreateGroup());
-  document.getElementById('confirmCreateGrp').addEventListener('click', confirmCreateGroup);
-  document.getElementById('cancelCreateGrp').addEventListener('click', ()=>closeModal('createGroupModal'));
-  document.getElementById('settingsToggle').addEventListener('click', ()=>document.getElementById('settingsPanel').style.display='flex');
-  document.getElementById('closeSettings').addEventListener('click', ()=>closeModal('settingsPanel'));
-  document.getElementById('sendBtn').addEventListener('click', sendMessage);
-  document.getElementById('messageInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendMessage(); });
-  document.getElementById('confirmJoinGrp').addEventListener('click', confirmJoinGroup);
-  document.getElementById('cancelJoinGrp').addEventListener('click', ()=>closeModal('joinGroupModal'));
-  document.getElementById('btnRefresh').addEventListener('click', loadAll);
-  document.getElementById('profileColor').addEventListener('change', updateProfileColor);
-  document.getElementById('darkMode').addEventListener('change', toggleDarkMode);
-
-  const color = getCookie('profileColor') || '#0b84ff';
-  document.getElementById('profileColor').value = color;
-  const dm = getCookie('darkMode')==='1';
-  document.getElementById('darkMode').checked = dm;
-  document.documentElement.setAttribute('data-theme', dm ? 'dark':'light');
-
-  // Set up Firebase listeners
-  onValue(ref(db,'users'), snap=>{ state.users = snap.val()||{}; renderGroups(); renderMessages(); });
-  onValue(ref(db,'groups'), snap=>{ state.groups = snap.val()||{}; renderGroups(); renderMessages(); });
-  onValue(ref(db,'messages'), snap=>{ state.messages = snap.val()||{}; renderMessages(); });
-}
-
-/* -------------------------
-  UI Helpers
-------------------------- */
-function closeModal(id){ document.getElementById(id).style.display='none'; }
-
-function applyUserToUI(){
-  const u = state.users[state.currentUser];
-  if(!u) return;
-  const fullname = u.fullName || state.currentUser;
-  document.getElementById('displayName').textContent = fullname;
-  document.getElementById('displayHandle').textContent = '@' + state.currentUser;
-  const initials = initialsFromFullName(fullname);
-  const color = u.color || getCookie('profileColor') || '#0b84ff';
-  document.getElementById('leftProfile').style.background = color;
-  document.getElementById('leftProfile').textContent = initials;
-  document.getElementById('profileCircleTop').style.background = color;
-  document.getElementById('profileCircleTop').textContent = initials;
-}
-
-/* -------------------------
-  User creation
-------------------------- */
-async function createProfile(){
-  const full = document.getElementById('fullNameInput').value.trim();
-  const pass = document.getElementById('passwordInput').value;
-  if(!full || !pass){ document.getElementById('createProfileMsg').textContent='Enter name and password'; return; }
-  const base = initialsFromFullName(full);
-  let username = base;
-  // ensure uniqueness in Firebase
-  let i=1;
-  while(await get(ref(db,'users/'+username)).then(s=>s.exists())){
-    username = base+i; i++;
-  }
-  const hash = await sha256Hex(pass);
-  await set(ref(db,'users/'+username), { fullName:full, passHash:hash, color:getCookie('profileColor')||'#0b84ff' });
-  setCookie('username', username);
-  setCookie('password', hash);
-  state.currentUser = username;
-  applyUserToUI();
-  closeModal('loginModal');
-}
-
-/* -------------------------
-  Groups
-------------------------- */
-function showCreateGroup(){
-  document.getElementById('grpName').value='';
-  document.getElementById('grpDesc').value='';
-  document.getElementById('grpInviteOnly').checked=false;
-  document.getElementById('createGroupModal').style.display='flex';
-}
-
-async function confirmCreateGroup(){
-  const name = document.getElementById('grpName').value.trim();
-  if(!name){ document.getElementById('createGrpMsg').textContent='Group name required'; return; }
-  const desc = document.getElementById('grpDesc').value.trim();
-  const inviteOnly = document.getElementById('grpInviteOnly').checked;
-  const id = 'g_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  const code = inviteOnly? Math.random().toString(36).slice(2,8).toUpperCase():null;
-  await set(ref(db,'groups/'+id), { id, name, desc, owner:state.currentUser, inviteOnly, inviteCode:code, members:[state.currentUser], banned:[] });
-  closeModal('createGroupModal');
-}
-
-/* -------------------------
-  Render groups
-------------------------- */
-function renderGroups(){
-  const groups = state.groups;
-  const container = document.getElementById('groupList');
-  const mini = document.getElementById('miniGroups');
-  container.innerHTML=''; mini.innerHTML='';
-  Object.values(groups).forEach(g=>{
-    const el = document.createElement('div');
-    el.className='groupEntry'+(state.currentGroupId===g.id?' selected':'');
-    el.title = g.desc||'';
-    el.innerHTML = `<div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#89c9ff);display:flex;align-items:center;justify-content:center;color:white;font-weight:700">${g.name[0]||'G'}</div>
-      <div style="display:flex;flex-direction:column;">
-        <div style="font-weight:700">${g.name}</div>
-        <div class="tiny">${g.owner}${g.inviteOnly?' · invite-only':''}</div>
-      </div>`;
-    el.addEventListener('click', ()=>selectGroup(g.id));
-    container.appendChild(el);
-
-    const m = document.createElement('div');
-    m.style.cursor='pointer'; m.style.display='flex'; m.style.alignItems='center'; m.style.justifyContent='center';
-    m.style.width='36px'; m.style.height='36px'; m.style.borderRadius='8px'; m.style.background='linear-gradient(135deg,var(--accent),#89c9ff)';
-    m.style.color='white'; m.textContent=g.name[0]||'G'; m.title=g.name;
-    m.addEventListener('click', ()=>selectGroup(g.id));
-    mini.appendChild(m);
   });
 }
 
-/* -------------------------
-  Select group
-------------------------- */
-function selectGroup(groupId){
-  const g = state.groups[groupId];
-  if(!g) return;
-  if(g.inviteOnly && !g.members.includes(state.currentUser)){
-    document.getElementById('joinGroupModal').style.display='flex';
-    document.getElementById('joinGroupName').textContent=`Joining: ${g.name} — invite-only`;
-    document.getElementById('joinGroupModal').dataset.groupId = groupId;
-    document.getElementById('joinCode').value='';
-    return;
-  }
-  if(g.banned?.includes(state.currentUser)){
-    alert('You are banned from this group.');
-    return;
-  }
-  state.currentGroupId = groupId;
-  document.getElementById('currentGroupName').textContent=g.name;
-  document.getElementById('currentGroupMeta').textContent=`${g.members.length} member(s) · ${g.inviteOnly?'Invite-only':'Public'}`;
-  renderMessages();
-  renderGroups();
-}
-
-/* -------------------------
-  Messages
-------------------------- */
-async function sendMessage(){
-  const text = document.getElementById('messageInput').value.trim();
-  if(!text || !state.currentGroupId) return;
-  const g = state.groups[state.currentGroupId];
-  if(!g) return;
-  if(g.banned?.includes(state.currentUser)){ alert('You are banned.'); return; }
-  if(g.inviteOnly && !g.members.includes(state.currentUser)){ alert('Not a member.'); return; }
-  const id = 'm_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  const msg = { id, groupId: g.id, sender: state.currentUser, text, ts:Date.now() };
-  await set(ref(db,'messages/'+g.id+'/'+id), msg);
-  document.getElementById('messageInput').value='';
-}
-
-/* -------------------------
-  Render messages
-------------------------- */
-function renderMessages(){
-  const chat = document.getElementById('chat');
-  chat.innerHTML='';
-  const g = state.groups[state.currentGroupId];
-  if(!g){ chat.innerHTML='<div class="tiny">Select a group to see messages.</div>'; return; }
-  const headerControls = document.createElement('div');
-  headerControls.style.display='flex'; headerControls.style.alignItems='center'; headerControls.style.gap='8px'; headerControls.style.marginBottom='6px';
-  const ownerBadge = document.createElement('div'); ownerBadge.className='tiny'; ownerBadge.textContent='Owner: '+g.owner;
-  headerControls.appendChild(ownerBadge);
-  if(g.inviteOnly){ const codeB=document.createElement('div'); codeB.className='inviteBadge'; codeB.textContent='Invite: '+g.inviteCode; headerControls.appendChild(codeB);}
-  if(g.owner===state.currentUser){
-    const banBtn=document.createElement('button'); banBtn.className='btn small secondary'; banBtn.textContent='Manage';
-    banBtn.addEventListener('click',()=>manageGroup(g.id)); headerControls.appendChild(banBtn);
-  } else { const leaveBtn=document.createElement('button'); leaveBtn.className='btn small secondary'; leaveBtn.textContent='Leave'; leaveBtn.addEventListener('click',()=>leaveGroup(g.id)); headerControls.appendChild(leaveBtn);}
-  chat.appendChild(headerControls);
-  const msgs = Object.values(state.messages[g.id]||{}).sort((a,b)=>a.ts-b.ts);
-  msgs.forEach(m=>{
-    const el=document.createElement('div'); el.className='message'+(m.sender===state.currentUser?' me':'');
-    const name=state.users[m.sender]?.fullName||m.sender;
-    const meta=document.createElement('div'); meta.className='msgMeta'; meta.textContent=`${name} · ${new Date(m.ts).toLocaleString()}`;
-    el.appendChild(meta); const body=document.createElement('div'); body.textContent=m.text; el.appendChild(body);
-    chat.appendChild(el);
+// Select group
+function selectGroup(id){
+  currentGroupId=id;
+  messages.innerHTML='';
+  const msgsRef=ref(db,'messages/'+id);
+  onValue(msgsRef,snapshot=>{
+    messages.innerHTML='';
+    const msgs = snapshot.val()||{};
+    for(const mid in msgs){
+      addMessage(msgs[mid].sender,msgs[mid].text);
+    }
   });
-  setTimeout(()=>chat.scrollTop=chat.scrollHeight,50);
 }
 
-/* -------------------------
-  Settings
-------------------------- */
-function updateProfileColor(e){
-  const c=e.target.value; setCookie('profileColor', c);
-  const uRef = ref(db,'users/'+state.currentUser);
-  update(uRef, { color:c }); applyUserToUI();
+// Send message
+sendBtn.onclick = async ()=>{
+  if(!currentGroupId) return alert('Select a group first');
+  const text = msgInput.value.trim();
+  if(!text) return;
+  const newMsgRef = push(ref(db,'messages/'+currentGroupId));
+  await set(newMsgRef,{ sender:currentUser, text, ts:Date.now() });
+  msgInput.value='';
 }
-function toggleDarkMode(e){ const on=e.target.checked; setCookie('darkMode',on?'1':'0'); document.documentElement.setAttribute('data-theme',on?'dark':'light'); }
 
-/* -------------------------
-  Initialization
-------------------------- */
-init().catch(e=>console.error(e));
+function addMessage(name,text){
+  const msg=document.createElement('div'); msg.className='message';
+  const pfp=document.createElement('div'); pfp.className='pfp'; pfp.textContent=getInitials(name); pfp.style.background=localStorage.getItem('pfpColor')||'#4c8bf5';
+  const bubble=document.createElement('div'); bubble.className='msg-text'; bubble.textContent=text;
+  msg.appendChild(pfp); msg.appendChild(bubble);
+  messages.appendChild(msg); messages.scrollTop=messages.scrollHeight;
+}
+
+// Settings UI
+settings.onclick = ()=>{ settingsMenu.style.display = settingsMenu.style.display==='none'?'block':'none'; }
+pfpColor.oninput=(e)=>{ localStorage.setItem('pfpColor',e.target.value); }
+darkModeToggle.onchange=(e)=>{ document.body.classList.toggle('dark',e.target.checked); localStorage.setItem('darkMode',e.target.checked); }
+if(localStorage.getItem('darkMode')==='true'){ document.body.classList.add('dark'); darkModeToggle.checked=true; }
+if(localStorage.getItem('pfpColor')){ pfpColor.value=localStorage.getItem('pfpColor'); }
+
+function logout(){ document.cookie='username=; Max-Age=0; path=/'; document.cookie='password=; Max-Age=0; path=/'; location.reload(); }
+
+// Create/Join group placeholders
+createGroupBtn.onclick=()=>{ const name=prompt('Group name'); if(!name) return; const id='g_'+Date.now().toString(36); set(ref(db,'groups/'+id),{name,owner:currentUser}); }
+joinGroupBtn.onclick=()=>{ const id=prompt('Enter group ID to join'); if(!id) return; set(ref(db,'groups/'+id+'/members/'+currentUser),true); }
+
+// Auto login if cookies exist
+const cookieUser=getCookie('username');
+if(cookieUser){ currentUser=cookieUser; loginScreen.style.display='none'; loadGroups(); }
+
 </script>
 </body>
 </html>
-
-
-
-
