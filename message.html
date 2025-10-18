@@ -165,6 +165,8 @@
     </div>
   </div>
 
+  <button class="btn small" onclick="promptJoinByCode()">Join by Code</button>
+
   <div id="settingsPanel" class="modalBackdrop" style="display:none;">
     <div class="modal">
       <h3>Settings</h3>
@@ -578,6 +580,30 @@ function leaveGroup(groupId){
   }
 }
 
+function joinGroupByCode(code) {
+  const groups = loadState('mm_groups', []);
+  const group = groups.find(g => g.inviteOnly && g.inviteCode === code);
+
+  if (!group) {
+    alert('Invalid invite code.');
+    return;
+  }
+
+  if (!group.members.includes(state.currentUser)) {
+    group.members.push(state.currentUser);
+    saveState('mm_groups', groups);
+    alert(`Joined ${group.name}!`);
+    renderGroups();
+  } else {
+    alert('You are already a member of this group.');
+  }
+}
+  
+function promptJoinByCode() {
+  const code = prompt("Enter invite code:");
+  if (code) joinGroupByCode(code.trim());
+}
+
 /* -------------------------
   Settings
    ------------------------- */
@@ -612,3 +638,4 @@ init().catch(e=>console.error(e));
 </script>
 </body>
 </html>
+
