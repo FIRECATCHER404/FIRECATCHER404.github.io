@@ -282,6 +282,14 @@ sendBtn.onclick = async () => {
   msgInput.value = '';
 };
 
+// === Press Enter to send ===
+msgInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendBtn.click();
+  }
+});
+
 // === Add message bubble ===
 function addMessage(name, text){
   const msg = document.createElement('div');
@@ -349,6 +357,7 @@ if (cookieUser) {
 </script>
 </body>
 </html>
+
 
 
 
