@@ -1,0 +1,228 @@
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>Spawning Pool</title>
+
+        <meta name="author"              content="Marpi">
+        <meta name="description"         content="Generative creatures crawling all around">
+        <meta property="og:title"        content="Spawning Pool">
+        <meta property="og:description"  content="Generative creatures crawling all around">
+        <meta property="og:url"          content="http://demo.marpi.pl/spawning_pool/">
+        <meta property="og:site_name"    content="Spawning Pool">
+        <meta property="og:type"         content="website">
+        <meta name="twitter:card"        content="summary_large_image">
+        <meta name="twitter:url"         content="http://demo.marpi.pl/spawning_pool/">
+        <meta name="twitter:title"       content="Spawning Pool">
+        <meta property="og:image"        content="http://demo.marpi.pl/spawning_pool/og_image.jpg">
+        <meta name="twitter:image"       content="http://demo.marpi.pl/spawning_pool/og_image.jpg">
+
+        <!-- Origin Trial Token, feature = WebVR, origin = https://marpi.pl, expires = 2017-05-19 -->
+        <meta http-equiv="origin-trial" data-feature="WebVR" data-expires="2017-05-19" content="AutAQvhPMXcJN2dfVzKebCb5nTzFtjcfJnUz4tqiNbly0tBNptQccZVEOatEEOK+O483IwJMdTjLqJzE1CINIQkAAABaeyJvcmlnaW4iOiJodHRwczovL21hcnBpLnBsOjQ0MyIsImZlYXR1cmUiOiJXZWJWUiIsImV4cGlyeSI6MTQ5NTIwMzE3NywiaXNTdWJkb21haW4iOnRydWV9">
+
+        <link href="https://demo.marpi.pl/spawning_pool/./css/style.css" rel="stylesheet" type="text/css">
+        <link href="https://demo.marpi.pl/spawning_pool/./css/font-awesome.min.css" rel="stylesheet" type="text/css">
+
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+        <meta charset="utf-8">
+        <link href="https://demo.marpi.pl/spawning_pool/./css/style.css" rel="stylesheet" type="text/css">
+        <style>
+            body{
+                background-color: #FFF;
+            }
+
+            .canvas {
+                cursor: pointer;
+                -webkit-user-select: none;
+                -khtml-user-select: none;
+                -moz-user-select: none;
+                -o-user-select: none;
+                user-select: none;
+            }
+
+            a{
+                color: #000;
+            }
+
+            #preloader_background{
+                background-color: #dddddd;
+            }
+        </style>
+    </head>	
+
+    <body>
+
+        <script src="https://demo.marpi.pl/_/scripts/demo-ui.js"></script>
+        <script type="text/javascript">
+            MarpiDemoUI.init( "spawning_pool" );
+        </script>
+
+        <div id="preloader">
+            <div id="preloader_background">
+                <div id="progress"></div>
+            </div>
+        </div>
+        <!--<audio loop id="myTune">
+            <source src="music.ogg" type="audio/ogg">
+            <source src="music.mp3" type="audio/mpeg">
+        </audio>-->
+
+        <!--<a href="#" style="position:absolute;left:10px;bottom:10px;z-index:100000000;" class="btn btn-default" data-toggle="tooltip" title="Music" onclick="aud_play_pause()"><i id="stateicon" class="fa fa-volume-up"></i></a>-->
+        <a href="#" style="position:absolute;right:10px;bottom:10px;z-index:100000000;" class="btn btn-default" data-toggle="tooltip" title="Fullscreen" onclick="fullscreen()"><i id="stateicon" class="fa fa-arrows-alt"></i></a>
+        <a href="http://marpi.pl/" style="position:absolute;right:30px;bottom:10px;z-index:100000000;" class="btn btn-default" data-toggle="tooltip" title="Info"><i id="stateicon" class="fa fa-info"></i></a>
+
+        <div id="viz"></div>
+        <div id="controls">
+            <div id="settings"></div>
+        </div>
+        <div id="wrap">
+            <div id="container">
+            </div>
+        </div>
+
+        <script>
+            var preloaderProgressValue = 0.15;
+            var preloaderProgressAnimValue = 0;
+            function preloaderProgress(perc) {
+                if (perc > preloaderProgressValue)
+                    preloaderProgressValue = perc;
+            }
+            function draw() {
+                preloaderProgressAnimValue -= (preloaderProgressAnimValue - preloaderProgressValue) / 5;
+                document.getElementById("progress").style.width = 100 * preloaderProgressAnimValue + "px";
+                document.getElementById("progress").style.backgroundColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+
+                if (preloaderProgressAnimValue < .98) {
+                    requestAnimationFrame(draw);
+                } else {
+                    document.getElementsByTagName("canvas")[0].style.display = "block";
+                    document.getElementById("preloader").style.display = "none";
+                }
+            }
+            draw();
+        </script>
+
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/minivents.min.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/jquery-2.1.3.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/Detector.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/three.min.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/stats.min.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/dat.gui.min.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/SimplexNoise.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/atutil.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/TweenMax.min.js"></script>
+
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/postprocessing/EffectComposer.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/postprocessing/RenderPass.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/postprocessing/ShaderPass.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/postprocessing/MaskPass.js"></script> 
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/controls/OrbitControls.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/controls/DeviceOrientationControls.js"></script>
+
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/WebVR.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/effects/VREffect.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/controls/VRControls.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/ViveController.js"></script>
+
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/isMobile.min.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/bas.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/seedrandom.js"></script>
+
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/shaders/SMAAShader.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/loaders/OBJLoader.js"></script>
+
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/shaders/CopyShader.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/shaders/TiltShiftShader.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/shaders/HorizontalBlurShader.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/shaders/VerticalBlurShader.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/shaders/RGBShiftShader2.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/shaders/SSAOShader.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/postprocessing/SMAAPass.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/lib/postprocessing/ManualMSAARenderPass.js"></script>
+
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/viz/Generator.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/https://demo.marpi.pl/spawning_pool/./js/viz/Tools.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/./js/viz/BG.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/./js/viz/Mecha.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/./js/viz/Shards.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/./js/viz/Assets.js"></script>
+
+        <script src="https://demo.marpi.pl/spawning_pool/./js/Main.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/./js/AudioHandler.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/./js/ControlsHandler.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/./js/FXHandler.js"></script>
+        <script src="https://demo.marpi.pl/spawning_pool/./js/VizHandler.js"></script>
+
+        <script>
+           
+            /*$(document).ready(function () {
+             var muted = false
+             //console.log(localStorage)
+             if (localStorage.muted == "true") {
+             muted = true;
+             $('#stateicon').removeClass('fa-volume-up');
+             $('#stateicon').addClass('fa-volume-off');
+             }
+             if (!muted)
+             setTimeout(play, 1000)
+             })
+             function aud_play_pause() {
+             var myAudio = document.getElementById("myTune");
+             if (myAudio.paused) {
+             $('#stateicon').removeClass('fa-volume-off');
+             $('#stateicon').addClass('fa-volume-up');
+             myAudio.play();
+             localStorage.setItem('muted', false);
+             } else {
+             $('#stateicon').removeClass('fa-volume-up');
+             $('#stateicon').addClass('fa-volume-off');
+             myAudio.pause();
+             localStorage.setItem('muted', true);
+             }
+             }
+             function play() {
+             var myAudio = document.getElementById("myTune");
+             myAudio.play()
+             }*/
+            function fullscreen() {
+                if ((document.fullScreenElement && document.fullScreenElement !== null) ||
+                        (!document.mozFullScreen && !document.webkitIsFullScreen)) {
+                    if (document.documentElement.requestFullScreen) {
+                        document.documentElement.requestFullScreen();
+                    } else if (document.documentElement.mozRequestFullScreen) {
+                        document.documentElement.mozRequestFullScreen();
+                    } else if (document.documentElement.webkitRequestFullScreen) {
+                        document.documentElement.webkitRequestFullScreen(Element.ALLOW_KEYBOARD_INPUT);
+                    }
+                } else {
+                    if (document.cancelFullScreen) {
+                        document.cancelFullScreen();
+                    } else if (document.mozCancelFullScreen) {
+                        document.mozCancelFullScreen();
+                    } else if (document.webkitCancelFullScreen) {
+                        document.webkitCancelFullScreen();
+                    }
+                }
+            }
+        </script>
+
+        <script type="text/javascript">
+
+            var _gaq = _gaq || [];
+            _gaq.push(['_setAccount', 'UA-873340-30']);
+            _gaq.push(['_trackPageview']);
+
+            (function () {
+                var ga = document.createElement('script');
+                ga.type = 'text/javascript';
+                ga.async = true;
+                ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+                var s = document.getElementsByTagName('script')[0];
+                s.parentNode.insertBefore(ga, s);
+            })();
+
+        </script>
+
+    </body>
+</html>

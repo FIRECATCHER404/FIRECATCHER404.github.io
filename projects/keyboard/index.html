@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>VR Typing — Physical Keyboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>html,body{height:100%;margin:0;background:#bde7ff}canvas{display:block}</style>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+
+//// Scene & Renderer ////
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbde7ff);
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 1000);
+camera.position.set(0,1.6,2.5);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+document.body.appendChild(VRButton.createButton(renderer));
+
+scene.add(new THREE.HemisphereLight(0xffffff,0xaaaaaa,1));
+const dir = new THREE.DirectionalLight(0xffffff,0.6);
+dir.position.set(5,10,3); scene.add(dir);
+
+//// Ground ////
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(2000,2000),
+  new THREE.MeshStandardMaterial({color:0xffffff})
+);
+ground.rotation.x = -Math.PI/2;
+scene.add(ground);
+
+//// Screen ////
+const canvas = document.createElement('canvas');
+canvas.width = 1024; canvas.height = 512;
+const ctx = canvas.getContext('2d');
+ctx.fillStyle="#0b0b10"; ctx.fillRect(0,0,1024,512);
+ctx.fillStyle="#e6f7ff"; ctx.font="40px monospace"; ctx.fillText("Type here...",40,60);
+const screenTex = new THREE.CanvasTexture(canvas);
+const screen = new THREE.Mesh(
+  new THREE.PlaneGeometry(2,1),
+  new THREE.MeshBasicMaterial({map:screenTex})
+);
+screen.position.set(0,1.6,-1.2);
+scene.add(screen);
+
+//// Hands (spheres + cones forward) ////
+const sphereGeo = new THREE.SphereGeometry(0.05,16,16);
+const coneGeo = new THREE.ConeGeometry(0.03,0.12,12);
+const handMat = new THREE.MeshStandardMaterial({color:0x666666});
+const hands=[], cones=[];
+for(let i=0;i<2;i++){
+  const s = new THREE.Mesh(sphereGeo,handMat);
+  const c = new THREE.Mesh(coneGeo,handMat);
+  scene.add(s); scene.add(c);
+  hands.push(s); cones.push(c);
+}
+
+//// Controllers ////
+const controllers=[];
+for(let i=0;i<2;i++){
+  const c = renderer.xr.getController(i);
+  c.userData.index=i;
+  c.addEventListener('connected', e => c.gamepad=e.data.gamepad);
+  scene.add(c);
+  controllers.push(c);
+}
+
+//// Keyboard Base (slightly curved slab) ////
+const kbWidth=2.0, kbDepth=0.6, kbRadius=2.5;
+const slabGeo = new THREE.PlaneGeometry(kbWidth,kbDepth,40,1);
+slabGeo.rotateX(-Math.PI/2);
+// curve it
+const pos = slabGeo.attributes.position;
+for(let i=0;i<pos.count;i++){
+  const x=pos.getX(i);
+  const z=pos.getZ(i);
+  const angle=x/kbWidth * 0.5; // gentle curve
+  pos.setX(i, Math.sin(angle)*kbRadius);
+  pos.setZ(i, z - kbRadius*Math.cos(angle));
+}
+pos.needsUpdate=true;
+slabGeo.computeVertexNormals();
+
+const slab = new THREE.Mesh(slabGeo,new THREE.MeshStandardMaterial({color:0x444444}));
+slab.position.set(0,1.0,-0.8);
+scene.add(slab);
+
+//// Keys ////
+const keyRows=[
+ ['1','2','3','4','5','6','7','8','9','0','Back'],
+ ['q','w','e','r','t','y','u','i','o','p'],
+ ['a','s','d','f','g','h','j','k','l','Enter'],
+ ['z','x','c','v','b','n','m',',','.','/'],
+ ['Space']
+];
+const keyObjs=[];
+const keyGeo = new THREE.BoxGeometry(0.12,0.04,0.12);
+const keyMat = new THREE.MeshStandardMaterial({color:0x777777});
+const startY=1.0+0.025; // sit just above slab
+
+for(let r=0;r<keyRows.length;r++){
+  for(let c=0;c<keyRows[r].length;c++){
+    const label=keyRows[r][c];
+    const key = new THREE.Mesh(keyGeo,keyMat.clone());
+    key.position.set(
+      (c-(keyRows[r].length-1)/2)*0.14,
+      startY,
+      -0.05-r*0.14
+    );
+    // parent to slab so it curves with it
+    slab.add(key);
+    key.userData.label=label;
+    keyObjs.push(key);
+  }
+}
+
+//// Animate ////
+renderer.setAnimationLoop(()=>{
+  // hands & cones
+  controllers.forEach((c,i)=>{
+    if(!c.visible) return;
+    const p=new THREE.Vector3().setFromMatrixPosition(c.matrixWorld);
+    const q=new THREE.Quaternion().setFromRotationMatrix(c.matrixWorld);
+
+    hands[i].position.copy(p);
+    cones[i].position.copy(p).add(new THREE.Vector3(0,0,-0.1).applyQuaternion(q));
+    cones[i].quaternion.copy(q);
+  });
+  renderer.render(scene,camera);
+});
+
+</script>
+</body>
+</html>

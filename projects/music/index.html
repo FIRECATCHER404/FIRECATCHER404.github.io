@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Sound Wave Sculptor</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #ui {
+      position: absolute;
+      top: 10px; left: 10px;
+      background: rgba(255,255,255,0.8);
+      padding: 10px;
+      border-radius: 8px;
+    }
+    button { margin: 5px; }
+  </style>
+</head>
+<body>
+<div id="ui">
+  <input type="file" id="audioFile" accept="audio/*">
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// === Scene & Camera ===
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x101010);
+
+const camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+camera.position.set(0, 20, 40);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// === Lights ===
+scene.add(new THREE.AmbientLight(0x404040));
+const light = new THREE.PointLight(0xffffff, 1, 100);
+light.position.set(20, 30, 20);
+scene.add(light);
+
+// === Audio Setup ===
+let audioContext, analyser, source;
+const fftSize = 64;
+const bars = [];
+const barSpacing = 1;
+
+const sphereGeo = new THREE.SphereGeometry(0.4, 16, 16);
+
+function setupAudio(file) {
+  if (audioContext) audioContext.close();
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioContext.createAnalyser();
+  analyser.fftSize = fftSize;
+  const reader = new FileReader();
+  reader.onload = e => {
+    audioContext.decodeAudioData(e.target.result, buffer => {
+      if (source) source.disconnect();
+      source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(analyser);
+      analyser.connect(audioContext.destination);
+      source.start();
+
+      initBars();
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// === Create Bars ===
+function initBars() {
+  bars.forEach(b => scene.remove(b.mesh));
+  bars.length = 0;
+
+  const frequencyBins = analyser.frequencyBinCount;
+  for (let i = 0; i < frequencyBins; i++) {
+    const material = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
+    const mesh = new THREE.Mesh(sphereGeo, material);
+    mesh.position.set((i - frequencyBins/2)*barSpacing, 0, 0);
+    scene.add(mesh);
+    bars.push({ mesh });
+  }
+}
+
+// === Animation ===
+const dataArray = new Uint8Array(fftSize);
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  if (analyser) {
+    analyser.getByteFrequencyData(dataArray);
+    for (let i = 0; i < bars.length; i++) {
+      const scale = dataArray[i]/50 + 0.1;
+      bars[i].mesh.scale.y = scale;
+      bars[i].mesh.position.y = scale/2;
+      bars[i].mesh.material.color.setHSL(dataArray[i]/255, 1, 0.5);
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// === Resize ===
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// === File Input ===
+document.getElementById('audioFile').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) setupAudio(file);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Ripple Pool</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// === Scene & Camera ===
+const scene = new THREE.Scene();
+scene.background = new THREE.Color( 0x000000 );
+
+const camera = new THREE.PerspectiveCamera(
+  60, window.innerWidth / window.innerHeight, 0.1, 1000
+);
+camera.position.set(0, 20, 30);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// === Lights ===
+scene.add(new THREE.AmbientLight(0x404040));
+const light = new THREE.PointLight(0xffffff, 1, 100);
+light.position.set(30, 50, 30);
+scene.add(light);
+
+// === Grid Setup ===
+const gridSize = 10;
+const spacing = 1;
+const spheres = [];
+
+const sphereGeo = new THREE.SphereGeometry(0.3, 16, 16);
+for (let x = -gridSize/2; x <= gridSize/2; x++) {
+  for (let z = -gridSize/2; z <= gridSize/2; z++) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x11bbff });
+    const sphere = new THREE.Mesh(sphereGeo, mat);
+    sphere.position.set(x * spacing, 0, z * spacing);
+    scene.add(sphere);
+    spheres.push({ mesh: sphere, x, z, y: 0 });
+  }
+}
+
+// === Ripple Data ===
+let ripples = [];
+
+function addRipple(worldX, worldZ) {
+  ripples.push({ x: worldX, z: worldZ, time: 0 });
+}
+
+// === Mouse Interaction ===
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function onMouseDown(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(spheres.map(s => s.mesh));
+  if (intersects.length > 0) {
+    const pos = intersects[0].object.position;
+    addRipple(pos.x, pos.z);
+  }
+}
+
+window.addEventListener('mousedown', onMouseDown);
+
+// === Animation Loop ===
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Update spheres based on ripples
+  spheres.forEach(s => {
+    let height = 0;
+    ripples.forEach(r => {
+      const dx = s.x*spacing - r.x;
+      const dz = s.z*spacing - r.z;
+      const dist = Math.sqrt(dx*dx + dz*dz);
+      const speed = 4;
+      const wavelength = 1.5;
+      const amplitude = 1;
+      height += amplitude * Math.sin(dist - r.time*speed) / (dist + 1);
+    });
+    s.mesh.position.y = height;
+  });
+
+  // Advance ripple time
+  ripples.forEach(r => r.time += 0.03);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// === Resize ===
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

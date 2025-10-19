@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Physics Playground</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #ui {
+      position: absolute;
+      top: 10px; left: 10px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 8px;
+    }
+    button { margin: 5px; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <button onclick="addBox()">Add Box</button>
+    <button onclick="addSphere()">Add Sphere</button>
+    <button onclick="addCylinder()">Add Cylinder</button>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
