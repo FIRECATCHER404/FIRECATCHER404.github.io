@@ -59,6 +59,27 @@
     .left-small { width:64px; }
   }
 
+  .messageRow {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  .messageRow.me {
+    flex-direction: row-reverse;
+  }
+  .msgPfp {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
   /* visual tweaks */
   .muted{color:var(--muted); font-size:13px;}
   .tiny{font-size:12px; color:rgba(0,0,0,0.45);}
@@ -292,6 +313,26 @@ msgInput.addEventListener('keydown', e => {
 
 // === Add message bubble ===
 function addMessage(name, text){
+async function addMessage(name, text){
+  // Create main row wrapper
+  const row = document.createElement('div');
+  row.className = 'messageRow' + (name === currentUser ? ' me' : '');
+
+  // Create profile circle
+  const pfp = document.createElement('div');
+  pfp.className = 'msgPfp';
+  pfp.textContent = getInitials(name);
+
+  // Try to load color from Firebase
+  import('https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js').then(({ get, ref }) => {
+    get(ref(db, 'users/' + name)).then(snapshot => {
+      const data = snapshot.val();
+      if (data && data.color) pfp.style.background = data.color;
+      else pfp.style.background = '#4c8bf5'; // fallback color
+    });
+  });
+
+  // Message bubble
   const msg = document.createElement('div');
   msg.className = 'message' + (name === currentUser ? ' me' : '');
   const meta = document.createElement('div');
@@ -301,9 +342,16 @@ function addMessage(name, text){
   bubble.textContent = text;
   msg.appendChild(meta);
   msg.appendChild(bubble);
-  messages.appendChild(msg);
+
+  // Append to row
+  row.appendChild(pfp);
+  row.appendChild(msg);
+
+  // Add to chat
+  messages.appendChild(row);
   messages.scrollTop = messages.scrollHeight;
 }
+
 
 // === Settings ===
 settings.onclick = () => {
@@ -357,6 +405,7 @@ if (cookieUser) {
 </script>
 </body>
 </html>
+
 
 
 
