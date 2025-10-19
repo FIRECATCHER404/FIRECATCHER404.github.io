@@ -381,13 +381,18 @@ darkModeToggle.onchange = e => {
   document.documentElement.dataset.theme = e.target.checked ? 'dark' : '';
   localStorage.setItem('darkMode', e.target.checked);
 };
+// === Restore dark mode and profile color ===
 if (localStorage.getItem('darkMode') === 'true') {
   document.documentElement.dataset.theme = 'dark';
   darkModeToggle.checked = true;
 }
-if (localStorage.getItem('pfpColor')) {
-  pfpColor.value = localStorage.getItem('pfpColor');
-}
+
+const savedColor = localStorage.getItem('pfpColor') || '#4c8bf5';
+pfpColor.value = savedColor;
+
+// Apply color to visible profile circles
+document.getElementById('profileCircleTop').style.background = savedColor;
+document.getElementById('leftProfile').style.background = savedColor;
 
 // === Create / Join groups ===
 createGroupBtn.onclick = () => {
@@ -414,6 +419,7 @@ if (cookieUser) {
 </script>
 </body>
 </html>
+
 
 
 
