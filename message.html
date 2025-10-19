@@ -363,7 +363,17 @@ document.getElementById('closeSettings').onclick = () => {
 
 // === Profile color ===
 pfpColor.oninput = e => {
-  localStorage.setItem('pfpColor', e.target.value);
+  const color = e.target.value;
+  localStorage.setItem('pfpColor', color);
+
+  // Update current user's circles live
+  document.getElementById('profileCircleTop').style.background = color;
+  document.getElementById('leftProfile').style.background = color;
+
+  // Save to Firebase if logged in
+  if (currentUser) {
+    set(ref(db, 'users/' + currentUser + '/color'), color);
+  }
 };
 
 // === Dark mode ===
@@ -404,6 +414,7 @@ if (cookieUser) {
 </script>
 </body>
 </html>
+
 
 
 
