@@ -10,8 +10,8 @@
 </head>
 <body>
 <script type="module">
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "https://unpkg.com/three@0.180.0/build/three.module.js";
+import { OrbitControls } from "https://unpkg.com/three@0.180.0/examples/jsm/controls/OrbitControls.js";
 
 let scene = new THREE.Scene();
 scene.background = new THREE.Color(0x202020);
@@ -131,3 +131,4 @@ window.addEventListener("resize", () => {
 </script>
 </body>
 </html>
+
