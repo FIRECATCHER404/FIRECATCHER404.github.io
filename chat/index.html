@@ -5,36 +5,182 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Chat</title>
   <style>
-    :root{
-      --bg:#fff; --text:#000; --muted:#666; --gap:12px;
-    }
-    [data-theme="dark"] {
-      --bg: #0f1720;
-      --text: #f5f5f5;
-      --muted: #888;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono",monospace}
-    .container{display:grid;grid-template-columns:280px 1fr;gap:var(--gap);padding:14px;height:100vh}
-    header{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}
-    .panel{border:1px solid #000;padding:12px;background:transparent;border-radius:4px}
-    .groups{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto;margin-bottom:8px}
-    .groupItem{padding:6px;border:1px solid #000;cursor:pointer}
-    .groupItem.active{background:#eee}
-    .controls{display:flex;gap:6px;margin-top:6px}
-    .controls input{flex:1;padding:6px;border:1px solid #000;background:transparent}
-    .controls button{padding:6px 8px;border:1px solid #000;background:transparent;cursor:pointer}
-    .chatPanel{display:flex;flex-direction:column;height:calc(100vh - 160px)}
-    .chatWindow{flex:1;border:1px solid #000;padding:12px;overflow:auto;white-space:pre-wrap}
-    .chatLine{margin:0 0 6px 0}
-    .msgForm{display:flex;gap:6px;margin-top:8px}
-    .msgForm input{flex:1;padding:8px;border:1px solid #000;background:transparent}
-    .msgForm button{padding:8px 10px;border:1px solid #000;background:transparent;cursor:pointer}
-    .authPanel{position: absolute; right: 16px; top: 72px; width: 260px; padding:12px; border:1px solid #000; background:#fff;}
-    .authPanel input{width:100%;padding:8px;margin-bottom:6px;border:1px solid #000;background:transparent}
-    .authBtns{display:flex;gap:6px;justify-content:space-between}
-    .hint{color:var(--muted);font-size:12px;margin-top:8px}
-    @media (max-width:700px){.container{grid-template-columns:1fr}.authPanel{position:static;width:100%;margin-top:8px}}
+:root {
+  --bg: #fff;
+  --text: #000;
+  --muted: #666;
+  --border: #000;
+  --accent: #0084ff;
+  --gap: 12px;
+}
+
+[data-theme="dark"] {
+  --bg: #0b0f14;
+  --text: #f5f5f5;
+  --muted: #888;
+  --border: #444;
+  --accent: #0af;
+}
+
+* {
+  box-sizing: border-box;
+  transition: background 0.25s, color 0.25s, border-color 0.25s;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", Consolas, monospace;
+}
+
+h1, h2 {
+  margin: 0 0 8px 0;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--gap);
+  padding: 14px;
+  height: 100vh;
+}
+
+header {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  padding: 12px;
+  background: transparent;
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow: auto;
+  margin-bottom: 8px;
+}
+
+.groupItem {
+  padding: 6px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: none;
+}
+.groupItem.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.controls {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.controls input,
+.msgForm input,
+.authPanel input {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+}
+
+button {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+button:hover {
+  background: var(--text);
+  color: var(--bg);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chatPanel {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 160px);
+}
+
+.chatWindow {
+  flex: 1;
+  border: 1px solid var(--border);
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.chatLine {
+  margin: 0 0 6px 0;
+}
+
+.msgForm {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.authPanel {
+  position: absolute;
+  right: 16px;
+  top: 72px;
+  width: 260px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.authBtns {
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 700px) {
+  .container {
+    grid-template-columns: 1fr;
+  }
+  .authPanel {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+  }
+}
+
   </style>
 </head>
 <body>
