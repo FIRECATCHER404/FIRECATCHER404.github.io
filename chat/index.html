@@ -293,16 +293,17 @@ if (cookieUser) {
   loadGroups();
 }
 
- // === Theme toggle ===
-function toggleTheme() {
+// === Theme toggle ===
+window.toggleTheme = function() {
   const root = document.documentElement;
   const isDark = root.dataset.theme === 'dark';
   root.dataset.theme = isDark ? 'light' : 'dark';
   localStorage.setItem('theme', isDark ? 'light' : 'dark');
-}
+};
 
 // Restore saved theme on load
 document.documentElement.dataset.theme = localStorage.getItem('theme') || 'light';
+
  
 </script>
 
