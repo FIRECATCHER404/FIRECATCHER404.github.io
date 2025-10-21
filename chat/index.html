@@ -92,7 +92,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-  <script type="module">
+<script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js';
 import { getDatabase, ref, set, push, onValue, get } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
 
@@ -110,76 +110,102 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // === DOM Elements ===
-const msgInput = document.getElementById('messageInput');
+const msgInput = document.getElementById('msgInput');
 const sendBtn = document.getElementById('sendBtn');
-const settings = document.getElementById('settingsToggle');
-const settingsMenu = document.getElementById('settingsPanel');
-const darkModeToggle = document.getElementById('darkMode');
-const pfpColor = document.getElementById('profileColor');
-const usernameInput = document.getElementById('fullNameInput');
-const passwordInput = document.getElementById('passwordInput');
-const joinBtn = document.getElementById('createProfileBtn');
-const groupListDiv = document.getElementById('groupList');
-const createGroupBtn = document.getElementById('btnCreateGroup');
-const joinGroupBtn = document.getElementById('confirmJoinGrp');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+const registerBtn = document.getElementById('register');
+const loginBtn = document.getElementById('login');
+const createGroupBtn = document.getElementById('createGroupBtn');
+const joinGroupBtn = document.getElementById('joinBtn');
+const groupListDiv = document.getElementById('groupsList');
 const messages = document.getElementById('chat');
+const authPanel = document.getElementById('auth');
+const showUser = document.getElementById('showUser');
+const logoutBtn = document.getElementById('logoutBtn');
 
 let currentUser = null;
 let currentGroupId = null;
 
-// === Helper functions ===
-function getInitials(name) {
-  const words = name.trim().split(' ');
-  return words.length === 1
-    ? words[0][0].toUpperCase()
-    : (words[0][0] + words[words.length - 1][0]).toUpperCase();
-}
-
+// === Simple cookie handling ===
 function setCookie(name, value, days = 365) {
   const d = new Date();
-  d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
-  document.cookie = name + '=' + encodeURIComponent(value) + ';path=/;expires=' + d.toUTCString();
+  d.setTime(d.getTime() + days * 864e5);
+  document.cookie = `${name}=${encodeURIComponent(value)};path=/;expires=${d.toUTCString()}`;
 }
 function getCookie(name) {
   const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-// === Login handling ===
-joinBtn.onclick = async () => {
+// === Auth ===
+registerBtn.onclick = async () => {
   const name = usernameInput.value.trim();
   const pass = passwordInput.value.trim();
   if (!name || !pass) return alert('Enter both fields');
 
-  currentUser = name;
+  await set(ref(db, 'retro/users/' + name), { password: pass });
   setCookie('username', name);
-  setCookie('password', pass);
-
-  await set(ref(db, 'retro/users/' + name), {
-    color: localStorage.getItem('pfpColor') || '#4c8bf5'
-  });
-  document.getElementById('loginModal').style.display = 'none';
+  currentUser = name;
+  authPanel.style.display = 'none';
+  showUser.textContent = name;
+  logoutBtn.style.display = 'inline';
   loadGroups();
 };
 
-// === Load groups ===
+loginBtn.onclick = async () => {
+  const name = usernameInput.value.trim();
+  const pass = passwordInput.value.trim();
+  const snap = await get(ref(db, 'retro/users/' + name));
+  if (!snap.exists()) return alert('User not found');
+  if (snap.val().password !== pass) return alert('Wrong password');
+
+  setCookie('username', name);
+  currentUser = name;
+  authPanel.style.display = 'none';
+  showUser.textContent = name;
+  logoutBtn.style.display = 'inline';
+  loadGroups();
+};
+
+logoutBtn.onclick = () => {
+  document.cookie = "username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  currentUser = null;
+  authPanel.style.display = 'block';
+  logoutBtn.style.display = 'none';
+};
+
+// === Groups ===
 function loadGroups() {
   const groupsRef = ref(db, 'retro/groups');
   onValue(groupsRef, snapshot => {
-    const data = snapshot.val() || {};
     groupListDiv.innerHTML = '';
+    const data = snapshot.val() || {};
     for (const id in data) {
-      const g = data[id];
       const div = document.createElement('div');
-      div.textContent = g.name;
-      div.className = 'groupEntry';
+      div.textContent = data[id].name;
+      div.className = 'groupItem';
       div.onclick = () => selectGroup(id);
       groupListDiv.appendChild(div);
     }
   });
 }
 
-// === Select group ===
+createGroupBtn.onclick = async () => {
+  if (!currentUser) return alert('Login first');
+  const name = document.getElementById('newGroupName').value.trim();
+  if (!name) return;
+  const id = 'g_' + Math.random().toString(36).slice(2, 10);
+  await set(ref(db, 'retro/groups/' + id), { name, owner: currentUser });
+};
+
+joinGroupBtn.onclick = () => {
+  const code = document.getElementById('inviteCode').value.trim();
+  if (!code) return;
+  selectGroup(code);
+};
+
+// === Messages ===
 function selectGroup(id) {
   currentGroupId = id;
   messages.innerHTML = '';
@@ -188,124 +214,36 @@ function selectGroup(id) {
     messages.innerHTML = '';
     const msgs = snapshot.val() || {};
     for (const mid in msgs) {
-      addMessage(msgs[mid].sender, msgs[mid].text);
+      const { sender, text } = msgs[mid];
+      const line = document.createElement('div');
+      line.className = 'chatLine';
+      line.textContent = `${sender} > ${text}`;
+      messages.appendChild(line);
     }
+    messages.scrollTop = messages.scrollHeight;
   });
 }
 
-// === Send message ===
-sendBtn.onclick = async () => {
-  if (!currentGroupId) return alert('Select a group first');
+sendBtn.onclick = async e => {
+  e.preventDefault();
+  if (!currentGroupId || !currentUser) return;
   const text = msgInput.value.trim();
   if (!text) return;
-
   const newMsgRef = push(ref(db, 'retro/messages/' + currentGroupId));
   await set(newMsgRef, { sender: currentUser, text, ts: Date.now() });
   msgInput.value = '';
 };
 
-// === Press Enter to send ===
-msgInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendBtn.click();
-  }
-});
-
-// === Add message bubble ===
-async function addMessage(name, text) {
-  // Escape HTML to prevent XSS
-  const safeText = text.replace(/[<>&]/g, c =>
-    ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c])
-  );
-
-  const row = document.createElement('div');
-  row.className = 'messageRow' + (name === currentUser ? ' me' : '');
-
-  const pfp = document.createElement('div');
-  pfp.className = 'msgPfp';
-  pfp.textContent = getInitials(name);
-
-  get(ref(db, 'retro/users/' + name)).then(snapshot => {
-    const data = snapshot.val();
-    if (data && data.color) pfp.style.background = data.color;
-    else pfp.style.background = '#4c8bf5';
-  });
-
-  const msg = document.createElement('div');
-  msg.className = 'message' + (name === currentUser ? ' me' : '');
-  const meta = document.createElement('div');
-  meta.className = 'msgMeta';
-  meta.textContent = name;
-  const bubble = document.createElement('div');
-  bubble.textContent = safeText;
-  msg.appendChild(meta);
-  msg.appendChild(bubble);
-
-  row.appendChild(pfp);
-  row.appendChild(msg);
-  messages.appendChild(row);
-  messages.scrollTop = messages.scrollHeight;
-}
-
-// === Settings ===
-settings.onclick = () => {
-  settingsMenu.style.display =
-    settingsMenu.style.display === 'none' ? 'flex' : 'none';
-};
-document.getElementById('closeSettings').onclick = () => {
-  settingsMenu.style.display = 'none';
-};
-
-// === Profile color ===
-pfpColor.oninput = e => {
-  const color = e.target.value;
-  localStorage.setItem('pfpColor', color);
-  document.getElementById('profileCircleTop').style.background = color;
-  document.getElementById('leftProfile').style.background = color;
-
-  if (currentUser) {
-    set(ref(db, 'retro/users/' + currentUser + '/color'), color);
-  }
-};
-
-// === Dark mode ===
-darkModeToggle.onchange = e => {
-  document.documentElement.dataset.theme = e.target.checked ? 'dark' : '';
-  localStorage.setItem('darkMode', e.target.checked);
-};
-if (localStorage.getItem('darkMode') === 'true') {
-  document.documentElement.dataset.theme = 'dark';
-  darkModeToggle.checked = true;
-}
-if (localStorage.getItem('pfpColor')) {
-  pfpColor.value = localStorage.getItem('pfpColor');
-}
-
-// === Create / Join groups ===
-createGroupBtn.onclick = () => {
-  const name = prompt('Group name');
-  if (!name) return;
-  const id = 'g_' + Date.now().toString(36);
-  set(ref(db, 'retro/groups/' + id), { name, owner: currentUser });
-};
-
-joinGroupBtn.onclick = () => {
-  const id = prompt('Enter group ID to join');
-  if (!id) return;
-  set(ref(db, 'retro/groups/' + id + '/members/' + currentUser), true);
-};
-
-// === Auto login ===
+// === Auto-login ===
 const cookieUser = getCookie('username');
 if (cookieUser) {
   currentUser = cookieUser;
-  document.getElementById('loginModal').style.display = 'none';
+  authPanel.style.display = 'none';
+  showUser.textContent = cookieUser;
+  logoutBtn.style.display = 'inline';
   loadGroups();
-} else {
-  document.getElementById('loginModal').style.display = 'flex';
 }
+</script>
 
-  </script>
 </body>
 </html>
