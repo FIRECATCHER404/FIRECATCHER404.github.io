@@ -176,33 +176,73 @@ logoutBtn.onclick = () => {
 };
 
 // === Groups ===
+
+// Load groups: shows public groups + invite-only groups user is member of
 function loadGroups() {
   const groupsRef = ref(db, 'retro/groups');
   onValue(groupsRef, snapshot => {
     groupListDiv.innerHTML = '';
     const data = snapshot.val() || {};
+
     for (const id in data) {
-      const div = document.createElement('div');
-      div.textContent = data[id].name;
-      div.className = 'groupItem';
-      div.onclick = () => selectGroup(id);
-      groupListDiv.appendChild(div);
+      const group = data[id];
+      const isMember = group.members && group.members[currentUser];
+
+      // Show if public OR user is member
+      if (!group.inviteOnly || isMember) {
+        const div = document.createElement('div');
+        div.textContent = group.name + (group.inviteOnly ? ' 🔒' : '');
+        div.className = 'groupItem';
+        div.onclick = () => selectGroup(id);
+        groupListDiv.appendChild(div);
+      }
     }
   });
 }
 
+// Create group
 createGroupBtn.onclick = async () => {
   if (!currentUser) return alert('Login first');
   const name = document.getElementById('newGroupName').value.trim();
-  if (!name) return;
+  if (!name) return alert('Enter a group name');
+
+  // Ask if invite-only
+  const isInviteOnly = confirm('Make this group invite-only?');
+  const inviteCode = isInviteOnly ? Math.random().toString(36).slice(2, 10) : null;
+
   const id = 'g_' + Math.random().toString(36).slice(2, 10);
-  await set(ref(db, 'retro/groups/' + id), { name, owner: currentUser });
+  await set(ref(db, `retro/groups/${id}`), {
+    name,
+    owner: currentUser,
+    inviteOnly: isInviteOnly,
+    inviteCode,
+    members: { [currentUser]: true } // creator is automatically a member
+  });
+
+  if (isInviteOnly) alert('Invite code: ' + inviteCode);
 };
 
-joinGroupBtn.onclick = () => {
+// Join group
+joinGroupBtn.onclick = async () => {
+  if (!currentUser) return alert('Login first');
+
   const code = document.getElementById('inviteCode').value.trim();
-  if (!code) return;
-  selectGroup(code);
+  if (!code) return alert('Enter an invite code');
+
+  const groupsRef = ref(db, 'retro/groups');
+  const snapshot = await get(groupsRef);
+  const groups = snapshot.val() || {};
+
+  // Find group with this code
+  const groupId = Object.keys(groups).find(id => groups[id].inviteCode === code);
+  if (!groupId) return alert('Invalid invite code');
+
+  // Add user as member
+  await set(ref(db, `retro/groups/${groupId}/members/${currentUser}`), true);
+
+  // Open the chat
+  selectGroup(groupId);
+  alert('Joined group: ' + groups[groupId].name);
 };
 
 // === Messages ===
