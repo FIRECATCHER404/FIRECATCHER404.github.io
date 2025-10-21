@@ -8,6 +8,11 @@
     :root{
       --bg:#fff; --text:#000; --muted:#666; --gap:12px;
     }
+    [data-theme="dark"] {
+      --bg: #0f1720;
+      --text: #f5f5f5;
+      --muted: #888;
+    }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono",monospace}
     .container{display:grid;grid-template-columns:280px 1fr;gap:var(--gap);padding:14px;height:100vh}
@@ -60,6 +65,10 @@
         <div style="margin-top:8px;font-size:12px;color:var(--muted)">
           Invite codes are 8-char codes. Groups are invite-only (people need the code).
         </div>
+      </div>
+      <div class="panel">
+        <h2>Settings</h2>
+        <button onclick="toggleTheme()">Toggle Dark / Light mode</button>
       </div>
     </section>
 
@@ -283,6 +292,18 @@ if (cookieUser) {
   logoutBtn.style.display = 'inline';
   loadGroups();
 }
+
+ // === Theme toggle ===
+function toggleTheme() {
+  const root = document.documentElement;
+  const isDark = root.dataset.theme === 'dark';
+  root.dataset.theme = isDark ? 'light' : 'dark';
+  localStorage.setItem('theme', isDark ? 'light' : 'dark');
+}
+
+// Restore saved theme on load
+document.documentElement.dataset.theme = localStorage.getItem('theme') || 'light';
+ 
 </script>
 
 </body>
