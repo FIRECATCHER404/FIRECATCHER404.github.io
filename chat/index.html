@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Retro Chat (GitHub Pages + Firebase)</title>
+  <style>
+    :root{
+      --bg:#fff; --text:#000; --muted:#666; --gap:12px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono",monospace}
+    .container{display:grid;grid-template-columns:280px 1fr;gap:var(--gap);padding:14px;height:100vh}
+    header{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}
+    .panel{border:1px solid #000;padding:12px;background:transparent;border-radius:4px}
+    .groups{display:flex;flex-direction:column;gap:6px;max-height:40vh;overflow:auto;margin-bottom:8px}
+    .groupItem{padding:6px;border:1px solid #000;cursor:pointer}
+    .groupItem.active{background:#eee}
+    .controls{display:flex;gap:6px;margin-top:6px}
+    .controls input{flex:1;padding:6px;border:1px solid #000;background:transparent}
+    .controls button{padding:6px 8px;border:1px solid #000;background:transparent;cursor:pointer}
+    .chatPanel{display:flex;flex-direction:column;height:calc(100vh - 160px)}
+    .chatWindow{flex:1;border:1px solid #000;padding:12px;overflow:auto;white-space:pre-wrap}
+    .chatLine{margin:0 0 6px 0}
+    .msgForm{display:flex;gap:6px;margin-top:8px}
+    .msgForm input{flex:1;padding:8px;border:1px solid #000;background:transparent}
+    .msgForm button{padding:8px 10px;border:1px solid #000;background:transparent;cursor:pointer}
+    .authPanel{position: absolute; right: 16px; top: 72px; width: 260px; padding:12px; border:1px solid #000; background:#fff;}
+    .authPanel input{width:100%;padding:8px;margin-bottom:6px;border:1px solid #000;background:transparent}
+    .authBtns{display:flex;gap:6px;justify-content:space-between}
+    .hint{color:var(--muted);font-size:12px;margin-top:8px}
+    @media (max-width:700px){.container{grid-template-columns:1fr}.authPanel{position:static;width:100%;margin-top:8px}}
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Retro Chat</h1>
+      <div id="userArea">
+        <span id="showUser"></span>
+        <button id="logoutBtn" style="display:none">Logout</button>
+      </div>
+    </header>
+
+    <section class="left">
+      <div class="panel">
+        <h2>Groups</h2>
+        <div id="groupsList" class="groups">(loading...)</div>
+
+        <div class="controls">
+          <input id="newGroupName" placeholder="Group name" />
+          <button id="createGroupBtn">Create</button>
+        </div>
+
+        <div class="controls">
+          <input id="inviteCode" placeholder="Invite code" />
+          <button id="joinBtn">Join</button>
+        </div>
+
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)">
+          Invite codes are 8-char codes. Groups are invite-only (people need the code).
+        </div>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="panel chatPanel">
+        <div id="chatHeader">No group selected</div>
+        <div id="chat" class="chatWindow" aria-live="polite"></div>
+
+        <form id="msgForm" class="msgForm">
+          <input id="msgInput" autocomplete="off" placeholder="Type a message..." />
+          <button>Send</button>
+        </form>
+      </div>
+    </section>
+
+    <div id="auth" class="authPanel panel">
+      <h2>Sign in / Register</h2>
+      <input id="username" placeholder="username (3-24, letters/numbers/_-. )" />
+      <input id="password" type="password" placeholder="password (min 6)" />
+      <div class="authBtns">
+        <button id="login">Login</button>
+        <button id="register">Register</button>
+      </div>
+      <p class="hint">Usernames are unique and can't be reused. Passwords are handled by Firebase Auth (secure).</p>
+    </div>
+  </main>
+
+  <!-- Firebase compat SDKs (easy for single-file deployment) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+  /********* REPLACE firebaseConfig BELOW WITH YOURS (you already pasted it) *********/
+  const firebaseConfig = {
+    apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
+    authDomain: "website-11b5c.firebaseapp.com",
+    databaseURL: "https://website-11b5c-default-rtdb.firebaseio.com",
+    projectId: "website-11b5c",
+    storageBucket: "website-11b5c.firebasestorage.app",
+    messagingSenderId: "821866548441",
+    appId: "1:821866548441:web:00a08e534699a6f97902c8"
+  };
+  /***************************************************************************/
+
+  // init
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.database();
+
+  // helpers
+  const $ = id => document.getElementById(id);
+  const chat = $('chat');
+  const groupsList = $('groupsList');
+  const showUser = $('showUser');
+  const logoutBtn = $('logoutBtn');
+  const authPanel = $('auth');
+
+  // simple sanitizer: escape special HTML characters BEFORE storing / rendering
+  function escapeText(s){
+    if (s == null) return '';
+    return s
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#39;');
+  }
+  function safeAppendLine(text){
+    const p = document.createElement('div');
+    p.className = 'chatLine';
+    p.textContent = text; // use textContent; do not use innerHTML
+    chat.appendChild(p);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  // format username -> synthetic email for Firebase Auth
+  function usernameToEmail(username){
+    return username.toLowerCase() + '@retro.local';
+  }
+
+  // state
+  let currentGroupId = null;
+  let currentGroupName = null;
+  let currentUid = null;
+  let currentUsername = null;
+  let messagesListeners = {}; // cleanup listeners per group
+
+  // show/hide auth panel depending on logged in
+  function setUserDisplay(username){
+    currentUsername = username;
+    if (username){
+      showUser.textContent = username;
+      logoutBtn.style.display = '';
+      authPanel.style.display = 'none';
+    } else {
+      showUser.textContent = '';
+      logoutBtn.style.display = 'none';
+      authPanel.style.display = '';
+    }
+  }
+
+  // --- Authentication (register/login) ---
+  // Registration flow:
+  // 1) createAuthUser(username@retro.local, password)
+  // 2) attempt transaction on /usernames/{username} to set -> uid if null
+  // 3) if transaction fails (username existed), delete auth user and error
+  async function registerUsername(username, password){
+    username = username.trim();
+    if (!/^[\w.\-]{3,24}$/.test(username)) throw 'invalid username (3-24 chars, letters/numbers/_-. )';
+    if (password.length < 6) throw 'password too short';
+    const email = usernameToEmail(username);
+    // create auth account
+    const cred = await auth.createUserWithEmailAndPassword(email, password);
+    const uid = cred.user.uid;
+    try {
+      // atomic: set username -> uid only if does not exist
+      const ref = db.ref('usernames/' + username);
+      const result = await ref.transaction(current => {
+        if (current === null) return uid;
+        return; // abort
+      });
+      if (!result.committed) {
+        // somebody else already owns the username
+        // cleanup auth account
+        await cred.user.delete().catch(()=>{});
+        throw 'username taken';
+      }
+      // commit user profile
+      await db.ref('users/' + uid).set({
+        username: username,
+        createdAt: firebase.database.ServerValue.TIMESTAMP
+      });
+      return { uid, username };
+    } catch (err) {
+      // if we created the auth user but transaction failed, we already deleted above
+      throw err;
+    }
+  }
+
+  async function loginUsername(username, password){
+    const email = usernameToEmail(username.trim());
+    const cred = await auth.signInWithEmailAndPassword(email, password);
+    // Read profile to get canonical username (in case)
+    const uid = cred.user.uid;
+    const snap = await db.ref('users/' + uid + '/username').get();
+    const uname = snap.exists() ? snap.val() : username;
+    return { uid, username: uname };
+  }
+
+  // --- Groups & invites ---
+  function makeInviteCode(){
+    const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    let s = '';
+    for (let i=0;i<8;i++) s += charset.charAt(Math.floor(Math.random()*charset.length));
+    return s;
+  }
+
+  async function createGroup(name){
+    if (!auth.currentUser) throw 'not signed in';
+    name = (name || 'Untitled').toString().slice(0,64);
+    const invite = makeInviteCode();
+    const newRef = db.ref('groups').push();
+    const groupId = newRef.key;
+    await newRef.set({
+      name,
+      inviteCode: invite,
+      ownerUid: auth.currentUser.uid,
+      createdAt: firebase.database.ServerValue.TIMESTAMP
+    });
+    // add owner to membership
+    await db.ref(`memberships/${groupId}/${auth.currentUser.uid}`).set(true);
+    return { id: groupId, name, inviteCode: invite };
+  }
+
+  // join by invite code (search groups where inviteCode == code)
+  async function joinByInvite(code){
+    if (!auth.currentUser) throw 'not signed in';
+    const q = await db.ref('groups').orderByChild('inviteCode').equalTo(code).get();
+    if (!q.exists()) throw 'invalid invite code';
+    const val = q.val();
+    const groupId = Object.keys(val)[0];
+    const group = val[groupId];
+    await db.ref(`memberships/${groupId}/${auth.currentUser.uid}`).set(true);
+    return { id: groupId, name: group.name || 'Group' };
+  }
+
+  // list groups the user is a member of
+  async function listMyGroups(){
+    if (!auth.currentUser) return [];
+    const uid = auth.currentUser.uid;
+    const snap = await db.ref('memberships').orderByChild(uid).get(); // won't work as structure is memberships/{groupId}/{uid}:true
+    // instead fetch groups and filter where membership exists under each group (efficient enough for small apps)
+    const groupsSnap = await db.ref('groups').get();
+    const groups = [];
+    if (!groupsSnap.exists()) return groups;
+    groupsSnap.forEach(gsnap => {
+      const gid = gsnap.key;
+      const g = gsnap.val();
+      // check membership
+      // Note: using synchronous get to membership node
+      // but we can check presence by reading memberships/{gid}/{uid}
+    });
+    // simpler: query memberships/{gid}/{uid}
+    const membershipSnap = await db.ref('memberships').get();
+    const myGroups = [];
+    membershipSnap.forEach(gmemSnap => {
+      const gid = gmemSnap.key;
+      const m = gmemSnap.val();
+      if (m && m[uid]) {
+        // get group info
+        // synchronous read: (we already have groupsSnap)
+        const g = groupsSnap.child(gid).val();
+        if (g) myGroups.push({ id: gid, name: g.name || ('Group ' + gid) });
+      }
+    });
+    return myGroups;
+  }
+
+  // listen for groups list updates (for current user)
+  async function refreshGroupsUI(){
+    groupsList.innerHTML = '';
+    if (!auth.currentUser){
+      groupsList.textContent = '(sign in to see groups)';
+      return;
+    }
+    const uid = auth.currentUser.uid;
+    // read groups & memberships and show groups where memberships/{gid}/{uid} == true
+    const [groupsSnap, memSnap] = await Promise.all([db.ref('groups').get(), db.ref('memberships').get()]);
+    const my = [];
+    if (!groupsSnap.exists()) { groupsList.textContent = '(no groups yet)'; return; }
+    groupsSnap.forEach(gsnap => {
+      const gid = gsnap.key;
+      const g = gsnap.val();
+      const mems = memSnap.child(gid).val();
+      if (mems && mems[uid]) my.push({ id: gid, name: g.name || ('Group '+gid) });
+    });
+    if (my.length === 0) { groupsList.textContent = '(no groups yet)'; return; }
+    for (const g of my){
+      const div = document.createElement('div');
+      div.className = 'groupItem';
+      div.textContent = `${g.name} (${g.id})`;
+      div.dataset.id = g.id;
+      div.addEventListener('click', ()=> selectGroup(g.id, g.name));
+      groupsList.appendChild(div);
+    }
+  }
+
+  // --- Messages ---
+  // listen to messages for a group
+  function listenMessages(groupId){
+    // cleanup old listener
+    if (messagesListeners[groupId]) return;
+    const ref = db.ref(`messages/${groupId}`);
+    const handler = ref.on('child_added', snap => {
+      const m = snap.val();
+      // render as: username > message
+      // message stored escaped already, but we render with textContent to be safe
+      safeAppendLine(`${m.username} > ${m.text}`);
+    });
+    messagesListeners[groupId] = { ref, handler };
+  }
+  function stopListeningMessages(groupId){
+    const info = messagesListeners[groupId];
+    if (info){
+      info.ref.off('child_added', info.handler);
+      delete messagesListeners[groupId];
+    }
+  }
+
+  async function selectGroup(groupId, name){
+    // leave previous group listeners
+    if (currentGroupId && currentGroupId !== groupId){
+      stopListeningMessages(currentGroupId);
+    }
+    currentGroupId = groupId;
+    currentGroupName = name;
+    document.querySelectorAll('.groupItem').forEach(el=>el.classList.remove('active'));
+    const sel = document.querySelector(`.groupItem[data-id="${groupId}"]`);
+    if (sel) sel.classList.add('active');
+    $('chatHeader').textContent = `Group: ${name} (${groupId})`;
+    chat.innerHTML = '';
+    // verify membership: check memberships/{groupId}/{uid}
+    const memSnap = await db.ref(`memberships/${groupId}/${auth.currentUser.uid}`).get();
+    if (!memSnap.exists()){
+      safeAppendLine('ERROR: not a member of this group.');
+      return;
+    }
+    // load last messages
+    const msgsSnap = await db.ref(`messages/${groupId}`).limitToLast(500).get();
+    if (msgsSnap.exists()){
+      msgsSnap.forEach(s => {
+        const m = s.val();
+        safeAppendLine(`${m.username} > ${m.text}`);
+      });
+    }
+    // start realtime listening
+    listenMessages(groupId);
+  }
+
+  async function sendMessageToGroup(groupId, text){
+    if (!auth.currentUser) throw 'not signed in';
+    if (!text || !text.trim()) throw 'empty';
+    // check membership
+    const memSnap = await db.ref(`memberships/${groupId}/${auth.currentUser.uid}`).get();
+    if (!memSnap.exists()) throw 'not a member';
+    const esc = escapeText(text).slice(0,1000);
+    await db.ref(`messages/${groupId}`).push({
+      uid: auth.currentUser.uid,
+      username: currentUsername || $('username').value || 'anon',
+      text: esc,
+      ts: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+
+  // --- UI wiring ---
+  $('register').addEventListener('click', async ()=>{
+    const u = $('username').value.trim();
+    const p = $('password').value;
+    try {
+      $('register').disabled = true;
+      const res = await registerUsername(u,p);
+      setUserDisplay(res.username);
+      await refreshGroupsUI();
+      alert('registered & signed in as ' + res.username);
+    } catch (err){
+      alert(String(err));
+    } finally { $('register').disabled = false; }
+  });
+
+  $('login').addEventListener('click', async ()=>{
+    const u = $('username').value.trim();
+    const p = $('password').value;
+    try {
+      $('login').disabled = true;
+      const res = await loginUsername(u,p);
+      setUserDisplay(res.username);
+      await refreshGroupsUI();
+      alert('signed in as ' + res.username);
+    } catch (err){
+      alert(String(err));
+    } finally { $('login').disabled = false; }
+  });
+
+  logoutBtn.addEventListener('click', async ()=>{
+    await auth.signOut();
+    setUserDisplay(null);
+    chat.innerHTML = '';
+    currentGroupId = null;
+    $('chatHeader').textContent = 'No group selected';
+    refreshGroupsUI();
+  });
+
+  $('createGroupBtn').addEventListener('click', async ()=>{
+    const name = $('newGroupName').value.trim() || 'Untitled';
+    try {
+      const g = await createGroup(name);
+      alert('Group created — invite code: ' + g.inviteCode);
+      await refreshGroupsUI();
+    } catch (err){ alert(String(err)); }
+  });
+
+  $('joinBtn').addEventListener('click', async ()=>{
+    const code = $('inviteCode').value.trim();
+    if (!code) return alert('enter invite code');
+    try {
+      const g = await joinByInvite(code);
+      alert('Joined ' + g.name);
+      await refreshGroupsUI();
+    } catch (err){ alert(String(err)); }
+  });
+
+  // message form
+  $('msgForm').addEventListener('submit', async (ev)=>{
+    ev.preventDefault();
+    if (!currentGroupId) return alert('select a group first');
+    const txt = $('msgInput').value;
+    if (!txt.trim()) return;
+    try {
+      await sendMessageToGroup(currentGroupId, txt);
+      $('msgInput').value = '';
+    } catch (err){ alert(String(err)); }
+  });
+
+  // keep UI in sync with auth
+  auth.onAuthStateChanged(async user => {
+    if (user){
+      currentUid = user.uid;
+      // fetch username
+      const unameSnap = await db.ref(`users/${user.uid}/username`).get();
+      const uname = unameSnap.exists() ? unameSnap.val() : (user.email ? user.email.split('@')[0] : 'unknown');
+      setUserDisplay(uname);
+      await refreshGroupsUI();
+    } else {
+      currentUid = null;
+      setUserDisplay(null);
+      groupsList.textContent = '(sign in to see groups)';
+    }
+  });
+
+  // initial UI
+  (async ()=> {
+    groupsList.textContent = '(sign in to see groups)';
+  })();
+  </script>
+</body>
+</html>
