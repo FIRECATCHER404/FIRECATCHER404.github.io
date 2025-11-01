@@ -1,0 +1,2387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Particle Playground</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #1e1e1e;
+      color: #f0f0f0;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    #hoverInfoBox {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      padding: 6px 10px;
+      background-color: black;
+      color: lime;
+      font-family: monospace;
+      font-size: 14px;
+      border: 1px solid lime;
+      border-radius: 6px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #error-notice {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(200, 50, 50, 0.9);
+      color: white;
+      padding: 0.5rem 1rem;
+      font-family: monospace;
+      white-space: pre-wrap;
+      display: none;
+      z-index: 9999;
+    }
+    .container {
+      background-color: #2b2b2b;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      max-width: 100%;
+      overflow: auto;
+    }
+    canvas {
+      border: 2px solid #444;
+      margin-top: 1rem;
+    }
+    .button {
+      margin: 5px;
+      padding: 10px 15px;
+      font-size: 14px;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .button:hover {
+      filter: brightness(1.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="error-notice"></div>
+  <div id="hoverInfoBox">Hover over a particle</div>
+  <div class="container">
+    <h1>Particle Playground</h1>
+    <div id="buttons"></div>
+    <div style="margin-top: 1rem;">
+      <a href="index.html"><button class="button" style="background-color: #555;">Main Menu</button></a>
+      <button class="button" style="background-color: #555; margin-left: 20px;" onclick="clearGrid()">Clear</button>
+    </div>
+    <canvas id="canvas" width="900" height="600"></canvas>
+  </div>
+
+  <script>
+     window.addEventListener('error', e => {
+        const n = document.getElementById('error-notice');
+        n.textContent = `Error: ${e.message}\n${e.filename}:${e.lineno}:${e.colno}`;
+        n.style.display = 'block';
+        // prevent browser console double‑report
+        return false;
+       });
+      window.addEventListener('unhandledrejection', e => {
+        const n = document.getElementById('error-notice');
+        n.textContent = `Promise Rejection: ${e.reason}`;
+        n.style.display = 'block';
+      });
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const scale = 4;
+    const gridWidth = Math.floor(width / scale);
+    const gridHeight = Math.floor(height / scale);
+
+    const grid = Array.from({ length: gridHeight }, () => Array(gridWidth).fill(null));
+
+    const particles = {
+      sand: {
+        color: '#C2B280',
+        update: (x, y) => {
+          const neighbors = [[x,y-1],[x+1,y],[x-1,y],[x,y+1]];
+          for (const [nx, ny] of neighbors) {
+            if (grid[ny] && grid[ny][nx] && ['fire', 'lava', 'plasma'].includes(grid[ny][nx].type)) {
+              grid[y][x] = { type: 'glass', ...particles.glass };
+              return;
+            }
+          }
+          fall(x, y);
+        }
+      },
+      glass: {
+        color: '#aaaaaa',
+        heatCounter: 0,
+        update: (x, y) => {
+          let heated = false;
+          const neighbors = [[x,y-1],[x+1,y],[x-1,y],[x,y+1]];
+          for (const [nx, ny] of neighbors) {
+            if (grid[ny] && grid[ny][nx] && ['fire', 'lava', 'plasma'].includes(grid[ny][nx].type)) {
+              heated = true;
+              break;
+            }
+          }
+          const cell = grid[y][x];
+          if (heated) {
+            cell.heatCounter = (cell.heatCounter || 0) + 1;
+            if (cell.heatCounter >= 100) {
+              grid[y][x] = { type: 'lava', from: 'glass', cooldown: 0, ...particles.lava };
+            }
+          } else {
+            cell.heatCounter = 0;
+          }
+        }
+      },
+      water: {
+        color: '#3399FF',
+        update: (x, y) => fall(x, y) || spread(x, y)
+      },
+      fire: {
+        color: '#FF6600',
+        update: (x, y) => {
+          const neighbors = [[x,y-1],[x+1,y],[x-1,y],[x,y+1]];
+          for (const [nx, ny] of neighbors) {
+            if (grid[ny] && grid[ny][nx] && grid[ny][nx].type === 'snow') {
+              grid[ny][nx] = { type: 'water', ...particles.water };
+            }
+          }
+          if (Math.random() < 0.1) grid[y][x] = null;
+        }
+      },
+      wind: {
+        color: '#CCCCFF',
+        update: (x, y) => {
+          const dx = Math.random() < 0.5 ? -1 : 1;
+          const nx = x + dx;
+          if (nx >= 0 && nx < gridWidth && !grid[y][nx]) {
+            grid[y][nx] = grid[y][x];
+            grid[y][x] = null;
+          }
+        }
+      },
+      concrete: {
+        color: '#999999',
+        update: () => {}
+      },
+      wood: {
+        color: '#8B4513',
+        update: (x, y) => {
+          const neighbors = [[x, y - 1], [x - 1, y], [x + 1, y], [x, y + 1]];
+          for (const [nx, ny] of neighbors) {
+            if (grid[ny] && grid[ny][nx] && grid[ny][nx].type === 'fire') {
+              if (Math.random() < 0.05) grid[y][x] = { type: 'fire', ...particles.fire };
+            }
+          }
+        }
+      },
+      acid: {
+        color: '#00FF00',
+        update: (x, y) => {
+          if (fall(x, y) || spread(x, y)) return;
+          const neighbors = [[x, y - 1], [x + 1, y], [x - 1, y], [x, y + 1]];
+          for (const [nx, ny] of neighbors) {
+            if (grid[ny] && grid[ny][nx] && grid[ny][nx].type !== 'acid') {
+              grid[ny][nx] = null;
+              if (Math.random() < 0.1) grid[y][x] = null;
+            }
+          }
+        }
+      },
+      lava: {
+        color: '#FF3300',
+        update: (x, y) => {
+          const cell = grid[y][x];
+          cell.cooldown = (cell.cooldown || 0) + 1;
+          const neighbors = [[x,y-1],[x+1,y],[x-1,y],[x,y+1]];
+          let reheated = false;
+
+          for (const [nx, ny] of neighbors) {
+            const target = grid[ny]?.[nx];
+            if (target) {
+              if (target.type === 'water') grid[y][x] = { type: 'concrete', ...particles.concrete };
+              else if (['sand', 'wood', 'fire', 'acid', 'wind'].includes(target.type)) grid[ny][nx] = null;
+              if (['fire', 'lava', 'plasma'].includes(target.type)) reheated = true;
+            }
+          }
+
+          if (!reheated && cell.cooldown > 200) {
+            grid[y][x] = cell.from === 'glass' ? { type: 'glass', heatCounter: 0, ...particles.glass } : { type: 'concrete', ...particles.concrete };
+          }
+
+          fall(x, y);
+        }
+      },
+      lightning: {
+        color: '#FFFF00',
+        update: (x, y) => {
+          const neighbors = [[x,y-1],[x+1,y],[x-1,y],[x,y+1]];
+          for (const [nx, ny] of neighbors) {
+            if (grid[ny] && grid[ny][nx] && grid[ny][nx].type === 'water') {
+              grid[ny][nx] = { type: 'lightning', ...particles.lightning };
+            }
+          }
+          if (Math.random() < 0.3) grid[y][x] = null;
+        }
+      },
+      erase: {
+        color: '#FFFFFF',
+        update: () => {}
+      },
+      snow: {
+        color: '#DDFFFF',
+        update: (x, y) => {
+          if (y+1 < gridHeight && !grid[y+1][x]) fall(x, y);
+          else {
+            const neighbors = [[x,y-1],[x+1,y],[x-1,y],[x,y+1]];
+            for (const [nx, ny] of neighbors) {
+              if (grid[ny] && grid[ny][nx] && ['fire','plasma'].includes(grid[ny][nx].type)) {
+                grid[y][x] = { type: 'water', ...particles.water };
+              }
+            }
+          }
+        }
+      },
+      plasma: {
+        color: '#FF00FF',
+        update: (x, y) => {
+          if (Math.random() < 0.3) return; // slow it down
+          const dx = Math.floor(Math.random() * 3) - 1;
+          const dy = Math.floor(Math.random() * 3) - 1;
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight) {
+            const target = grid[ny][nx];
+            if (!target) {
+              grid[ny][nx] = grid[y][x];
+              grid[y][x] = null;
+            } else if (target.type === 'snow') {
+              grid[ny][nx] = { type: 'water', ...particles.water };
+            } else if (target.type === 'concrete') {
+              grid[ny][nx] = { type: 'lava', from: 'concrete', cooldown: 0, ...particles.lava };
+            }
+          }
+        }
+      },
+      vine: {
+        color: '#228B22',
+        update: (x, y) => {
+          const directions = [[0,1], [-1,0], [1,0]];
+          for (const [dx, dy] of directions) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (grid[ny] && grid[ny][nx] == null && Math.random() < 0.05) {
+              grid[ny][nx] = { type: 'vine', ...particles.vine };
+            }
+          }
+        }
+      },
+      electric: {
+        color: '#00FFFF',
+        lifespan: 10,
+        update: (x, y) => {
+          const cell = grid[y][x];
+          cell.lifespan = (cell.lifespan || 0) + 1;
+          const neighbors = [[x, y - 1], [x + 1, y], [x - 1, y], [x, y + 1]];
+          for (const [nx, ny] of neighbors) {
+            if (grid[ny]?.[nx] && ['water', 'plasma', 'metal'].includes(grid[ny][nx].type)) {
+              grid[ny][nx] = { type: 'electric', ...particles.electric };
+            }
+          }
+          if (cell.lifespan > 10) {
+            grid[y][x] = null;
+          }
+        }
+      },
+      storm: {
+        color: '#8888FF',
+        update: (x, y) => {
+          if (Math.random() < 0.05) {
+            const below = grid[y + 1]?.[x];
+            if (!below) {
+              if (Math.random() < 0.5) {
+                grid[y + 1][x] = { type: 'rain', ...particles.rain };
+              } else {
+                grid[y + 1][x] = { type: 'lightning', ...particles.lightning };
+              }
+            }
+          }
+          if (y > 0 && !grid[y - 1][x]) {
+            grid[y - 1][x] = grid[y][x];
+            grid[y][x] = null;
+          }
+        }
+      },
+      metal: {
+        color: '#bbbbbb',
+        update: (x, y) => {
+          const visited = new Set();
+          function spreadElectric(cx, cy) {
+            const key = `${cx},${cy}`;
+            if (visited.has(key)) return;
+            visited.add(key);
+
+            const neighbors = [[0,1],[1,0],[-1,0],[0,-1]];
+            for (const [dx, dy] of neighbors) {
+              const nx = cx + dx;
+              const ny = cy + dy;
+              const target = grid[ny]?.[nx];
+              if (target?.type === 'metal') {
+                grid[ny][nx] = { type: 'metal', ...particles.metal }; // keep it metal
+                spreadElectric(nx, ny); // propagate
+              } else if (target?.type === 'water') {
+                grid[ny][nx] = { type: 'electric', ...particles.electric };
+              }
+            }
+          }
+
+          // Check if any electric nearby to trigger chain reaction
+          const neighbors = [[0,1],[1,0],[-1,0],[0,-1]];
+          for (const [dx, dy] of neighbors) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (grid[ny]?.[nx]?.type === 'electric') {
+              spreadElectric(x, y);
+              break;
+            }
+          }
+        }
+      },
+      radioactive: {
+        color: '#00ff88',
+        update: (x, y) => {
+          const dirs = [[0,1],[1,0],[-1,0],[0,-1]];
+          for (const [dx, dy] of dirs) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (Math.random() < 0.005 && nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight && !grid[ny][nx]) {
+              grid[ny][nx] = { type: 'radioactive', ...particles.radioactive };
+            } else if (grid[ny]?.[nx] && !['radioactive', 'concrete'].includes(grid[ny][nx].type)) {
+              if (Math.random() < 0.01) {
+                const keys = Object.keys(particles);
+                const randType = keys[Math.floor(Math.random() * keys.length)];
+                grid[ny][nx] = { type: randType, ...particles[randType] };
+              } else if (['wood', 'glass'].includes(grid[ny][nx].type)) {
+                if (Math.random() < 0.02) grid[ny][nx] = null;
+              }
+            }
+          }
+        }
+      },
+      oil: {
+        color: '#442200',
+        update: (x, y) => {
+          if (fall(x, y) || spread(x, y)) return;
+
+          const neighbors = [[x,y-1],[x+1,y],[x-1,y],[x,y+1]];
+          for (const [nx, ny] of neighbors) {
+            const target = grid[ny]?.[nx];
+            if (target && ['fire', 'lava', 'plasma'].includes(target.type)) {
+              grid[y][x] = { type: 'fire', ...particles.fire };
+            }
+          }
+        }
+      },
+      magic: {
+        color: '#ccffff',
+        update: (x, y) => {
+          if (Math.random() < 0.02) {
+            const tx = Math.floor(Math.random() * gridWidth);
+            const ty = Math.floor(Math.random() * gridHeight);
+            if (!grid[ty][tx]) {
+              grid[ty][tx] = grid[y][x];
+              grid[y][x] = null;
+              return;
+            }
+          }
+
+          const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+          for (const [dx, dy] of dirs) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (grid[ny]?.[nx] && Math.random() < 0.01) {
+              const tx = Math.floor(Math.random() * gridWidth);
+              const ty = Math.floor(Math.random() * gridHeight);
+              if (!grid[ty][tx]) {
+                grid[ty][tx] = grid[ny][nx];
+                grid[ny][nx] = null;
+              }
+            }
+          }
+        }
+      },
+battery: {
+  color: '#FFFFAA',
+  charged: true,
+  update: () => {}
+},
+      corruption: {
+        color: '#550088',
+        update: (x, y) => {
+          const dirs = [[0,1],[1,0],[-1,0],[0,-1]];
+          for (const [dx, dy] of dirs) {
+            const nx = x + dx, ny = y + dy;
+            const target = grid[ny]?.[nx];
+            if (target && !['concrete', 'metal', 'corruption'].includes(target.type)) {
+              if (Math.random() < 0.02) {
+                grid[ny][nx] = { type: 'corruption', ...particles.corruption };
+              }
+            }
+          }
+        }
+      },
+rainbow: {
+  color: '#FF0000', // will cycle
+  cycle: 0,
+  update: (x, y) => {
+    const cell = grid[y][x];
+    const colors = ['#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'];
+    cell.cycle = (cell.cycle || 0) + 1;
+    cell.color = colors[Math.floor(cell.cycle / 10) % colors.length];
+
+    // Chance to randomize nearby particles
+    const neighbors = [[x,y-1],[x+1,y],[x-1,y],[x,y+1]];
+    for (const [nx, ny] of neighbors) {
+      const target = grid[ny]?.[nx];
+      if (target && Math.random() < 0.01) {
+        const keys = Object.keys(particles).filter(k => k !== 'rainbow');
+        const randomType = keys[Math.floor(Math.random() * keys.length)];
+        grid[ny][nx] = { type: randomType, ...particles[randomType] };
+      }
+    }
+  }
+},
+phantom: {
+  color: '#eeeeee',
+  update: (x, y) => {
+    // Random teleport
+    if (Math.random() < 0.01) {
+      const tx = Math.floor(Math.random() * gridWidth);
+      const ty = Math.floor(Math.random() * gridHeight);
+      if (!grid[ty][tx]) {
+        grid[ty][tx] = grid[y][x];
+        grid[y][x] = null;
+        return;
+      }
+    }
+
+    // Occasionally possess others
+    const neighbors = [[x,y-1],[x+1,y],[x-1,y],[x,y+1]];
+    for (const [nx, ny] of neighbors) {
+      const target = grid[ny]?.[nx];
+      if (target && Math.random() < 0.002) {
+        const keys = Object.keys(particles).filter(k => k !== 'phantom');
+        const randomType = keys[Math.floor(Math.random() * keys.length)];
+        grid[ny][nx] = { type: randomType, ...particles[randomType] };
+      }
+    }
+
+    // Slight ghostly drift
+    const dx = Math.floor(Math.random() * 3) - 1;
+    const dy = Math.floor(Math.random() * 3) - 1;
+    const nx = x + dx, ny = y + dy;
+    if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight && !grid[ny][nx]) {
+      grid[ny][nx] = grid[y][x];
+      grid[y][x] = null;
+    }
+  }
+},
+blackhole: {
+  color: '#000000',
+  update: (x, y) => {
+    const radius = 50;
+
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (
+          nx >= 0 && nx < gridWidth &&
+          ny >= 0 && ny < gridHeight &&
+          !(dx === 0 && dy === 0)
+        ) {
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist <= radius && grid[ny][nx]) {
+            const pullStrength = 1 / dist;
+
+            const tx = x + Math.round((nx - x) * (1 - pullStrength));
+            const ty = y + Math.round((ny - y) * (1 - pullStrength));
+
+            if (
+              tx >= 0 && tx < gridWidth &&
+              ty >= 0 && ty < gridHeight &&
+              !grid[ty][tx]
+            ) {
+              grid[ty][tx] = grid[ny][nx];
+              grid[ny][nx] = null;
+            }
+          }
+
+          // Consume particles within 1 block
+          if (dist <= 2.5) {
+            grid[ny][nx] = null;
+          }
+        }
+      }
+    }
+  }
+},
+gravity_controller: {
+  color: '#00FFFF',
+  update: (x, y) => {
+    const directions = [
+      [0, -1], // up
+      [1, 0],  // right
+      [-1, 0], // left
+      [0, 1]   // down
+    ];
+    for (const [dx, dy] of directions) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (
+        grid[ny] && grid[ny][nx] &&
+        grid[ny][nx].type === 'gravity_well'
+      ) {
+        gravityDirection = [dx, dy];
+        break;
+      }
+    }
+  }
+},
+
+gravity_well: {
+  color: '#FF00AA',
+  update: () => {}
+},
+ai: {
+  color: '#00FFCC',
+  update: (x, y) => {
+    const cell = grid[y][x];
+    if (!cell) return;
+
+    if (!cell.stepCooldown) cell.stepCooldown = 0;
+    cell.stepCooldown--;
+    if (cell.stepCooldown > 0) return;
+    cell.stepCooldown = 5;
+
+    const neighbors = [
+      [0, 1], [0, -1], [1, 0], [-1, 0]
+    ];
+
+    // Destroy nearby water and emit electricity
+    for (const [dx, dy] of neighbors) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight) {
+        const target = grid[ny][nx];
+        if (target?.type === 'water') {
+          grid[ny][nx] = { type: 'electric', ...particles.electric };
+        }
+      }
+    }
+
+    // Pathfind toward water > battery > other AI
+    const targetTypes = ['water', 'battery'];
+    const queue = [[x, y]];
+    const visited = new Set();
+    const parent = {};
+    let goal = null;
+
+    visited.add(`${x},${y}`);
+
+    while (queue.length && !goal) {
+      const [cx, cy] = queue.shift();
+      for (const [dx, dy] of neighbors) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        const key = `${nx},${ny}`;
+        if (
+          nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight &&
+          !visited.has(key)
+        ) {
+          visited.add(key);
+          const target = grid[ny][nx];
+          parent[key] = [cx, cy];
+          if (target && targetTypes.includes(target.type)) {
+            goal = [nx, ny];
+            break;
+          }
+          if (!target) queue.push([nx, ny]);
+        }
+      }
+    }
+
+    let moveTo = null;
+
+    if (goal) {
+      // Walk back from goal to find next move
+      let [tx, ty] = goal;
+      while (parent[`${tx},${ty}`] && `${tx},${ty}` !== `${x},${y}`) {
+        const [px, py] = parent[`${tx},${ty}`];
+        if (`${px},${py}` === `${x},${y}`) break;
+        tx = px;
+        ty = py;
+      }
+      if (!grid[ty][tx]) moveTo = [tx, ty];
+    } else {
+      // No target found, pick random empty direction
+      const shuffled = neighbors.sort(() => Math.random() - 0.5);
+      for (const [dx, dy] of shuffled) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (
+          nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight &&
+          !grid[ny][nx]
+        ) {
+          moveTo = [nx, ny];
+          break;
+        }
+      }
+    }
+
+    if (moveTo) {
+      const [mx, my] = moveTo;
+      grid[my][mx] = cell;
+      grid[y][x] = null;
+    }
+  }
+},
+pathfinder: {
+    color: '#00FF99',
+    update: (x, y) => {
+        const cell = grid[y][x];
+        if (!cell) return;
+
+        if (!cell.stepCooldown) cell.stepCooldown = 0;
+        cell.stepCooldown--;
+        if (cell.stepCooldown > 0) return;
+        cell.stepCooldown = 5;
+
+        const neighbors = [
+            [0, 1], [0, -1], [1, 0], [-1, 0]
+        ];
+
+        // Pathfind toward battery
+        const queue = [[x, y]];
+        const visited = new Set();
+        const parent = {};
+        let goal = null;
+
+        visited.add(`${x},${y}`);
+
+        while (queue.length && !goal) {
+            const [cx, cy] = queue.shift();
+            for (const [dx, dy] of neighbors) {
+                const nx = cx + dx;
+                const ny = cy + dy;
+                const key = `${nx},${ny}`;
+                if (
+                    nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight &&
+                    !visited.has(key)
+                ) {
+                    visited.add(key);
+                    const target = grid[ny][nx];
+                    parent[key] = [cx, cy];
+                    if (target && target.type === 'battery') {
+                        goal = [nx, ny];
+                        break;
+                    }
+                    if (!target) queue.push([nx, ny]);
+                }
+            }
+        }
+
+        let moveTo = null;
+
+        if (goal) {
+            // Walk back from goal to find next move
+            let [tx, ty] = goal;
+            while (parent[`${tx},${ty}`] && `${tx},${ty}` !== `${x},${y}`) {
+                const [px, py] = parent[`${tx},${ty}`];
+                if (`${px},${py}` === `${x},${y}`) break;
+                tx = px;
+                ty = py;
+            }
+            if (!grid[ty][tx]) moveTo = [tx, ty];
+        } else {
+            // No target found, pick random empty direction
+            const shuffled = neighbors.sort(() => Math.random() - 0.5);
+            for (const [dx, dy] of shuffled) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (
+                    nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight &&
+                    !grid[ny][nx]
+                ) {
+                    moveTo = [nx, ny];
+                    break;
+                }
+            }
+        }
+
+        if (moveTo) {
+            const [mx, my] = moveTo;
+            // Leave electric trail
+            grid[y][x] = { type: 'electric', ...particles.electric };
+            grid[my][mx] = cell;
+        }
+    }
+},
+
+soundwave: {
+    color: '#00CCFF',
+    update: (x, y) => {
+        const cell = grid[y][x];
+        if (!cell) return;
+
+        if (!cell.pulseTimer) cell.pulseTimer = 0;
+        cell.pulseTimer++;
+
+        if (cell.pulseTimer % 10 === 0) {
+            const radius = cell.pulseTimer / 10;
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (
+                        dist <= radius && dist >= radius - 1 &&
+                        nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight &&
+                        grid[ny][nx] && grid[ny][nx].type !== 'soundwave'
+                    ) {
+                        const pushX = Math.sign(dx);
+                        const pushY = Math.sign(dy);
+                        const tx = nx + pushX;
+                        const ty = ny + pushY;
+                        if (
+                            tx >= 0 && tx < gridWidth && ty >= 0 && ty < gridHeight &&
+                            !grid[ty][tx]
+                        ) {
+                            grid[ty][tx] = grid[ny][nx];
+                            grid[ny][nx] = null;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (cell.pulseTimer > 50) grid[y][x] = null;
+    }
+},
+nanobot: {
+  color: '#33FFAA',
+  update: (x, y) => {
+    const cell = grid[y][x];
+    if (!cell) return;
+
+    if (!cell.spawnCooldown) cell.spawnCooldown = 0;
+    if (!cell.dx) cell.dx = 0;
+    if (!cell.dy) cell.dy = 0;
+
+    // Cooldown before spreading
+    if (cell.spawnCooldown > 0) cell.spawnCooldown--;
+
+    // Repel from nearby nanobots
+    let repulsionX = 0, repulsionY = 0;
+    for (let ddy = -5; ddy <= 5; ddy++) {
+      for (let ddx = -5; ddx <= 5; ddx++) {
+        if (ddx === 0 && ddy === 0) continue;
+        const nx = x + ddx;
+        const ny = y + ddy;
+        if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight) {
+          const neighbor = grid[ny][nx];
+          if (neighbor?.type === 'nanobot') {
+            const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+            if (dist < 5) {
+              repulsionX -= ddx / dist;
+              repulsionY -= ddy / dist;
+            }
+          }
+        }
+      }
+    }
+
+    // Add random plasma-style drift
+    cell.dx += (Math.random() - 0.5) * 0.5 + repulsionX * 0.05;
+    cell.dy += (Math.random() - 0.5) * 0.5 + repulsionY * 0.05;
+
+    // Normalize speed
+    const speed = Math.sqrt(cell.dx * cell.dx + cell.dy * cell.dy);
+    const maxSpeed = 1;
+    if (speed > maxSpeed) {
+      cell.dx *= maxSpeed / speed;
+      cell.dy *= maxSpeed / speed;
+    }
+
+    const nx = Math.round(x + cell.dx);
+    const ny = Math.round(y + cell.dy);
+
+    // out of bounds guard
+    if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight) return;
+
+    const target = grid[ny][nx];
+
+    // === BLOCK: don't move into example1 at all ===
+    if (target && target.type === 'firewall') {
+      // bounce/deflect slightly so the nanobot doesn't keep "trying"
+      cell.dx = -cell.dx * 0.8;
+      cell.dy = -cell.dy * 0.8;
+      return;
+    }
+
+    // If there's a target (not example1) and cooldown allows, schedule conversion.
+    if (target && cell.spawnCooldown === 0) {
+      const targetType = target.type;
+      // only convert if the target type is not example1 (extra safety)
+      if (targetType !== 'firewall') {
+        const tx = nx, ty = ny; // capture coords for the timeout
+        // schedule conversion after delay — but re-check the current type at that time
+        setTimeout(() => {
+          const cur = grid[ty]?.[tx];
+          // Only convert if the cell still exists and is the same type we intended (and not example1)
+          if (cur && cur.type === targetType && cur.type !== 'firewall') {
+            grid[ty][tx] = { type: 'nanobot', ...particles.nanobot };
+          }
+        }, 2000);
+
+        cell.spawnCooldown = 20;
+        // Move away quickly
+        cell.dx = -cell.dx * 1.5;
+        cell.dy = -cell.dy * 1.5;
+      }
+      return;
+    }
+
+    // Move into empty space
+    if (!target) {
+      grid[ny][nx] = cell;
+      grid[y][x] = null;
+    }
+  }
+},
+repeller: {
+  color: '#00FFFF',
+  update: (x, y) => {
+    const radius = 20;
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const nx = x + dx, ny = y + dy;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (
+          dist <= radius && grid[ny]?.[nx] && !(dx === 0 && dy === 0)
+        ) {
+          const tx = x + Math.round((nx - x) * 1.2);
+          const ty = y + Math.round((ny - y) * 1.2);
+          if (
+            tx >= 0 && tx < gridWidth && ty >= 0 && ty < gridHeight &&
+            !grid[ty][tx]
+          ) {
+            grid[ty][tx] = grid[ny][nx];
+            grid[ny][nx] = null;
+          }
+        }
+      }
+    }
+  }
+},
+floatator: {
+  color: '#66FFCC',
+  data: {
+    vx: 0,
+    vy: 0,
+    batteryX: null,
+    batteryY: null,
+    cooldown: 0,
+    moveTimer: 0
+  },
+  update(x, y) {
+    const self = grid[y][x];
+
+    // Step 1: Battery detection only in cardinal directions (no diagonals)
+    if (self.data.cooldown <= 0) {
+      const dirs = [
+        [0, -1], // up
+        [1, 0],  // right
+        [0, 1],  // down
+        [-1, 0]  // left
+      ];
+
+      for (let [dx, dy] of dirs) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (
+          nx >= 0 && nx < gridWidth &&
+          ny >= 0 && ny < gridHeight &&
+          grid[ny][nx] &&
+          grid[ny][nx].type === 'battery' &&
+          (nx !== self.data.batteryX || ny !== self.data.batteryY)
+        ) {
+          // Found new battery: store opposite direction
+          self.data.batteryX = nx;
+          self.data.batteryY = ny;
+          self.data.vx = -dx;
+          self.data.vy = -dy;
+          self.data.cooldown = 60; // 1 sec cooldown
+          self.data.moveTimer = 0;
+          break;
+        }
+      }
+    } else {
+      self.data.cooldown--;
+    }
+
+    // Step 2: Move every 20 frames for smoothness
+    self.data.moveTimer++;
+    if (self.data.moveTimer >= 20) {
+      self.data.moveTimer = 0;
+
+      const nx = x + self.data.vx;
+      const ny = y + self.data.vy;
+
+      if (
+        nx >= 0 && nx < gridWidth &&
+        ny >= 0 && ny < gridHeight
+      ) {
+        if (!grid[ny][nx]) {
+          grid[ny][nx] = grid[y][x];
+          grid[y][x] = null;
+        }
+      } else {
+        // Vanish at edge
+        grid[y][x] = null;
+      }
+    }
+  }
+},
+orbit_core: {
+  color: '#FFD700',
+  update(x, y) {
+    // Still does nothing — just exists as an anchor
+  }
+},
+
+orbiter: {
+  color: '#99CCFF',
+  update(x, y) {
+    const self = grid[y][x];
+
+    if (!self.data || !self.data.initialized) {
+      let closest = null;
+      let closestDist = Infinity;
+
+      for (let dy = -80; dy <= 80; dy++) {
+        for (let dx = -80; dx <= 80; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (
+            nx >= 0 && nx < gridWidth &&
+            ny >= 0 && ny < gridHeight &&
+            grid[ny][nx] &&
+            grid[ny][nx].type === 'orbit_core'
+          ) {
+            const dist = dx * dx + dy * dy;
+            if (dist < closestDist) {
+              closestDist = dist;
+              closest = { x: nx, y: ny };
+            }
+          }
+        }
+      }
+
+      if (closest) {
+        const dx = x - closest.x;
+        const dy = y - closest.y;
+        const radius = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+
+        self.data = {
+          initialized: true,
+          centerX: closest.x,
+          centerY: closest.y,
+          radius: radius,
+          angle: angle,
+          fx: x + 0.5,
+          fy: y + 0.5
+        };
+      } else {
+        return;
+      }
+    }
+
+    const d = self.data;
+
+    // Safety: destroy if orbit core is gone
+    const core = grid[d.centerY]?.[d.centerX];
+    if (!core || core.type !== 'orbit_core') {
+      grid[y][x] = null;
+      return;
+    }
+
+    // ✅ REAL FIX: constant arc speed, not constant angle delta
+    const arcSpeed = 0.4; // pixels per frame
+    const angleStep = arcSpeed / d.radius;
+    d.angle += angleStep;
+
+    // Get new target position
+    const targetFx = d.centerX + 0.5 + Math.cos(d.angle) * d.radius;
+    const targetFy = d.centerY + 0.5 + Math.sin(d.angle) * d.radius;
+
+    // Smoothly move toward target
+    const smoothing = 0.5;
+    d.fx += (targetFx - d.fx) * smoothing;
+    d.fy += (targetFy - d.fy) * smoothing;
+
+    const newX = Math.floor(d.fx);
+    const newY = Math.floor(d.fy);
+
+    if (
+      (newX !== x || newY !== y) &&
+      newX >= 0 && newX < gridWidth &&
+      newY >= 0 && newY < gridHeight &&
+      !grid[newY][newX]
+    ) {
+      grid[newY][newX] = self;
+      grid[y][x] = null;
+    }
+  }
+},
+
+wire: {
+  color: '#dddddd',
+  update(x, y) {
+    const self = grid[y][x];
+    if (!self.data) self.data = {};
+    // The global propagatePower() handles all logic
+    // We don't need to do anything here
+  }
+},
+piston: {
+  color: '#EEAA22',
+  update(x, y) {
+    const self = grid[y][x];
+    if (!self.data) self.data = { powered: false };
+
+    // Check for power and record source direction
+    let powered = false;
+    let fromDir = null;
+
+    const directions = [
+      { dx: 0, dy: -1, name: 'up' },
+      { dx: 0, dy: 1, name: 'down' },
+      { dx: -1, dy: 0, name: 'left' },
+      { dx: 1, dy: 0, name: 'right' },
+    ];
+
+    for (const dir of directions) {
+      const nx = x + dir.dx;
+      const ny = y + dir.dy;
+      if (nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight) continue;
+
+      const neighbor = grid[ny][nx];
+      if (!neighbor) continue;
+
+      if (neighbor.type === 'battery' || (neighbor.type === 'wire' && neighbor.data?.charged)) {
+        powered = true;
+        fromDir = dir;
+        break;
+      }
+    }
+
+    if (powered && !self.data.powered) {
+      self.data.powered = true;
+
+      for (const dir of directions) {
+        if (dir.name === fromDir.name) continue; // Skip the direction of the power source
+
+        const tx1 = x + dir.dx;
+        const ty1 = y + dir.dy;
+        const tx2 = x + 2 * dir.dx;
+        const ty2 = y + 2 * dir.dy;
+
+        if (
+          tx1 >= 0 && tx1 < gridWidth && ty1 >= 0 && ty1 < gridHeight &&
+          tx2 >= 0 && tx2 < gridWidth && ty2 >= 0 && ty2 < gridHeight
+        ) {
+          const target = grid[ty1][tx1];
+          const destination = grid[ty2][tx2];
+          if (target && !destination) {
+            grid[ty2][tx2] = target;
+            grid[ty1][tx1] = null;
+            break; // Only push one direction
+          }
+        }
+      }
+    }
+
+    if (!powered) self.data.powered = false;
+  }
+},
+and_gate: {
+  color: '#ff00ff',
+  update(x, y) {
+    const self = grid[y][x];
+    if (!self.data) self.data = { outputting: false };
+
+    let leftPowered = false;
+    let topPowered = false;
+
+    if (x > 0) {
+      const left = grid[y][x - 1];
+      if (left && left.type === 'wire' && left.data?.charged) leftPowered = true;
+    }
+    if (y > 0) {
+      const top = grid[y - 1][x];
+      if (top && top.type === 'wire' && top.data?.charged) topPowered = true;
+    }
+
+    const output = (leftPowered && topPowered);
+    self.data.outputting = output;
+
+    // Output to the right
+    if (output && x < gridWidth - 1) {
+      const right = grid[y][x + 1];
+      if (right && right.type === 'wire') {
+        if (!right.data) right.data = {};
+        right.data.charged = true;
+        right.color = '#ffaaaa';
+      }
+    }
+
+    self.color = output ? '#cc66ff' : '#ff00ff';
+  }
+},
+inverter: {
+  color: '#8888ff',
+  update(x, y) {
+    const self = grid[y][x];
+    if (!self.data) self.data = {};
+
+    let inputPowered = false;
+
+    if (x > 0) {
+      const left = grid[y][x - 1];
+      if (left && left.type === 'wire' && left.data?.charged) inputPowered = true;
+    }
+
+    const output = !inputPowered;
+
+    if (output && x < gridWidth - 1) {
+      const right = grid[y][x + 1];
+      if (right && right.type === 'wire') {
+        if (!right.data) right.data = {};
+        right.data.charged = true;
+        right.color = '#ffaaaa';
+      }
+    }
+
+    self.color = output ? '#aaaaee' : '#8888ff';
+  }
+},
+or_gate: {
+  color: '#ff8800',
+  update(x, y) {
+    const self = grid[y][x];
+    if (!self.data) self.data = {};
+
+    let leftPowered = false;
+    let topPowered = false;
+
+    if (x > 0) {
+      const left = grid[y][x - 1];
+      if (left?.type === 'wire' && left.data?.charged) leftPowered = true;
+    }
+
+    if (y > 0) {
+      const top = grid[y - 1][x];
+      if (top?.type === 'wire' && top.data?.charged) topPowered = true;
+    }
+
+    const output = leftPowered || topPowered;
+
+    if (output && x < gridWidth - 1) {
+      const right = grid[y][x + 1];
+      if (right?.type === 'wire') {
+        if (!right.data) right.data = {};
+        right.data.charged = true;
+        right.color = '#ffaaaa';
+      }
+    }
+
+    self.color = output ? '#ffcc66' : '#ff8800';
+  }
+},
+light: {
+  color: '#000000',
+  update(x, y) {
+    const self = grid[y][x];
+    if (!self.data) self.data = {};
+
+    // Check adjacent tiles for powered wire or source
+    let powered = false;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight) continue;
+      const neighbor = grid[ny][nx];
+      if (!neighbor) continue;
+
+      if (
+        (neighbor.type === 'wire' && neighbor.data?.charged) ||
+        (neighbor.type === 'battery') ||
+        (neighbor.type === 'and_gate' && neighbor.data?.charged) ||
+        (neighbor.type === 'or_gate' && neighbor.data?.charged) ||
+        (neighbor.type === 'inverter' && neighbor.data?.charged)
+      ) {
+        powered = true;
+        break;
+      }
+    }
+
+    // Change color based on power state
+    self.data.charged = powered;
+    self.color = powered ? '#ffffff' : '#000000';
+  }
+},
+bubble: {
+  color: '#aeefff',
+  update(x, y) {
+    const self = grid[y][x];
+    if (!self) return;
+
+    // Initialize per‐particle data
+    if (!self.data) {
+      self.data = {
+        lastFrame: -Infinity,
+        lastMove: -Infinity
+      };
+    }
+
+    // 1) Only allow one update per frame
+    if (self.data.lastFrame === currentFrame) return;
+    self.data.lastFrame = currentFrame;
+
+    // 2) Throttle movement to once every 5 frames
+    if (currentFrame - self.data.lastMove < 5) return;
+
+    // 3) Record the move frame
+    self.data.lastMove = currentFrame;
+
+    // 4) Pop if at the top
+    if (y === 0) {
+      grid[y][x] = null;
+      return;
+    }
+
+    // 5) Pop if blocked above
+    if (grid[y - 1][x]) {
+      grid[y][x] = null;
+      return;
+    }
+
+    // 6) Wobble & float up
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    const nx = x + dir;
+    if (
+      nx >= 0 && nx < gridWidth &&
+      grid[y][nx] == null &&
+      grid[y - 1][nx] == null
+    ) {
+      grid[y - 1][nx] = self;
+    } else {
+      grid[y - 1][x] = self;
+    }
+    grid[y][x] = null;
+  }
+},
+fuse: {
+  color: '#ffaa55',
+  update(x, y) {
+    const self = grid[y][x];
+    if (!self) return;
+
+    // Initialize our per‐piece state
+    if (!self.data) {
+      self.data = {
+        lit: false,
+        timer: 0
+      };
+    }
+
+    // 1) If not yet lit, check for any adjacent fire
+    if (!self.data.lit) {
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (
+          nx >= 0 && nx < gridWidth &&
+          ny >= 0 && ny < gridHeight &&
+          grid[ny][nx]?.type === 'fire'
+        ) {
+          // ignite this piece and start its burn‐down timer
+          self.data.lit   = true;
+          self.data.timer = 10;    // ← adjust this for faster/slower burn
+          break;
+        }
+      }
+      return; // stay as fuse until timer starts ticking
+    }
+
+    // 2) Once lit, count down
+    if (self.data.timer > 0) {
+      self.data.timer--;
+      return; // still burning, not yet converting
+    }
+
+    // 3) Timer expired → turn into a fire cell
+    grid[y][x] = { type: 'fire', ...particles.fire };
+    // That new fire will in turn ignite its neighbors on their update pass
+  }
+},
+error: {
+  color: '#AA00AA',
+  update(x, y) {
+    // Deliberately throw an error every tick
+    throw new Error(`Particle at (${x},${y}) Errored`);
+  }
+},
+scribblert: {
+  color: 'cyan',
+  update(x, y) {
+    const cell = grid[y][x];
+    if (!cell) return;
+    if (!cell.data) cell.data = {};
+
+    const d = cell.data;
+    if (!d.initialized) {
+      const modes = [
+        'zigzag',
+        'spiral',
+        'scribble',
+        'circle',
+        'square',
+        'line',
+        'star',
+        'zigcircle'
+      ];
+      d.mode = modes[Math.floor(Math.random() * modes.length)];
+      d.cx = x; d.cy = y;
+      d.angle = 0;
+      d.r = 1;
+      d.age = 0;
+      // square
+      d.side = 1; d.stepOnSide = 0; d.dirIndex = 0;
+      // line
+      d.dir = [[1,0],[-1,0],[0,1],[0,-1]][Math.floor(Math.random()*4)];
+      // star
+      d.spoke = 0;
+      d.initialized = true;
+    }
+
+    d.age++;
+    if (d.age > 300) { grid[y][x] = null; return; }
+
+    let nx = x, ny = y;
+
+    switch(d.mode) {
+      case 'zigzag':
+        if (d.dx===undefined){ d.dx=1; d.dy=1; }
+        nx += d.dx; ny += d.dy;
+        if (Math.random()<0.1) d.dx *= -1;
+        if (Math.random()<0.1) d.dy *= -1;
+        break;
+
+      case 'spiral':
+        d.angle += 0.3;
+        d.r     += 0.5;      // bigger step so coils separate
+        nx = Math.floor(d.cx + Math.cos(d.angle) * d.r);
+        ny = Math.floor(d.cy + Math.sin(d.angle) * d.r);
+        break;
+
+      case 'scribble':
+        nx += Math.floor(Math.random()*3)-1;
+        ny += Math.floor(Math.random()*3)-1;
+        break;
+
+      case 'circle':
+        d.angle += 0.2;
+        const R = 8;
+        nx = Math.floor(d.cx + Math.cos(d.angle)*R);
+        ny = Math.floor(d.cy + Math.sin(d.angle)*R);
+        break;
+
+      case 'square':
+        const dirs = [[1,0],[0,1],[-1,0],[0,-1]];
+        const [dx, dy] = dirs[d.dirIndex];
+        nx = x + dx; ny = y + dy;
+        d.stepOnSide++;
+        if (d.stepOnSide >= d.side) {
+          d.stepOnSide = 0;
+          d.dirIndex = (d.dirIndex + 1) % 4;
+          if (d.dirIndex === 0 || d.dirIndex === 2) d.side++;
+        }
+        break;
+
+      case 'line':
+        nx = x + d.dir[0];
+        ny = y + d.dir[1];
+        break;
+
+      case 'star':
+        const starDirs = [
+          [1,0], [-1,0], [0,1], [0,-1], [1,1]
+        ];
+        const [sdx, sdy] = starDirs[d.spoke];
+        nx = d.cx + sdx;
+        ny = d.cy + sdy;
+        d.spoke = (d.spoke + 1) % starDirs.length;
+        break;
+
+      case 'zigcircle':
+        d.angle += 0.2;
+        d.r     = 5;        // fixed radius
+        nx = Math.floor(d.cx + Math.cos(d.angle)*d.r) + (Math.random()<0.5?-1:1);
+        ny = Math.floor(d.cy + Math.sin(d.angle)*d.r) + (Math.random()<0.5?-1:1);
+        break;
+    }
+
+    // out of bounds?
+    if (nx<0||ny<0||nx>=gridWidth||ny>=gridHeight) {
+      grid[y][x] = null;
+      return;
+    }
+
+    // move, always leave concrete behind
+    const target = grid[ny][nx];
+    if (target == null || target.type === 'concrete') {
+      grid[ny][nx] = cell;
+      grid[y][x]   = { type: 'concrete', ...particles.concrete };
+    } else {
+      grid[y][x] = null;
+    }
+  }
+},
+crystal: {
+  color: '#66CCFF',
+  update(x, y) {
+    const cell = grid[y][x];
+    if (!cell) return;
+
+    // ── First-Time Initialization ─────────────────────
+    if (!cell.data) {
+      const max = 50 + Math.floor(Math.random() * 80); // max growth range
+      const allowed = new Set();
+      const queue = [[0, 0]];
+      allowed.add('0,0');
+
+      while (queue.length && allowed.size < max) {
+        const [cx, cy] = queue.shift();
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        for (const [dx, dy] of dirs) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          const key = `${nx},${ny}`;
+          if (!allowed.has(key) && Math.random() < 0.6) {
+            allowed.add(key);
+            queue.push([nx, ny]);
+          }
+        }
+      }
+
+      cell.data = {
+        originX: x,
+        originY: y,
+        allowedPositions: allowed,
+        lastGrow: 0
+      };
+    }
+
+    // ── Throttle Growth ───────────────────────────────
+    if (currentFrame - cell.data.lastGrow < 8) return;
+    cell.data.lastGrow = currentFrame;
+
+    // ── Try to Grow ───────────────────────────────────
+    const dirs = [
+      [1,0],[-1,0],[0,1],[0,-1],
+      [1,1],[1,-1],[-1,1],[-1,-1]
+    ];
+
+    // Shuffle directions
+    for (let i = dirs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+    }
+
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight) continue;
+      if (grid[ny][nx]) continue;
+
+      const relX = nx - cell.data.originX;
+      const relY = ny - cell.data.originY;
+      const key = `${relX},${relY}`;
+      if (!cell.data.allowedPositions.has(key)) continue;
+
+      // Only allow to grow if exactly 1 neighbor crystal
+      let neighborCount = 0;
+      for (const [dx2, dy2] of dirs) {
+        const cx = nx + dx2;
+        const cy = ny + dy2;
+        if (
+          cx >= 0 && cx < gridWidth &&
+          cy >= 0 && cy < gridHeight &&
+          grid[cy][cx]?.type === 'crystal'
+        ) {
+          neighborCount++;
+        }
+      }
+
+      if (neighborCount === 1) {
+        grid[ny][nx] = {
+          type: 'crystal',
+          ...particles.crystal,
+          data: {
+            originX: cell.data.originX,
+            originY: cell.data.originY,
+            allowedPositions: cell.data.allowedPositions,
+            lastGrow: currentFrame
+          }
+        };
+        break; // Only grow one per frame
+      }
+    }
+  }
+},
+vortex: {
+  color: '#336699',
+  update(x, y) {
+    const cell = grid[y][x];
+    if (!cell) return;
+
+    // ─── init ─────────────────────────────────────────────
+    if (!cell.data) {
+      cell.data = {
+        age: 0,
+        // start with a big ring
+        radius: 20,
+        // how fast the ring shrinks each frame
+        shrinkRate: 0.02,
+        // how many frames between each spin step
+        spinThrottle: 2,
+        lastSpinFrame: 0
+      };
+    }
+
+    const d = cell.data;
+
+    // age‑out after a while
+    if (++d.age > 400) {
+      grid[y][x] = null;
+      return;
+    }
+
+    // only spin every spinThrottle frame
+    if (currentFrame - d.lastSpinFrame < d.spinThrottle) return;
+    d.lastSpinFrame = currentFrame;
+
+    // integer radius for stepping through cells
+    const R = Math.floor(d.radius);
+    if (R < 1) { 
+      // once too small, just vanish
+      grid[y][x] = null;
+      return;
+    }
+
+    // ─── spin each ring 1..R ────────────────────────────
+    for (let r = 1; r <= R; r++) {
+      const coords = [];
+      // top edge
+      for (let dx = -r; dx <= +r; dx++) coords.push([x + dx, y - r]);
+      // right edge
+      for (let dy = -r + 1; dy <= +r; dy++) coords.push([x + r, y + dy]);
+      // bottom edge
+      for (let dx = r - 1; dx >= -r; dx--) coords.push([x + dx, y + r]);
+      // left edge
+      for (let dy = r - 1; dy >= -r + 1; dy--) coords.push([x - r, y + dy]);
+
+      // snapshot old
+      const old = coords.map(([cx, cy]) =>
+        cy >= 0 && cy < gridHeight && cx >= 0 && cx < gridWidth
+          ? grid[cy][cx]
+          : null
+      );
+      // clear
+      coords.forEach(([cx, cy]) => {
+        if (cy >= 0 && cy < gridHeight && cx >= 0 && cx < gridWidth) {
+          grid[cy][cx] = null;
+        }
+      });
+      // rotate in
+      const L = coords.length;
+      old.forEach((c, i) => {
+        const [tx, ty] = coords[(i + 1) % L];
+        if (ty >= 0 && ty < gridHeight && tx >= 0 && tx < gridWidth) {
+          grid[ty][tx] = c;
+        }
+      });
+    }
+
+    // ─── compress inward ────────────────────────────────
+    d.radius = Math.max(0, d.radius - d.shrinkRate);
+  }
+},
+rain: {
+  color: '#55AAFF',
+  update(x, y) {
+    const cell = grid[y][x];
+    if (!cell) return;
+    // try to fall
+    if (!fall(x, y)) {
+      // hit something → spawn a splash
+      splash(x, y);
+      grid[y][x] = null;
+    }
+  }
+},
+
+drop: {
+  color: '#55AAFF',
+  lifespan: 15,
+  update(x, y) {
+    const cell = grid[y][x];
+    if (!cell) return;
+    // age out
+    if (!cell.age) cell.age = 0;
+    if (cell.age++ > cell.lifespan) { grid[y][x] = null; return; }
+    // gravity fall
+    const [gx, gy] = gravityDirection;
+    const nx = x + gx, ny = y + gy;
+    if (ny < gridHeight && !grid[ny][nx]) {
+      grid[ny][nx] = cell;
+      grid[y][x]   = null;
+    }
+    // fade color to transparent blue
+    const t = 1 - cell.age / cell.lifespan;
+    const v = Math.floor(200 * t);
+    const g = Math.min(170, 85 + v);
+    cell.color = `rgba(85, ${g}, 255, ${t})`;
+  }
+},
+blaster: {
+  color: '#FF4444',
+  category: 'powerable',
+  update(x, y) {
+    const self = grid[y][x];
+    if (!self.data) self.data = {
+      powered: false,
+      fired: false,
+      cooldown: 0,
+      fromDir: null
+    };
+
+    const d = self.data;
+
+    const directions = [
+      { dx: 0, dy: -1 }, // up
+      { dx: 1, dy: 0 },  // right
+      { dx: 0, dy: 1 },  // down
+      { dx: -1, dy: 0 }  // left
+    ];
+
+    let nowPowered = false;
+    let sourceDir = null;
+
+    for (const { dx, dy } of directions) {
+      const nx = x + dx, ny = y + dy;
+      const n = grid[ny]?.[nx];
+      if (n && (n.type === 'battery' || (n.type === 'wire' && n.data?.charged))) {
+        nowPowered = true;
+        sourceDir = { dx, dy };
+        break;
+      }
+    }
+
+    if (nowPowered) {
+      if (!d.powered) {
+        // Just powered up
+        d.powered = true;
+        d.fired = false;
+        d.cooldown = 10; // 10 frame delay
+        d.fromDir = sourceDir;
+      }
+
+      if (!d.fired && d.cooldown-- <= 0) {
+        // Fire in opposite direction
+        const outDx = -d.fromDir.dx;
+        const outDy = -d.fromDir.dy;
+        for (let i = 1; i <= 10; i++) {
+          const tx = x + outDx * i;
+          const ty = y + outDy * i;
+          if (tx < 0 || ty < 0 || tx >= gridWidth || ty >= gridHeight) break;
+
+          // Blast away any existing particle
+          grid[ty][tx] = {
+            type: 'electric',
+            ...particles.electric
+          };
+        }
+        d.fired = true;
+      }
+    } else {
+      d.powered = false;
+      d.fired = false;
+      d.cooldown = 0;
+      d.fromDir = null;
+    }
+  }
+},
+transmittor: {
+  color: '#AA55FF',
+  update(x, y) {
+    const cell = grid[y][x];
+    if (!cell) return;
+
+    if (!cell.data) cell.data = { paired: false };
+
+    // ── Link with another unpaired transmittor ──
+    if (!cell.data.paired) {
+      for (let yy = 0; yy < gridHeight; yy++) {
+        for (let xx = 0; xx < gridWidth; xx++) {
+          const target = grid[yy][xx];
+          if (
+            target &&
+            target.type === 'transmittor' &&
+            target !== cell &&
+            !target.data?.paired
+          ) {
+            // Link them
+            cell.data.paired = true;
+            cell.data.link = { x: xx, y: yy };
+            target.data = { paired: true, link: { x, y } };
+            break;
+          }
+        }
+        if (cell.data.paired) break;
+      }
+    }
+
+    if (!cell.data?.link) return;
+
+    const { x: lx, y: ly } = cell.data.link;
+    const linkTarget = grid[ly]?.[lx];
+    if (!linkTarget || linkTarget.type !== 'transmittor') {
+      grid[y][x] = null;
+      return;
+    }
+
+    for (let dy = -5; dy <= 5; dy++) {
+      for (let dx = -5; dx <= 5; dx++) {
+        const sx = x + dx, sy = y + dy;
+        const tx = lx + dx, ty = ly + dy;
+
+        if (
+          sx < 0 || sx >= gridWidth || sy < 0 || sy >= gridHeight ||
+          tx < 0 || tx >= gridWidth || ty < 0 || ty >= gridHeight
+        ) continue;
+
+        const source = grid[sy][sx];
+
+        // Prevent infinite mirror copying
+        if (!source || source.type === 'transmittor' || source.mirrorGuard) continue;
+
+        // List of transient particles to avoid copying
+        const skipTypes = ['electric', 'drop', 'soundwave', 'bubble'];
+
+        if (skipTypes.includes(source.type)) continue;
+
+        const dest = grid[ty][tx];
+        if (!dest || dest.type !== source.type) {
+          // Deep clone with data copy and mirrorGuard flag
+          const copy = {
+            type: source.type,
+            color: source.color,
+            update: particles[source.type].update,
+            mirrorGuard: true
+          };
+
+          if (source.data) {
+            copy.data = JSON.parse(JSON.stringify(source.data));
+          }
+          if (source.age !== undefined) copy.age = source.age;
+
+          grid[ty][tx] = copy;
+        }
+      }
+    }
+  }
+},
+random: {
+    color: '#4D4D4D',
+    update(x, y) {
+        const cell = grid[y][x];
+        if (!cell) return;
+
+        if (!cell.data) {
+            cell.data = {};
+            cell.data.tag = generateRandomTag();
+        }
+
+        // does nothing else for now
+    }
+},
+tag_linker: {
+    color: '#00FFAA',
+    update(x, y) {
+        const cell = grid[y][x];
+        if (!cell) return;
+
+        // Initialize with random tag
+        if (!cell.data) {
+            cell.data = {};
+            cell.data.tag = generateRandomTag();
+        }
+
+        const myTag = cell.data.tag;
+        let closest = null;
+        let minDist = Infinity;
+
+        for (let yy = 0; yy < gridHeight; yy++) {
+            for (let xx = 0; xx < gridWidth; xx++) {
+                if (xx === x && yy === y) continue;
+                const other = grid[yy][xx];
+                if (other?.type === 'tag_linker' && other.data?.tag === myTag) {
+                    const dx = xx - x;
+                    const dy = yy - y;
+                    const dist = dx * dx + dy * dy;
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = { x: xx, y: yy };
+                    }
+                }
+            }
+        }
+
+        // Move toward closest match
+        if (closest && minDist > 2 && Math.random() < 0.1) {
+            const dx = Math.sign(closest.x - x);
+            const dy = Math.sign(closest.y - y);
+            const nx = x + dx;
+            const ny = y + dy;
+            if (
+                nx >= 0 && ny >= 0 &&
+                nx < gridWidth && ny < gridHeight &&
+                !grid[ny][nx]
+            ) {
+                grid[ny][nx] = cell;
+                grid[y][x] = null;
+            }
+        }
+    }
+},
+tnt: {
+    color: '#FF4444',
+    update(x, y) {
+        const cell = grid[y][x];
+        if (!cell) return;
+
+        if (!cell.data) {
+            cell.data = {
+                lit: false,
+                fuse: 180,
+                exploding: false
+            };
+        }
+
+        const dirs = [
+            [1, 0], [-1, 0], [0, 1], [0, -1]
+        ];
+
+        // Ignition from fire or electricity
+        if (!cell.data.lit && !cell.data.exploding) {
+            for (const [dx, dy] of dirs) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight) continue;
+                const neighbor = grid[ny][nx];
+                if (neighbor && (neighbor.type === 'fire' || neighbor.type === 'electricity')) {
+                    cell.data.lit = true;
+                    break;
+                }
+            }
+        }
+
+        // If lit, tick fuse
+        if (cell.data.lit && !cell.data.exploding) {
+            cell.color = `rgba(255, ${100 + Math.floor(Math.random() * 155)}, ${100 + Math.floor(Math.random() * 155)}, 1)`;
+            cell.data.fuse--;
+
+            if (cell.data.fuse <= 0) {
+                // 🔒 Mark as exploding
+                cell.data.exploding = true;
+
+                const radius = 4;
+                for (let dx = -radius; dx <= radius; dx++) {
+                    for (let dy = -radius; dy <= radius; dy++) {
+                        const nx = x + dx;
+                        const ny = y + dy;
+
+                        if (
+                            nx >= 0 && ny >= 0 &&
+                            nx < gridWidth && ny < gridHeight
+                        ) {
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist <= radius) {
+                                const neighbor = grid[ny][nx];
+
+                                if (neighbor?.type === 'tnt') {
+                                    if (!neighbor.data?.lit && !neighbor.data?.exploding) {
+                                        neighbor.data = { lit: true, fuse: 0, exploding: false };
+                                    }
+                                } else {
+                                    grid[ny][nx] = null;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 💥 Finally, remove self
+                grid[y][x] = null;
+            }
+        }
+    }
+},
+tag_counter: {
+    color: '#99FF44',
+    update(x, y) {
+        const cell = grid[y][x];
+        if (!cell) return;
+
+        // Initialize tag and power state
+        if (!cell.data) {
+            cell.data = {
+                tag: "0",
+                wasPowered: false
+            };
+        }
+
+        // Check for adjacent battery
+        const dirs = [
+            [1, 0], [-1, 0], [0, 1], [0, -1]
+        ];
+
+        let isPowered = false;
+        for (const [dx, dy] of dirs) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight) continue;
+            const neighbor = grid[ny][nx];
+            if (neighbor?.type === 'battery') {
+                isPowered = true;
+                break;
+            }
+        }
+
+        // Only increment on rising edge: not previously powered, now powered
+        if (isPowered && !cell.data.wasPowered) {
+            const currentValue = parseInt(cell.data.tag) || 0;
+            cell.data.tag = (currentValue + 1).toString();
+        }
+
+        // Store power state for next frame
+        cell.data.wasPowered = isPowered;
+    }
+},
+tag_bridge_core: {
+    color: '#55DDFF',
+    update(x, y) {
+        const cell = grid[y][x];
+        if (!cell) return;
+
+        // Setup with tag and path
+        if (!cell.data) {
+            cell.data = {
+                tag: cell.data?.tag || generateRandomTag(),
+                path: null,
+                lastGrow: -999
+            };
+        }
+
+        const tag = cell.data.tag;
+
+        // Limit growth rate
+        if (currentFrame - cell.data.lastGrow < 2) return;
+
+        // Find target and path if we don't have one
+        if (!cell.data.path || cell.data.path.length === 0) {
+            let closest = null;
+            let minDist = Infinity;
+
+            for (let yy = 0; yy < gridHeight; yy++) {
+                for (let xx = 0; xx < gridWidth; xx++) {
+                    if (xx === x && yy === y) continue;
+                    const other = grid[yy][xx];
+                    if (
+                        other?.data?.tag === tag &&
+                        other.type !== 'tag_bridge' &&
+                        other.type !== 'tag_bridge_core'
+                    ) {
+                        const dx = xx - x;
+                        const dy = yy - y;
+                        const dist = Math.abs(dx) + Math.abs(dy); // Manhattan distance
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closest = { x: xx, y: yy };
+                        }
+                    }
+                }
+            }
+
+            // Build straight path if target found
+            if (closest) {
+                const path = [];
+                let cx = x;
+                let cy = y;
+
+                while (cx !== closest.x || cy !== closest.y) {
+                    const dx = Math.sign(closest.x - cx);
+                    const dy = Math.sign(closest.y - cy);
+
+                    // Prefer horizontal or vertical step (straight lines)
+                    if (cx !== closest.x) cx += dx;
+                    else if (cy !== closest.y) cy += dy;
+
+                    path.push([cx, cy]);
+                }
+
+                cell.data.path = path;
+            }
+        }
+
+        // Grow one segment along the path
+        if (cell.data.path && cell.data.path.length > 0) {
+            const [nx, ny] = cell.data.path.shift();
+            if (
+                nx >= 0 && ny >= 0 &&
+                nx < gridWidth && ny < gridHeight &&
+                !grid[ny][nx]
+            ) {
+                grid[ny][nx] = {
+                    type: 'tag_bridge',
+                    ...particles.tag_bridge,
+                    data: { tag: tag }
+                };
+                cell.data.lastGrow = currentFrame;
+            }
+        }
+    }
+},
+
+tag_bridge: {
+    color: '#3399AA',
+    update(x, y) {
+        // Passive segment, does nothing (yet)
+    }
+},
+      firewall: {
+        color: '#ff3300',
+        update: () => {}
+      }
+
+    };
+
+    const tools = Object.keys(particles);
+    let currentTool = 'sand';
+
+    const buttonsDiv = document.getElementById('buttons');
+    tools.forEach(tool => {
+      if (tool === 'erase') return; // omit if needed
+      const btn = document.createElement('button');
+      btn.innerText = tool;
+      btn.className = 'button';
+      btn.style.backgroundColor = particles[tool].color;
+      btn.onclick = () => currentTool = tool;
+      buttonsDiv.appendChild(btn);
+    });
+
+    canvas.addEventListener("mousedown", (e) => {
+        drawing = true;
+        placeParticle(e); // ✅ draw on click
+    });
+
+    canvas.addEventListener("mouseup", () => drawing = false);
+    canvas.addEventListener("mouseleave", () => drawing = false);
+
+    canvas.addEventListener("mousemove", e => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = Math.floor((e.clientX - rect.left) / scale);
+        const my = Math.floor((e.clientY - rect.top) / scale);
+
+        if (mx >= 0 && my >= 0 && mx < gridWidth && my < gridHeight) {
+            const cell = grid[my][mx];
+            if (cell) {
+                const tag = cell.data?.tag;
+                if (tag !== undefined) {
+                    hoverInfoBox.innerText = `id: ${cell.type} | tag: ${tag}`;
+                } else {
+                    hoverInfoBox.innerText = `id: ${cell.type}`;
+                }
+            } else {
+                hoverInfoBox.innerText = `empty`;
+            }
+
+            // Draw while mouse is held
+            if (drawing) {
+                placeParticle(e);
+            }
+        } else {
+            hoverInfoBox.innerText = `outside grid`;
+        }
+    });
+
+
+
+
+    let drawing = false;
+    let gravityDirection = [0, 1]; // Default: down
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (drawing) placeParticle(e); // ✅ reuse helper for drawing
+    });
+
+    function placeParticle(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) / scale);
+        const y = Math.floor((e.clientY - rect.top) / scale);
+
+        if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
+            if (currentTool === 'erase') {
+                grid[y][x] = null;
+            } else {
+                const cell = {
+                    type: currentTool,
+                    ...particles[currentTool]
+                };
+
+                // Secret tag override for tag_linker
+                if (currentTool === 'tag_linker' || currentTool === 'tag_bridge_core' || currentTool === 'random' && e.shiftKey) {
+                    const customTag = prompt("Enter custom tag:");
+                    if (customTag) {
+                        cell.data = { tag: customTag };
+                    }
+
+                    // 🔒 Prevent more from being placed accidentally
+                    drawing = false;
+                }
+
+                grid[y][x] = cell;
+            }
+        }
+    }
+
+
+
+    function fall(x, y) {
+        const [dx, dy] = gravityDirection;
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx >= 0 && nx < gridWidth && ny >= 0 && ny < gridHeight && !grid[ny][nx]) {
+          grid[ny][nx] = grid[y][x];
+          grid[y][x] = null;
+          return true;
+        }
+        return false;
+      }
+
+
+    function spread(x, y) {
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      const nx = x + dir;
+      if (nx >= 0 && nx < gridWidth && !grid[y][nx]) {
+        grid[y][nx] = grid[y][x];
+        grid[y][x] = null;
+        return true;
+      }
+      return false;
+    }
+
+    function clearGrid() {
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          grid[y][x] = null;
+        }
+      }
+    }
+
+function propagatePower() {
+  // 1. Create a 2D array of “powered” flags, default false
+  const powered = Array.from({ length: gridHeight },
+    () => Array(gridWidth).fill(false));
+
+  const queue = [];
+
+  // 2. Seed with all true power sources
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      const c = grid[y][x];
+      if (!c) continue;
+      if (
+        c.type === 'battery' ||
+        (c.type === 'toggle_power' && c.data?.on) ||
+        c.type === 'and_gate' ||
+        c.type === 'or_gate'  ||
+        c.type === 'inverter'
+      ) {
+        // look at their N/S/E/W neighbors
+        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          const nx = x + dx, ny = y + dy;
+          if (ny>=0 && ny<gridHeight && nx>=0 && nx<gridWidth) {
+            if (grid[ny][nx]?.type === 'wire' && !powered[ny][nx]) {
+              powered[ny][nx] = true;
+              queue.push([nx, ny]);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 3. BFS: spread through wires
+  while (queue.length) {
+    const [x, y] = queue.shift();
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (
+        ny>=0 && ny<gridHeight &&
+        nx>=0 && nx<gridWidth &&
+        grid[ny][nx]?.type === 'wire' &&
+        !powered[ny][nx]
+      ) {
+        powered[ny][nx] = true;
+        queue.push([nx, ny]);
+      }
+    }
+  }
+
+  // 4. Finally, write back to each wire’s data & color
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      const c = grid[y][x];
+      if (c?.type === 'wire') {
+        c.data = c.data || {};
+        c.data.charged = powered[y][x];
+        c.color       = powered[y][x] ? '#ffaaaa' : '#dddddd';
+      }
+    }
+  }
+}
+
+    function splash(cx, cy) {
+        const count = 8 + Math.floor(Math.random() * 8);
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.5 + Math.random() * 1.5;
+            const dx = Math.cos(angle) * speed;
+            const dy = Math.sin(angle) * speed;
+            const x = cx + Math.round(dx);
+            const y = cy + Math.round(dy);
+            if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
+                grid[y][x] = {
+                    type: 'drop',
+                    age: 0,
+                    lifespan: 10 + Math.floor(Math.random() * 10),
+                    vx: dx,
+                    vy: dy,
+                    color: '#55AAFF',
+                    update: particles.drop.update
+                };
+            }
+        }
+    }
+
+function generateRandomTag(length = 8) {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*1234567890";
+    let tag = "";
+    for (let i = 0; i < length; i++) {
+        tag += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return tag;
+}
+
+function isPowered(x, y) {
+    const dirs = [
+        [1, 0], [-1, 0], [0, 1], [0, -1]
+    ];
+    for (const [dx, dy] of dirs) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= gridWidth || ny >= gridHeight) continue;
+        const neighbor = grid[ny][nx];
+        if (neighbor?.type === 'battery' && neighbor.data?.powered) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+    function updateGrid() {
+      // First pass: update all non-exempt particles
+      for (let y = gridHeight - 1; y >= 0; y--) {
+        for (let x = 0; x < gridWidth; x++) {
+          const cell = grid[y][x];
+          if (cell && typeof cell.update === 'function') {
+            if (!['gravity_well', 'gravity_controller', 'black_hole', 'vine', 'corruption'].includes(cell.type)) {
+              cell.update(x, y);
+            }
+          }
+        }
+      }
+
+  // Second pass: update all gravity_controllers to set gravity direction
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      const cell = grid[y][x];
+      if (cell && cell.type === 'gravity_controller') {
+        cell.update(x, y);
+      }
+    }
+  }
+}
+
+
+    function drawGrid() {
+      ctx.clearRect(0, 0, width, height);
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          const cell = grid[y][x];
+          if (cell) {
+            ctx.fillStyle = cell.color;
+            ctx.fillRect(x * scale, y * scale, scale, scale);
+          }
+        }
+      }
+    }
+    
+    let currentFrame = 0;
+
+    function loop() {
+      currentFrame++
+      propagatePower();
+      updateGrid();
+      drawGrid();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
