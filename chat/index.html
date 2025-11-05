@@ -541,13 +541,7 @@ sendBtn.onclick = async e => {
         messages.innerHTML = '';
         chatHeader.textContent = '';
       }
-    } else if (command === 'changegroupname') {
-      const newName = rest;
-      if (!newName) return alert('Usage: //changegroupname New Group Name');
-      await update(ref(db, `retro/groups/${currentGroupId}`), { name: newName });
-      await postSystemMessage(currentGroupId, `Group name changed to "${newName}" by ${currentUser}.`);
-      // update local copy (onValue on groups will update UI too)
-    } else if (command === 'makesilent') {
+        } else if (command === 'makesilent') {
       if (!rest) return alert('Usage: //makesilent username  OR  //makesilent !username (everyone except username)');
 
       if (rest.startsWith('!')) {
@@ -559,36 +553,29 @@ sendBtn.onclick = async e => {
         const target = rest;
         await update(ref(db, `retro/groups/${currentGroupId}`), { mute: { type: 'user', target } });
         await postSystemMessage(currentGroupId, `${target} has been silenced (by ${currentUser}).`);
-      } else if (command === 'unsilent') {
-          if (!rest) return alert('Usage: //unsilent username');
-    
-          const target = rest.trim();
-    
-          // Get current mute state
-          const groupRef = ref(db, `retro/groups/${currentGroupId}`);
-          const snapshot = await get(child(groupRef, 'mute'));
-    
-          if (!snapshot.exists()) {
-            return alert('No mute data found for this group.');
-          }
-    
-          const muteData = snapshot.val();
-    
-          // If muted user matches, or they’re in a muted list (future-proofing)
-          if (muteData.type === 'user' && muteData.target === target) {
-            await update(groupRef, { mute: { type: 'none' } });
-            await postSystemMessage(currentGroupId, `${currentUser} has unsilenced ${target}.`);
-          } else if (muteData.type === 'everyone_except') {
-            // Convert everyone_except back to everyone silenced except the target (if they were excluded)
-            if (muteData.target === target) {
-              await update(groupRef, { mute: { type: 'everyone' } });
-              await postSystemMessage(currentGroupId, `${currentUser} has unsilenced ${target}.`);
-            } else {
-              await postSystemMessage(currentGroupId, `${target} was not silenced under this mode.`);
-            }
-          } else {
-            await postSystemMessage(currentGroupId, `${target} is not currently silenced.`);
-          }
+      }
+
+    } else if (command === 'unsilent') {
+      if (!rest) return alert('Usage: //unsilent username');
+
+      const target = rest.trim();
+
+      const groupRef = ref(db, `retro/groups/${currentGroupId}`);
+      const snapshot = await get(ref(db, `retro/groups/${currentGroupId}/mute`));
+
+      if (!snapshot.exists()) return alert('No mute data found for this group.');
+
+      const muteData = snapshot.val();
+
+      if (muteData.type === 'user' && muteData.target === target) {
+        await update(groupRef, { mute: { type: 'none' } });
+        await postSystemMessage(currentGroupId, `${target} has been unsilenced by ${currentUser}.`);
+      } else if (muteData.type === 'everyone_except' && muteData.target === target) {
+        await update(groupRef, { mute: { type: 'everyone' } });
+        await postSystemMessage(currentGroupId, `${target} has been unsilenced by ${currentUser}.`);
+      } else {
+        await postSystemMessage(currentGroupId, `${target} is not currently silenced.`);
+      }
     } else {
       return alert('Unknown command.');
     }
