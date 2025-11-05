@@ -418,8 +418,14 @@ function selectGroup(id) {
       msgSpan.textContent = `${sender} > ${text}`;
     
       const timeSpan = document.createElement('span');
-      const time = ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-      timeSpan.textContent = time;
+      if (ts) {
+        const d = new Date(ts);
+        const date = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+        const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        timeSpan.textContent = `${date} · ${time}`;
+      } else {
+        timeSpan.textContent = '';
+      }
       timeSpan.style.color = 'var(--muted)';
       timeSpan.style.fontSize = '12px';
       timeSpan.style.marginLeft = '8px';
