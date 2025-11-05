@@ -409,10 +409,29 @@ function selectGroup(id) {
     messages.innerHTML = '';
     const msgs = snapshot.val() || {};
     for (const mid in msgs) {
-      const { sender, text } = msgs[mid];
+      const { sender, text, ts } = msgs[mid];
       const line = document.createElement('div');
       line.className = 'chatLine';
-      line.textContent = `${sender} > ${text}`;
+    
+      // Create elements
+      const msgSpan = document.createElement('span');
+      msgSpan.textContent = `${sender} > ${text}`;
+    
+      const timeSpan = document.createElement('span');
+      const time = ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      timeSpan.textContent = time;
+      timeSpan.style.color = 'var(--muted)';
+      timeSpan.style.fontSize = '12px';
+      timeSpan.style.marginLeft = '8px';
+      timeSpan.style.whiteSpace = 'nowrap';
+    
+      // Flex layout for alignment
+      line.style.display = 'flex';
+      line.style.justifyContent = 'space-between';
+      line.style.alignItems = 'center';
+    
+      line.appendChild(msgSpan);
+      line.appendChild(timeSpan);
       messages.appendChild(line);
     }
     messages.scrollTop = messages.scrollHeight;
