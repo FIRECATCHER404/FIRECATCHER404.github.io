@@ -408,6 +408,9 @@ joinGroupBtn.onclick = async () => {
   // Open the chat
   selectGroup(groupId);
   alert('Joined group: ' + groups[groupId].name);
+
+  // 🔹 Reload groups so the new group appears in the list
+  loadGroups();
 };
 
 // === Messages & group selection ===
