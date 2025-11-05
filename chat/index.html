@@ -249,7 +249,7 @@ button:disabled {
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js';
-import { getDatabase, ref, set, push, onValue, get } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
+import { getDatabase, ref, set, push, onValue, get, update } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
@@ -278,9 +278,11 @@ const messages = document.getElementById('chat');
 const authPanel = document.getElementById('auth');
 const showUser = document.getElementById('showUser');
 const logoutBtn = document.getElementById('logoutBtn');
+const chatHeader = document.getElementById('chatHeader');
 
 let currentUser = null;
 let currentGroupId = null;
+let currentGroupData = null; // group metadata (owner, inviteOnly, members, mute...)
 
 // === Simple cookie handling ===
 function setCookie(name, value, days = 365) {
@@ -293,12 +295,19 @@ function getCookie(name) {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+// === Helper: system message ===
+async function postSystemMessage(groupId, text) {
+  const newMsgRef = push(ref(db, 'retro/messages/' + groupId));
+  await set(newMsgRef, { sender: '—system—', text, ts: Date.now(), system: true });
+}
+
 // === Auth ===
 registerBtn.onclick = async () => {
   const name = usernameInput.value.trim();
   const pass = passwordInput.value.trim();
   if (!name || !pass) return alert('Enter both fields');
 
+  // NOTE: simple password storage like this is only for demo; production should use Firebase Auth.
   await set(ref(db, 'retro/users/' + name), { password: pass });
   setCookie('username', name);
   currentUser = name;
@@ -328,11 +337,13 @@ logoutBtn.onclick = () => {
   currentUser = null;
   authPanel.style.display = 'block';
   logoutBtn.style.display = 'none';
+  currentGroupId = null;
+  currentGroupData = null;
+  chatHeader.textContent = '';
+  messages.innerHTML = '';
 };
 
 // === Groups ===
-
-// Load groups: shows public groups + invite-only groups user is member of
 function loadGroups() {
   const groupsRef = ref(db, 'retro/groups');
   onValue(groupsRef, snapshot => {
@@ -341,7 +352,7 @@ function loadGroups() {
 
     for (const id in data) {
       const group = data[id];
-      const isMember = group.members && group.members[currentUser];
+      const isMember = group.members && currentUser && group.members[currentUser];
 
       // Show if public OR user is member
       if (!group.inviteOnly || isMember) {
@@ -361,7 +372,6 @@ createGroupBtn.onclick = async () => {
   const name = document.getElementById('newGroupName').value.trim();
   if (!name) return alert('Enter a group name');
 
-  // Ask if invite-only
   const isInviteOnly = confirm('Make this group invite-only?');
   const inviteCode = isInviteOnly ? Math.random().toString(36).slice(2, 10) : null;
 
@@ -371,7 +381,8 @@ createGroupBtn.onclick = async () => {
     owner: currentUser,
     inviteOnly: isInviteOnly,
     inviteCode,
-    members: { [currentUser]: true } // creator is automatically a member
+    members: { [currentUser]: true },
+    mute: { type: 'none' } // default
   });
 
   if (isInviteOnly) alert('Invite code: ' + inviteCode);
@@ -388,7 +399,6 @@ joinGroupBtn.onclick = async () => {
   const snapshot = await get(groupsRef);
   const groups = snapshot.val() || {};
 
-  // Find group with this code
   const groupId = Object.keys(groups).find(id => groups[id].inviteCode === code);
   if (!groupId) return alert('Invalid invite code');
 
@@ -400,42 +410,63 @@ joinGroupBtn.onclick = async () => {
   alert('Joined group: ' + groups[groupId].name);
 };
 
-// === Messages ===
+// === Messages & group selection ===
 function selectGroup(id) {
+  // clear previous listeners/state
   currentGroupId = id;
+  currentGroupData = null;
   messages.innerHTML = '';
+  chatHeader.textContent = 'Loading...';
+
+  // Load group metadata (owner, name, mute state)
+  (async () => {
+    const gSnap = await get(ref(db, `retro/groups/${id}`));
+    if (!gSnap.exists()) {
+      chatHeader.textContent = 'Group not found';
+      return;
+    }
+    currentGroupData = gSnap.val();
+    chatHeader.innerHTML = `<strong>${escapeHtml(currentGroupData.name || 'Unnamed')}</strong>
+                            <div style="font-size:12px;color:var(--muted)">owner: ${escapeHtml(currentGroupData.owner || 'n/a')}</div>`;
+  })();
+
   const msgsRef = ref(db, 'retro/messages/' + id);
   onValue(msgsRef, snapshot => {
     messages.innerHTML = '';
     const msgs = snapshot.val() || {};
     for (const mid in msgs) {
-      const { sender, text, ts } = msgs[mid];
+      const { sender, text, ts, system } = msgs[mid];
+
+      // If currentGroupData not loaded yet, show everything (will re-render when data arrives)
+      // Skip messages if they are muted by group mute rules
+      if (currentGroupData && isMessageMutedByGroup(sender, currentGroupData.mute)) {
+        continue;
+      }
+
       const line = document.createElement('div');
       line.className = 'chatLine';
-    
-      // Create elements
+
       const msgSpan = document.createElement('span');
       msgSpan.textContent = `${sender} > ${text}`;
-    
+
       const timeSpan = document.createElement('span');
-      if (ts) {
-        const d = new Date(ts);
-        const date = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-        const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        timeSpan.textContent = `${date} · ${time}`;
-      } else {
-        timeSpan.textContent = '';
-      }
+      const time = ts ? formatTimestamp(ts) : '';
+      timeSpan.textContent = time;
       timeSpan.style.color = 'var(--muted)';
       timeSpan.style.fontSize = '12px';
       timeSpan.style.marginLeft = '8px';
       timeSpan.style.whiteSpace = 'nowrap';
-    
-      // Flex layout for alignment
+
       line.style.display = 'flex';
       line.style.justifyContent = 'space-between';
       line.style.alignItems = 'center';
-    
+
+      // System messages styling
+      if (system) {
+        msgSpan.style.fontStyle = 'italic';
+        msgSpan.style.color = 'var(--muted)';
+      }
+
       line.appendChild(msgSpan);
       line.appendChild(timeSpan);
       messages.appendChild(line);
@@ -444,13 +475,108 @@ function selectGroup(id) {
   });
 }
 
+// Format timestamp to "Nov 5, 2025 · 12:34 PM"
+function formatTimestamp(ts) {
+  const d = new Date(ts);
+  const date = d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return `${date} · ${time}`;
+}
+
+// Check mute rules
+function isMessageMutedByGroup(sender, mute) {
+  if (!mute || mute.type === 'none') return false;
+
+  if (mute.type === 'user') {
+    // target is muted
+    return sender === mute.target;
+  }
+
+  if (mute.type === 'everyone_except') {
+    // everyone except target is muted
+    return sender !== mute.target;
+  }
+
+  if (mute.type === 'everyone') {
+    return true;
+  }
+
+  return false;
+}
+
+// send handler (including commands)
 sendBtn.onclick = async e => {
   e.preventDefault();
   if (!currentGroupId || !currentUser) return;
-  const text = msgInput.value.trim();
-  if (!text) return;
+
+  const textRaw = msgInput.value.trim();
+  if (!textRaw) return;
+
+  // Command syntax starts with //
+  if (textRaw.startsWith('//')) {
+    // Only owner can run commands
+    const groupRef = ref(db, `retro/groups/${currentGroupId}`);
+    const gSnap = await get(groupRef);
+    const g = gSnap.exists() ? gSnap.val() : null;
+    if (!g) return alert('Group not found');
+
+    if (g.owner !== currentUser) return alert('Only the group owner can run commands.');
+
+    // parse command
+    const parts = textRaw.slice(2).trim().split(' ');
+    const command = parts[0].toLowerCase();
+    const rest = parts.slice(1).join(' ').trim();
+
+    if (command === 'ban') {
+      const target = rest;
+      if (!target) return alert('Usage: //ban username');
+      // remove member entry
+      await set(ref(db, `retro/groups/${currentGroupId}/members/${target}`), null);
+      await postSystemMessage(currentGroupId, `${target} was banned by ${currentUser}.`);
+      // If the banned user is the current viewer, kick them out
+      if (target === currentUser) {
+        alert('You banned yourself (you are no longer a member).');
+        currentGroupId = null;
+        currentGroupData = null;
+        messages.innerHTML = '';
+        chatHeader.textContent = '';
+      }
+    } else if (command === 'changegroupname') {
+      const newName = rest;
+      if (!newName) return alert('Usage: //changegroupname New Group Name');
+      await update(ref(db, `retro/groups/${currentGroupId}`), { name: newName });
+      await postSystemMessage(currentGroupId, `Group name changed to "${newName}" by ${currentUser}.`);
+      // update local copy (onValue on groups will update UI too)
+    } else if (command === 'makesilent') {
+      if (!rest) return alert('Usage: //makesilent username  OR  //makesilent !username (everyone except username)');
+
+      if (rest.startsWith('!')) {
+        const exceptUser = rest.slice(1);
+        if (!exceptUser) return alert('Specify a username after !');
+        await update(ref(db, `retro/groups/${currentGroupId}`), { mute: { type: 'everyone_except', target: exceptUser } });
+        await postSystemMessage(currentGroupId, `All users silenced except ${exceptUser} (by ${currentUser}).`);
+      } else {
+        const target = rest;
+        await update(ref(db, `retro/groups/${currentGroupId}`), { mute: { type: 'user', target } });
+        await postSystemMessage(currentGroupId, `${target} has been silenced (by ${currentUser}).`);
+      }
+    } else {
+      return alert('Unknown command.');
+    }
+
+    msgInput.value = '';
+    return;
+  }
+
+  // Normal message: check if the sender is allowed (not silenced)
+  const groupSnap = await get(ref(db, `retro/groups/${currentGroupId}`));
+  const gdata = groupSnap.exists() ? groupSnap.val() : null;
+  if (gdata && isMessageMutedByGroup(currentUser, gdata.mute)) {
+    return alert('You are currently silenced in this group and cannot send messages.');
+  }
+
   const newMsgRef = push(ref(db, 'retro/messages/' + currentGroupId));
-  await set(newMsgRef, { sender: currentUser, text, ts: Date.now() });
+  await set(newMsgRef, { sender: currentUser, text: textRaw, ts: Date.now() });
   msgInput.value = '';
 };
 
@@ -475,7 +601,10 @@ window.toggleTheme = function() {
 // Restore saved theme on load
 document.documentElement.dataset.theme = localStorage.getItem('theme') || 'light';
 
- 
+// small helper to escape HTML when injecting names etc.
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 </script>
 
 </body>
