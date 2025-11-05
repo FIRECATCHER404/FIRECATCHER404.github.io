@@ -579,6 +579,20 @@ sendBtn.onclick = async e => {
       } else {
         await postSystemMessage(currentGroupId, `${target} is not currently silenced.`);
       }
+    } else if (command === 'rename') {
+      const newName = rest.trim();
+      if (!newName) return alert('Usage: //rename New Group Name');
+    
+      // Update group name in the database
+      await update(ref(db, `retro/groups/${currentGroupId}`), { name: newName });
+    
+      // Update currentGroupData locally so header updates immediately
+      currentGroupData.name = newName;
+      chatHeader.innerHTML = `<strong>${escapeHtml(currentGroupData.name || 'Unnamed')}</strong>
+                              <div style="font-size:12px;color:var(--muted)">owner: ${escapeHtml(currentGroupData.owner || 'n/a')}</div>`;
+    
+      // Post system message
+      await postSystemMessage(currentGroupId, `Group name changed to "${newName}" by ${currentUser}.`);
     } else {
       return alert('Unknown command.');
     }
