@@ -501,9 +501,14 @@ function selectGroup(id) {
 
     // 🔔 Only increment unread count, don’t auto-switch
     if (currentGroupId !== id && currentGroupData && currentGroupData.inviteOnly) {
-      incrementUnread(id);
+      // Find the matching group element and add/update the unread count inline
+      const groupItem = document.querySelector(`.groupItem[data-id="${id}"]`);
+      if (groupItem) {
+        const match = groupItem.textContent.match(/🔒(?: \(\[(\d+)\]\))?/);
+        let count = match && match[1] ? parseInt(match[1]) + 1 : 1;
+        groupItem.textContent = groupItem.textContent.replace(/🔒(?: \(\[\d+\]\))?/, `🔒 ([${count}])`);
+      }
     }
-
     messages.scrollTop = messages.scrollHeight;
   });
 }
