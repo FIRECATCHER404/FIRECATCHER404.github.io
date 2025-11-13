@@ -694,6 +694,33 @@ document.documentElement.dataset.theme = localStorage.getItem('theme') || 'light
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+// === Global notification watcher for invite-only groups ===
+function watchGroupNotifications() {
+  const groupsRef = ref(db, 'retro/messages');
+  onValue(groupsRef, snapshot => {
+    const allMsgs = snapshot.val() || {};
+    for (const gid in allMsgs) {
+      if (gid === currentGroupId) continue; // skip open chat
+      const groupItem = document.querySelector(`.groupItem[data-id="${gid}"]`);
+      if (!groupItem) continue;
+
+      // only if invite-only
+      const gSnap = ref(db, `retro/groups/${gid}`);
+      get(gSnap).then(grp => {
+        if (grp.exists() && grp.val().inviteOnly) {
+          const match = groupItem.textContent.match(/🔒(?: \((\d+)\))?/);
+          let count = match && match[1] ? parseInt(match[1]) + 1 : 1;
+          groupItem.textContent = groupItem.textContent.replace(/🔒(?: \(\d+\))?/, `🔒 (${count})`);
+        }
+      });
+    }
+  });
+}
+
+// Call this once after user login
+watchGroupNotifications();
+  
 </script>
 
 </body>
