@@ -348,7 +348,6 @@ logoutBtn.onclick = () => {
 
 // === Groups ===
 function loadGroups() {
-  div.dataset.id = id; // so we can find it later
   const groupsRef = ref(db, 'retro/groups');
   onValue(groupsRef, snapshot => {
     groupListDiv.innerHTML = '';
@@ -361,8 +360,12 @@ function loadGroups() {
       // Show if public OR user is member
       if (!group.inviteOnly || isMember) {
         const div = document.createElement('div');
+        div.dataset.id = id; // ✅ moved here
+
         const unreadCount = parseInt(localStorage.getItem(`unread_${id}`)) || 0;
-        div.textContent = group.name + (group.inviteOnly ? ` 🔒${unreadCount > 0 ? ' (' + unreadCount + ')' : ''}` : '');
+        div.textContent =
+          group.name +
+          (group.inviteOnly ? ` 🔒${unreadCount > 0 ? ' (' + unreadCount + ')' : ''}` : '');
         div.className = 'groupItem';
         div.onclick = () => selectGroup(id);
         groupListDiv.appendChild(div);
@@ -505,9 +508,9 @@ function selectGroup(id) {
       // Find the matching group element and add/update the unread count inline
       const groupItem = document.querySelector(`.groupItem[data-id="${id}"]`);
       if (groupItem) {
-        const match = groupItem.textContent.match(/🔒(?: \(\[(\d+)\]\))?/);
+        const match = groupItem.textContent.match(/🔒(?: \((\d+)\))?/);
         let count = match && match[1] ? parseInt(match[1]) + 1 : 1;
-        groupItem.textContent = groupItem.textContent.replace(/🔒(?: \(\[\d+\]\))?/, `🔒 ([${count}])`);
+        groupItem.textContent = groupItem.textContent.replace(/🔒(?: \(\d+\))?/, `🔒 (${count})`);
       }
     }
     messages.scrollTop = messages.scrollHeight;
