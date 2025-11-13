@@ -193,7 +193,7 @@
 
         <div class="controlRow">
           <div class="small">Rows</div>
-          <input id="rows" type="number" min="1" max="32" value="8" style="width:64px;">
+          <input id="rows" type="number" min="1" max="32" value="10" style="width:64px;">
           <div class="small">Cols</div>
           <input id="cols" type="number" min="8" max="1024" step="8" value="34" style="width:80px;">
           <button id="rebuildBtn" class="btn alt">Rebuild Grid</button>
@@ -209,7 +209,7 @@
 <script>
 (function(){
   // State
-  let rows = 8;
+  let rows = 10;
   let cols = 34;
   let tempo = 90;
   let grid = []; // [row][col] boolean
@@ -271,16 +271,31 @@
   function renderCell(el, r, c){
     const active = !!grid[r][c];
     const isCur = (c === currentCol);
-    el.className = 'cell';
+  
+    el.className = 'cell'; // reset classes
+  
     if (!active) {
       el.classList.add('inactive');
       el.classList.add(document.body.classList.contains('light') ? 'light' : 'dark');
       if (isCur) el.classList.add('current','inactive');
     } else {
-      // choose color by row. If more rows than 8, map proportionally into 0..7
-      const idx = Math.min(colorClass.length-1, Math.floor((r / Math.max(1, rows-1)) * (colorClass.length-1)));
-      const cls = colorClass[idx];
-      el.classList.add(cls);
+      // bottom row = beat
+      if (r === rows - 1) {
+        el.classList.add('beat');
+        el.style.backgroundColor = active ? 'var(--yellow)' : (document.body.classList.contains('light') ? 'var(--inactive-light)' : 'var(--inactive-dark)');
+      
+      // second from bottom = snare
+      } else if (r === rows - 2) {
+        el.classList.add('snare');
+        el.style.borderBottomColor = active ? 'var(--yellow)' : (document.body.classList.contains('light') ? 'var(--inactive-light)' : 'var(--inactive-dark)');
+  
+      // normal note
+      } else {
+        const idx = Math.min(colorClass.length-1, Math.floor((r / Math.max(1, rows-1)) * (colorClass.length-1)));
+        const cls = colorClass[idx];
+        el.classList.add(cls);
+      }
+  
       if (isCur) el.classList.add('current','active');
     }
   }
@@ -470,7 +485,7 @@ playBtn.addEventListener('click', () => {
   });
 
   rebuildBtn.addEventListener('click', () => {
-    const rVal = Number(rowsInput.value) || 8;
+    const rVal = Number(rowsInput.value) || 10;
     const cVal = Number(colsInput.value) || 34;
     rows = Math.max(1, Math.min(32, rVal));
     cols = Math.max(8, Math.min(1024, cVal));
@@ -520,5 +535,6 @@ playBtn.addEventListener('click', () => {
 </script>
 </body>
 </html>
+
 
 
