@@ -146,6 +146,26 @@
   @media (max-width:720px){
     .controls{ flex-direction:column; align-items:flex-start; gap:8px; }
   }
+
+  .beat {
+    border-radius: 50%;
+  }
+
+  .snare {
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-bottom: 28px solid var(--accent);
+    background: none !important;
+    border-radius: 0 !important;
+  }
+  .snare.active {
+    border-bottom-color: var(--yellow); /* or appropriate color */
+  }
+  .snare.inactive {
+    border-bottom-color: var(--inactive-dark);
+  }
 </style>
 </head>
 <body>
@@ -301,12 +321,62 @@
     try { osc.stop(when + 0.3); } catch(e){}
   }
 
+  function playBeat(when){
+    ensureAudioCtx();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+  
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(120, when);
+    osc.frequency.exponentialRampToValueAtTime(40, when + 0.15);
+  
+    gain.gain.setValueAtTime(1, when);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + 0.2);
+  
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(when);
+    osc.stop(when + 0.2);
+  }
+
+  function playSnare(when){
+    ensureAudioCtx();
+  
+    const noise = audioCtx.createBufferSource();
+    const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.2, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  
+    noise.buffer = buffer;
+  
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.5, when);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + 0.2);
+  
+    noise.connect(gain).connect(audioCtx.destination);
+    noise.start(when);
+  }
+
   function scheduleStep(colIndex){
     ensureAudioCtx();
     if (!audioCtx) return;
+  
     const when = audioCtx.currentTime + 0.02;
-    for(let r=0;r<rows;r++){
-      if (grid[r][colIndex]) playSynth(r, when);
+  
+    for (let r = 0; r < rows; r++) {
+      if (!grid[r][colIndex]) continue;
+  
+      // bottom row = BEAT
+      if (r === rows - 1) {
+        playBeat(when);
+  
+      // second from bottom = SNARE
+      } else if (r === rows - 2) {
+        playSnare(when);
+  
+      // everything above = pitched notes
+      } else {
+        playSynth(r, when);
+      }
     }
   }
 
@@ -450,4 +520,5 @@ playBtn.addEventListener('click', () => {
 </script>
 </body>
 </html>
+
 
