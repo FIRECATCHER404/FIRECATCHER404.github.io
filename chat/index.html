@@ -215,6 +215,8 @@ button:disabled {
       <div class="panel">
         <h2>Settings</h2>
         <button onclick="toggleTheme()">Toggle Dark / Light mode</button>
+        <label for="bgColorPicker">Background: </label>
+        <input type="color" id="bgColorPicker" value="#121212">
       </div>
     </section>
 
@@ -357,13 +359,26 @@ function loadGroups() {
       // Show if public OR user is member
       if (!group.inviteOnly || isMember) {
         const div = document.createElement('div');
-        div.textContent = group.name + (group.inviteOnly ? ' 🔒' : '');
+        const unreadCount = parseInt(localStorage.getItem(`unread_${id}`)) || 0;
+        div.textContent = group.name + (group.inviteOnly ? ` 🔒${unreadCount > 0 ? ' (' + unreadCount + ')' : ''}` : '');
         div.className = 'groupItem';
         div.onclick = () => selectGroup(id);
         groupListDiv.appendChild(div);
       }
     }
   });
+}
+
+function incrementUnread(groupId) {
+  const key = `unread_${groupId}`;
+  const current = parseInt(localStorage.getItem(key)) || 0;
+  localStorage.setItem(key, current + 1);
+  loadGroups(); // refresh the list
+}
+
+function resetUnread(groupId) {
+  localStorage.setItem(`unread_${groupId}`, 0);
+  loadGroups(); // refresh the list
 }
 
 // Create group
@@ -417,6 +432,7 @@ joinGroupBtn.onclick = async () => {
 function selectGroup(id) {
   // clear previous listeners/state
   currentGroupId = id;
+  resetUnread(id);
   currentGroupData = null;
   messages.innerHTML = '';
   chatHeader.textContent = 'Loading...';
@@ -473,6 +489,9 @@ function selectGroup(id) {
       line.appendChild(msgSpan);
       line.appendChild(timeSpan);
       messages.appendChild(line);
+    }
+    if (currentGroupId !== id && currentGroupData && currentGroupData.inviteOnly) {
+      incrementUnread(id);
     }
     messages.scrollTop = messages.scrollHeight;
   });
@@ -630,6 +649,23 @@ window.toggleTheme = function() {
   root.dataset.theme = isDark ? 'light' : 'dark';
   localStorage.setItem('theme', isDark ? 'light' : 'dark');
 };
+
+// === Background color selector ===
+const bgColorPicker = document.getElementById('bgColorPicker');
+
+// When user selects a background color
+bgColorPicker.addEventListener('input', (e) => {
+  const color = e.target.value;
+  document.documentElement.style.setProperty('--bg', color);
+  localStorage.setItem('customBgColor', color);
+});
+
+// Apply saved color on load
+const savedBg = localStorage.getItem('customBgColor');
+if (savedBg) {
+  document.documentElement.style.setProperty('--bg', savedBg);
+  bgColorPicker.value = savedBg;
+}
 
 // Restore saved theme on load
 document.documentElement.dataset.theme = localStorage.getItem('theme') || 'light';
