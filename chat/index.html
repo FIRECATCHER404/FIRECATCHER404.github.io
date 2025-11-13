@@ -267,6 +267,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // === DOM Elements ===
+let groupMessageListener = null;
 const msgInput = document.getElementById('msgInput');
 const sendBtn = document.getElementById('sendBtn');
 const usernameInput = document.getElementById('username');
@@ -430,6 +431,12 @@ joinGroupBtn.onclick = async () => {
 
 // === Messages & group selection ===
 function selectGroup(id) {
+  // ✅ Remove previous message listener so other groups don’t hijack the chat
+  if (groupMessageListener) {
+    groupMessageListener(); // unsubscribe from previous onValue listener
+    groupMessageListener = null;
+  }
+
   // clear previous listeners/state
   currentGroupId = id;
   resetUnread(id);
@@ -450,13 +457,14 @@ function selectGroup(id) {
   })();
 
   const msgsRef = ref(db, 'retro/messages/' + id);
-  onValue(msgsRef, snapshot => {
+
+  // ✅ Save unsubscribe function so we can stop listening next time
+  groupMessageListener = onValue(msgsRef, snapshot => {
     messages.innerHTML = '';
     const msgs = snapshot.val() || {};
     for (const mid in msgs) {
       const { sender, text, ts, system } = msgs[mid];
 
-      // If currentGroupData not loaded yet, show everything (will re-render when data arrives)
       // Skip messages if they are muted by group mute rules
       if (currentGroupData && isMessageMutedByGroup(sender, currentGroupData.mute)) {
         continue;
@@ -490,9 +498,12 @@ function selectGroup(id) {
       line.appendChild(timeSpan);
       messages.appendChild(line);
     }
+
+    // 🔔 Only increment unread count, don’t auto-switch
     if (currentGroupId !== id && currentGroupData && currentGroupData.inviteOnly) {
       incrementUnread(id);
     }
+
     messages.scrollTop = messages.scrollHeight;
   });
 }
