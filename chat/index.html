@@ -348,6 +348,7 @@ logoutBtn.onclick = () => {
 
 // === Groups ===
 function loadGroups() {
+  div.dataset.id = id; // so we can find it later
   const groupsRef = ref(db, 'retro/groups');
   onValue(groupsRef, snapshot => {
     groupListDiv.innerHTML = '';
