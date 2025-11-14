@@ -4,7 +4,20 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Song maker</title>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js"></script>
 <style>
+
+  .c-red     { background: #dc2626 !important; }
+  .c-orange  { background: #ea580c !important; }
+  .c-yellow  { background: #eab308 !important; }
+  .c-lime    { background: #84cc16 !important; }
+  .c-green   { background: #22c55e !important; }
+  .c-cyan    { background: #06b6d4 !important; }
+  .c-blue    { background: #3b82f6 !important; }
+  .c-indigo  { background: #6366f1 !important; }
+  .c-purple  { background: #8b5cf6 !important; }
+  .c-pink    { background: #ec4899 !important; }
+  .c-rose    { background: #f43f5e !important; }
   :root{
     --bg: #0f1724;
     --panel: #111827;
@@ -147,25 +160,15 @@
     .controls{ flex-direction:column; align-items:flex-start; gap:8px; }
   }
 
-  .beat {
-    border-radius: 50%;
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    user-select: none;
   }
 
-  .snare {
-    width: 0;
-    height: 0;
-    border-left: 14px solid transparent;
-    border-right: 14px solid transparent;
-    border-bottom: 28px solid var(--accent);
-    background: none !important;
-    border-radius: 0 !important;
-  }
-  .snare.active {
-    border-bottom-color: var(--yellow); /* or appropriate color */
-  }
-  .snare.inactive {
-    border-bottom-color: var(--inactive-dark);
-  }
 </style>
 </head>
 <body>
@@ -183,6 +186,10 @@
           <button id="playBtn" class="btn">Play</button>
           <button id="clearBtn" class="btn alt">Clear</button>
           <button id="randomBtn" class="btn alt">Random</button>
+          
+          <!-- NEW IMPORT / EXPORT BUTTONS -->
+          <button id="exportMP3" class="btn alt">Export MP3</button>
+          <input type="file" id="mp3File" accept=".mp3" style="display:none;">
         </div>
 
         <div class="controlRow">
@@ -195,7 +202,7 @@
           <div class="small">Rows</div>
           <input id="rows" type="number" min="1" max="32" value="10" style="width:64px;">
           <div class="small">Cols</div>
-          <input id="cols" type="number" min="8" max="1024" step="8" value="34" style="width:80px;">
+          <input id="cols" type="number" min="8" max="1024" step="8" value="32" style="width:80px;">
           <button id="rebuildBtn" class="btn alt">Rebuild Grid</button>
         </div>
       </div>
@@ -210,7 +217,7 @@
 (function(){
   // State
   let rows = 10;
-  let cols = 34;
+  let cols = 32;
   let tempo = 90;
   let grid = []; // [row][col] boolean
   let currentCol = -1;
@@ -268,37 +275,44 @@
     gridWrap.scrollLeft = 0;
   }
 
-  function renderCell(el, r, c){
-    const active = !!grid[r][c];
-    const isCur = (c === currentCol);
-  
-    el.className = 'cell'; // reset classes
-  
-    if (!active) {
-      el.classList.add('inactive');
-      el.classList.add(document.body.classList.contains('light') ? 'light' : 'dark');
-      if (isCur) el.classList.add('current','inactive');
-    } else {
-      // bottom row = beat
-      if (r === rows - 1) {
-        el.classList.add('beat');
-        el.style.backgroundColor = active ? 'var(--yellow)' : (document.body.classList.contains('light') ? 'var(--inactive-light)' : 'var(--inactive-dark)');
-      
-      // second from bottom = snare
-      } else if (r === rows - 2) {
-        el.classList.add('snare');
-        el.style.borderBottomColor = active ? 'var(--yellow)' : (document.body.classList.contains('light') ? 'var(--inactive-light)' : 'var(--inactive-dark)');
-  
-      // normal note
-      } else {
-        const idx = Math.min(colorClass.length-1, Math.floor((r / Math.max(1, rows-1)) * (colorClass.length-1)));
-        const cls = colorClass[idx];
-        el.classList.add(cls);
-      }
-  
-      if (isCur) el.classList.add('current','active');
+  function renderCell(el, r, c) {
+  const active = !!grid[r][c];
+  const isCur = (c === currentCol);
+
+  el.className = 'cell'; // reset
+
+  if (!active) {
+    // inactive cell
+    el.classList.add('inactive');
+    el.classList.add(document.body.classList.contains('light') ? 'light' : 'dark');
+    el.textContent = "";
+    if (isCur) el.classList.add('current','inactive');
+  } else {
+    // ACTIVE CELL
+    if (r === rows - 1) {
+      // bottom row = kick
+      el.classList.add('c-red');
+      el.textContent = "k";
+    } 
+    else if (r === rows - 2) {
+      // second row = snare
+      el.classList.add('c-orange');
+      el.textContent = "s";
+    } 
+    else {
+      // melodic rows
+      const idx = Math.min(
+        colorClass.length - 1,
+        Math.floor((r / Math.max(1, rows - 1)) * (colorClass.length - 1))
+      );
+      const cls = colorClass[idx];
+      el.classList.add(cls);
+      el.textContent = "";
     }
+
+    if (isCur) el.classList.add('current','active');
   }
+}
 
   // Re-render entire grid (useful when currentCol changes or rows/cols rebuild)
   function rerenderGrid(){
@@ -486,7 +500,7 @@ playBtn.addEventListener('click', () => {
 
   rebuildBtn.addEventListener('click', () => {
     const rVal = Number(rowsInput.value) || 10;
-    const cVal = Number(colsInput.value) || 34;
+    const cVal = Number(colsInput.value) || 32;
     rows = Math.max(1, Math.min(32, rVal));
     cols = Math.max(8, Math.min(1024, cVal));
     rowsInput.value = rows;
@@ -531,10 +545,167 @@ playBtn.addEventListener('click', () => {
     }
   });
 
+  // ----- MP3 EXPORT -----
+  async function exportToMP3(){
+    const durationPerStep = (60 / tempo) / 4;
+    const totalDuration = durationPerStep * cols;
+    const sampleRate = 44100;
+    const offCtx = new OfflineAudioContext(1, sampleRate * totalDuration, sampleRate);
+
+    for(let c=0;c<cols;c++){
+      const when = c * durationPerStep;
+      for(let r=0;r<rows;r++){
+        if(!grid[r][c]) continue;
+        if(r===rows-1) renderBeatOffline(offCtx, when);
+        else if(r===rows-2) renderSnareOffline(offCtx, when);
+        else renderSynthOffline(offCtx, when, r);
+      }
+    }
+
+    const rendered = await offCtx.startRendering();
+    const mp3 = new lamejs.Mp3Encoder(1, sampleRate, 128);
+    const samples = rendered.getChannelData(0);
+    const chunk = 1152;
+    let mp3Data=[];
+
+    for(let i=0;i<samples.length;i+=chunk){
+      const slice = samples.subarray(i,i+chunk);
+      const mp3buf = mp3.encodeBuffer(floatTo16(slice));
+      if(mp3buf.length) mp3Data.push(mp3buf);
+    }
+
+    const end = mp3.flush();
+    if(end.length) mp3Data.push(end);
+
+    const blob = new Blob(mp3Data,{type:"audio/mp3"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "song.mp3";
+    a.click();
+  }
+
+  function floatTo16(buf){
+    const out = new Int16Array(buf.length);
+    for(let i=0;i<buf.length;i++){
+      let s = Math.max(-1,Math.min(1,buf[i]));
+      out[i] = s<0 ? s*0x8000 : s*0x7FFF;
+    }
+    return out;
+  }
+
+  function renderSynthOffline(ctx, when, row){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const base = 110;
+    const exp = (rows-1-row)/12;
+    osc.frequency.value = base*Math.pow(2,exp);
+    gain.gain.setValueAtTime(0.001,when);
+    gain.gain.exponentialRampToValueAtTime(0.3,when+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001,when+0.25);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(when);
+    osc.stop(when+0.3);
+  }
+
+  function renderBeatOffline(ctx,when){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type="sine";
+    osc.frequency.setValueAtTime(120,when);
+    osc.frequency.exponentialRampToValueAtTime(40,when+0.15);
+    gain.gain.setValueAtTime(1,when);
+    gain.gain.exponentialRampToValueAtTime(0.001,when+0.2);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(when);
+    osc.stop(when+0.2);
+  }
+
+  function renderSnareOffline(ctx,when){
+    const buffer = ctx.createBuffer(1,ctx.sampleRate*0.2,ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i] = Math.random()*2-1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.5,when);
+    gain.gain.exponentialRampToValueAtTime(0.001,when+0.2);
+    noise.connect(gain).connect(ctx.destination);
+    noise.start(when);
+  }
+
+  document.getElementById("exportMP3").addEventListener("click",exportToMP3);
+
+
+  // ----- MP3 IMPORT -----
+document.getElementById("importMP3").addEventListener("click", ()=>{
+  document.getElementById("mp3File").click();
+});
+
+document.getElementById("mp3File").addEventListener("change", async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  ensureAudioCtx();
+
+  const array = await file.arrayBuffer();
+  const audio = await audioCtx.decodeAudioData(array);
+
+  // === Mix to mono ===
+  const len = audio.length;
+  const ch = audio.numberOfChannels;
+  const sr = audio.sampleRate;
+  const mono = new Float32Array(len);
+  for (let c = 0; c < ch; c++) {
+    const data = audio.getChannelData(c);
+    for (let i = 0; i < len; i++) mono[i] += data[i] / ch;
+  }
+
+  // === High-pass filter to catch drum transients ===
+  for (let i = len-1; i >= 1; i--)
+    mono[i] = mono[i] - 0.995 * mono[i-1];
+
+  // === Compute short-time energy (transient detector) ===
+  const win = 512;
+  const hop = 256;
+  const energy = [];
+  for (let i = 0; i + win < mono.length; i += hop) {
+    let sum = 0;
+    for (let j=0; j<win; j++) {
+      const v = mono[i+j];
+      sum += v*v;
+    }
+    energy.push(sum);
+  }
+
+  // === Adaptive threshold ===
+  const sorted = [...energy].sort((a,b)=>a-b);
+  const median = sorted[Math.floor(sorted.length/2)];
+  const threshold = median * 4;
+
+  // === Peak-picking (onset detection) ===
+  const peaks = [];
+  for (let i = 1; i < energy.length - 1; i++) {
+    if (energy[i] > threshold &&
+        energy[i] > energy[i-1] &&
+        energy[i] > energy[i+1]) {
+      peaks.push(i);
+    }
+  }
+
+  // === Map peaks to grid columns ===
+  grid = makeEmptyGrid(rows, cols);
+
+  for (let p of peaks) {
+    const time = (p * hop) / sr;
+    const col = Math.floor((time / audio.duration) * cols);
+    if (col >= 0 && col < cols) {
+      grid[rows - 1][col] = true;   // Kick row
+    }
+  }
+
+  rerenderGrid();
+});
 })();
 </script>
 </body>
 </html>
-
-
-
