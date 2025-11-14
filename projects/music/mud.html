@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Song maker</title>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js"></script>
+<style>
+
+  .c-red     { background: #dc2626 !important; }
+  .c-orange  { background: #ea580c !important; }
+  .c-yellow  { background: #eab308 !important; }
+  .c-lime    { background: #84cc16 !important; }
+  .c-green   { background: #22c55e !important; }
+  .c-cyan    { background: #06b6d4 !important; }
+  .c-blue    { background: #3b82f6 !important; }
+  .c-indigo  { background: #6366f1 !important; }
+  .c-purple  { background: #8b5cf6 !important; }
+  .c-pink    { background: #ec4899 !important; }
+  .c-rose    { background: #f43f5e !important; }
+  :root{
+    --bg: #0f1724;
+    --panel: #111827;
+    --muted: #94a3b8;
+    --accent: #6366f1;
+    --cell-size: 28px;
+    --cell-gap: 6px;
+    --inactive-dark: #1f2937;
+    --inactive-light: #e6eef6;
+    --yellow: #FFEB3B;
+    --lime: #CDDC39;
+    --green: #4CAF50;
+    --aqua: #00BCD4;
+    --mblue: #2196F3;
+    --dblue: #0D47A1;
+    --magenta: #E040FB;
+    --purple: #8E24AA;
+  }
+
+  /* Light mode overrides (added/removed by JS) */
+  .light {
+    --bg: #ffffff;
+    --panel: #ffffff;
+    --muted: #374151;
+  }
+
+  html,body{
+    height:100%;
+    margin:0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: var(--bg);
+    color: #e6eef6;
+  }
+
+  .light body, .light {
+    color: #0f1724;
+  }
+
+  .app {
+    max-width:1200px;
+    margin:24px auto;
+    padding:20px;
+  }
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:18px;
+  }
+
+  h1{
+    margin:0;
+    font-size:20px;
+    font-weight:600;
+  }
+
+  .controls{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+
+  .btn {
+    background:var(--accent);
+    color:white;
+    border:0;
+    padding:8px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+  }
+  .btn.alt { background:#374151; }
+  .btn.warn { background:#ef4444; }
+
+  .controlRow { display:flex; gap:8px; align-items:center; }
+
+  input[type="range"]{ width:140px; }
+
+  .panel {
+    background: var(--panel);
+    padding:12px;
+    border-radius:10px;
+    box-shadow: 0 4px 14px rgba(2,6,23,0.6);
+  }
+
+  /* Grid area */
+  .grid-wrapper {
+    margin-top:12px;
+    overflow:auto;
+    border-radius:8px;
+    padding:12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(0,0,0,0.03));
+  }
+
+  .grid {
+    display: grid;
+    gap: var(--cell-gap);
+    /* grid-template-rows/columns set by JS inline style */
+  }
+
+  .cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    border-radius:6px;
+    border:1px solid rgba(0,0,0,0.3);
+    box-sizing:border-box;
+    cursor:pointer;
+    transition: transform 0.08s, box-shadow 0.08s, opacity 0.08s;
+    display:inline-block;
+  }
+
+  .cell.inactive.dark { background: var(--inactive-dark); }
+  .cell.inactive.light { background: var(--inactive-light); }
+
+  /* Color scale (active cells) */
+  .c-yellow { background: var(--yellow); }
+  .c-lime   { background: var(--lime); }
+  .c-green  { background: var(--green); }
+  .c-aqua   { background: var(--aqua); }
+  .c-mblue  { background: var(--mblue); color:#fff; }
+  .c-dblue  { background: var(--dblue); color:#fff; }
+  .c-magenta{ background: var(--magenta); }
+  .c-purple { background: var(--purple); color:#fff; }
+
+  /* Current column highlight */
+  .cell.current.inactive { background: rgba(255,215,64,0.12); box-shadow: 0 0 0 2px rgba(255,215,64,0.12) inset; }
+  .cell.current.active { box-shadow: 0 0 0 3px rgba(255,235,59,0.18); transform: scale(1.04); }
+
+  /* small helpers */
+  .small { font-size:13px; color:var(--muted); }
+  .spaced { display:flex; gap:8px; align-items:center; }
+  footer { margin-top:12px; color:var(--muted); font-size:13px; }
+  label.toggle { display:flex; gap:8px; align-items:center; cursor:pointer; user-select:none; }
+
+  /* responsive */
+  @media (max-width:720px){
+    .controls{ flex-direction:column; align-items:flex-start; gap:8px; }
+  }
+
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    user-select: none;
+  }
+
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Song maker</h1>
+      <div class="controls">
+        <label class="toggle"><input id="darkToggle" type="checkbox" checked> Dark</label>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="controls">
+        <div class="controlRow">
+          <button id="playBtn" class="btn">Play</button>
+          <button id="clearBtn" class="btn alt">Clear</button>
+          <button id="randomBtn" class="btn alt">Random</button>
+          
+          <!-- NEW IMPORT / EXPORT BUTTONS -->
+          <button id="exportMP3" class="btn alt">Export MP3</button>
+          <input type="file" id="mp3File" accept=".mp3" style="display:none;">
+        </div>
+
+        <div class="controlRow">
+          <div class="small">Tempo</div>
+          <input id="tempo" type="range" min="40" max="240" value="90">
+          <div id="tempoVal" class="small">90 BPM</div>
+        </div>
+
+        <div class="controlRow">
+          <div class="small">Rows</div>
+          <input id="rows" type="number" min="1" max="32" value="10" style="width:64px;">
+          <div class="small">Cols</div>
+          <input id="cols" type="number" min="8" max="1024" step="8" value="32" style="width:80px;">
+          <button id="rebuildBtn" class="btn alt">Rebuild Grid</button>
+        </div>
+      </div>
+
+      <div class="grid-wrapper" id="gridWrap" style="margin-top:12px;">
+        <div id="grid" class="grid"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // State
+  let rows = 10;
+  let cols = 32;
+  let tempo = 90;
+  let grid = []; // [row][col] boolean
+  let currentCol = -1;
+  let isPlaying = false;
+  let audioCtx = null;
+  let stepTimer = null;
+  const gridEl = document.getElementById('grid');
+  const gridWrap = document.getElementById('gridWrap');
+
+  // Colors top → bottom (index 0 = top row)
+  const colorClass = ['c-yellow','c-lime','c-green','c-aqua','c-mblue','c-dblue','c-magenta','c-purple'];
+
+  // DOM
+  const playBtn = document.getElementById('playBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const randomBtn = document.getElementById('randomBtn');
+  const tempoSlider = document.getElementById('tempo');
+  const tempoVal = document.getElementById('tempoVal');
+  const rowsInput = document.getElementById('rows');
+  const colsInput = document.getElementById('cols');
+  const rebuildBtn = document.getElementById('rebuildBtn');
+  const darkToggle = document.getElementById('darkToggle');
+
+  // Initialize from defaults
+  function makeEmptyGrid(r, c){
+    const g = new Array(r);
+    for(let i=0;i<r;i++){
+      g[i] = new Array(c).fill(false);
+    }
+    return g;
+  }
+
+  function buildGridDOM(){
+    // update CSS grid template
+    gridEl.style.gridTemplateRows = `repeat(${rows}, var(--cell-size))`;
+    gridEl.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size))`;
+    gridEl.innerHTML = ''; // wipe
+
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const btn = document.createElement('button');
+        btn.className = 'cell inactive ' + (document.body.classList.contains('light') ? 'light' : 'dark');
+        btn.dataset.r = r;
+        btn.dataset.c = c;
+        btn.title = `r${r} c${c}`;
+        btn.addEventListener('click', () => {
+          grid[r][c] = !grid[r][c];
+          renderCell(btn, r, c);
+        });
+        renderCell(btn, r, c);
+        gridEl.appendChild(btn);
+      }
+    }
+    // ensure wrapper scrolls to start
+    gridWrap.scrollLeft = 0;
+  }
+
+  function renderCell(el, r, c) {
+  const active = !!grid[r][c];
+  const isCur = (c === currentCol);
+
+  el.className = 'cell'; // reset
+
+  if (!active) {
+    // inactive cell
+    el.classList.add('inactive');
+    el.classList.add(document.body.classList.contains('light') ? 'light' : 'dark');
+    el.textContent = "";
+    if (isCur) el.classList.add('current','inactive');
+  } else {
+    // ACTIVE CELL
+    if (r === rows - 1) {
+      // bottom row = kick
+      el.classList.add('c-red');
+      el.textContent = "k";
+    } 
+    else if (r === rows - 2) {
+      // second row = snare
+      el.classList.add('c-orange');
+      el.textContent = "s";
+    } 
+    else {
+      // melodic rows
+      const idx = Math.min(
+        colorClass.length - 1,
+        Math.floor((r / Math.max(1, rows - 1)) * (colorClass.length - 1))
+      );
+      const cls = colorClass[idx];
+      el.classList.add(cls);
+      el.textContent = "";
+    }
+
+    if (isCur) el.classList.add('current','active');
+  }
+}
+
+  // Re-render entire grid (useful when currentCol changes or rows/cols rebuild)
+  function rerenderGrid(){
+    const children = gridEl.children;
+    for(let i=0;i<children.length;i++){
+      const el = children[i];
+      const r = Number(el.dataset.r);
+      const c = Number(el.dataset.c);
+      renderCell(el, r, c);
+    }
+  }
+
+  // Audio utils
+  function ensureAudioCtx(){
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  function playSynth(row, when=0){
+    ensureAudioCtx();
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const baseFreq = 110;
+    // Map so top row (r=0) => higher pitch, bottom row => lower pitch:
+    // exponent = (rows - 1 - row) / 12  (same as final React mapping)
+    const exp = (rows - 1 - row) / 12;
+    const freq = baseFreq * Math.pow(2, exp);
+    osc.frequency.value = freq;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.exponentialRampToValueAtTime(0.3, when + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.25);
+    osc.connect(gain).connect(audioCtx.destination);
+    try { osc.start(when); } catch(e){}
+    try { osc.stop(when + 0.3); } catch(e){}
+  }
+
+  function playBeat(when){
+    ensureAudioCtx();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+  
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(120, when);
+    osc.frequency.exponentialRampToValueAtTime(40, when + 0.15);
+  
+    gain.gain.setValueAtTime(1, when);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + 0.2);
+  
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(when);
+    osc.stop(when + 0.2);
+  }
+
+  function playSnare(when){
+    ensureAudioCtx();
+  
+    const noise = audioCtx.createBufferSource();
+    const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.2, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  
+    noise.buffer = buffer;
+  
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.5, when);
+    gain.gain.exponentialRampToValueAtTime(0.001, when + 0.2);
+  
+    noise.connect(gain).connect(audioCtx.destination);
+    noise.start(when);
+  }
+
+  function scheduleStep(colIndex){
+    ensureAudioCtx();
+    if (!audioCtx) return;
+  
+    const when = audioCtx.currentTime + 0.02;
+  
+    for (let r = 0; r < rows; r++) {
+      if (!grid[r][colIndex]) continue;
+  
+      // bottom row = BEAT
+      if (r === rows - 1) {
+        playBeat(when);
+  
+      // second from bottom = SNARE
+      } else if (r === rows - 2) {
+        playSnare(when);
+  
+      // everything above = pitched notes
+      } else {
+        playSynth(r, when);
+      }
+    }
+  }
+
+  // Playback loop
+  function startPlaying(){
+    ensureAudioCtx();
+    if (!audioCtx) return;
+    // Resume in case browser suspended it
+    if (audioCtx.state === 'suspended' && audioCtx.resume) {
+      audioCtx.resume().catch(()=>{});
+    }
+    if (isPlaying) return;
+    isPlaying = true;
+    currentCol = 0;
+    updateColAndRender(0);
+    loopStep();
+  }
+
+  function stopPlaying(){
+    isPlaying = false;
+    if (stepTimer) { clearTimeout(stepTimer); stepTimer = null; }
+    currentCol = -1;
+    rerenderGrid();
+  }
+
+  function loopStep(){
+    if (!isPlaying) return;
+    scheduleStep(currentCol);
+    updateColAndRender(currentCol);
+    currentCol = (currentCol + 1) % cols;
+    // one column per 16th note
+    const intervalMs = (60000 / tempo) / 4;
+    stepTimer = setTimeout(loopStep, intervalMs);
+  }
+
+  function updateColAndRender(col){
+    currentCol = col;
+    // update visual highlight for the whole grid (we could optimize to update only prev/next columns)
+    rerenderGrid();
+    // auto-scroll to keep current column visible if user has scrolled far right
+    const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size')) || 28;
+    const gap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-gap')) || 6;
+    const colPos = col * (cellSize + gap);
+    const visibleLeft = gridWrap.scrollLeft;
+    const visibleRight = visibleLeft + gridWrap.clientWidth;
+    if (colPos < visibleLeft || colPos > visibleRight - (cellSize + gap)) {
+      // center the column a bit
+      gridWrap.scrollLeft = Math.max(0, colPos - gridWrap.clientWidth/2 + (cellSize+gap)/2);
+    }
+  }
+
+  // UI events
+// PLAY BUTTON TOGGLE
+playBtn.addEventListener('click', () => {
+  if (!isPlaying) {
+    // Switch to STOP
+    playBtn.textContent = "Stop";
+    playBtn.classList.add("warn");
+
+    ensureAudioCtx();
+    if (audioCtx && audioCtx.state === 'suspended' && audioCtx.resume) {
+      audioCtx.resume().then(() => startPlaying()).catch(() => startPlaying());
+    } else {
+      startPlaying();
+    }
+
+  } else {
+    // Switch to PLAY
+    playBtn.textContent = "Play";
+    playBtn.classList.remove("warn");
+    stopPlaying();
+  }
+});
+
+  clearBtn.addEventListener('click', () => {
+    grid = makeEmptyGrid(rows, cols);
+    rerenderGrid();
+  });
+  randomBtn.addEventListener('click', () => {
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        grid[r][c] = Math.random() > 0.85;
+      }
+    }
+    rerenderGrid();
+  });
+
+  tempoSlider.addEventListener('input', (e) => {
+    tempo = Number(e.target.value);
+    tempoVal.textContent = tempo + ' BPM';
+  });
+
+  rebuildBtn.addEventListener('click', () => {
+    const rVal = Number(rowsInput.value) || 10;
+    const cVal = Number(colsInput.value) || 32;
+    rows = Math.max(1, Math.min(32, rVal));
+    cols = Math.max(8, Math.min(1024, cVal));
+    rowsInput.value = rows;
+    colsInput.value = cols;
+    grid = makeEmptyGrid(rows, cols);
+    buildGridDOM();
+  });
+
+  rowsInput.addEventListener('change', () => {
+    // update but don't rebuild until clicking Rebuild (keeps behavior consistent)
+    // optional: auto rebuild when changing rows/cols — currently user must click Rebuild
+  });
+
+  colsInput.addEventListener('change', () => {});
+
+  // dark toggle
+  darkToggle.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      document.body.classList.remove('light');
+      // force inactive class adjust
+    } else {
+      document.body.classList.add('light');
+    }
+    // re-render cells to update inactive color variant
+    rerenderGrid();
+  });
+
+  // initial build
+  grid = makeEmptyGrid(rows, cols);
+  buildGridDOM();
+
+  // convenience: allow pressing space to toggle play/stop
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (isPlaying) stopPlaying(); else {
+        ensureAudioCtx();
+        if (audioCtx && audioCtx.state === 'suspended' && audioCtx.resume) {
+          audioCtx.resume().then(() => startPlaying()).catch(() => startPlaying());
+        } else startPlaying();
+      }
+    }
+  });
+
+  // ----- MP3 EXPORT -----
+  async function exportToMP3(){
+    const durationPerStep = (60 / tempo) / 4;
+    const totalDuration = durationPerStep * cols;
+    const sampleRate = 44100;
+    const offCtx = new OfflineAudioContext(1, sampleRate * totalDuration, sampleRate);
+
+    for(let c=0;c<cols;c++){
+      const when = c * durationPerStep;
+      for(let r=0;r<rows;r++){
+        if(!grid[r][c]) continue;
+        if(r===rows-1) renderBeatOffline(offCtx, when);
+        else if(r===rows-2) renderSnareOffline(offCtx, when);
+        else renderSynthOffline(offCtx, when, r);
+      }
+    }
+
+    const rendered = await offCtx.startRendering();
+    const mp3 = new lamejs.Mp3Encoder(1, sampleRate, 128);
+    const samples = rendered.getChannelData(0);
+    const chunk = 1152;
+    let mp3Data=[];
+
+    for(let i=0;i<samples.length;i+=chunk){
+      const slice = samples.subarray(i,i+chunk);
+      const mp3buf = mp3.encodeBuffer(floatTo16(slice));
+      if(mp3buf.length) mp3Data.push(mp3buf);
+    }
+
+    const end = mp3.flush();
+    if(end.length) mp3Data.push(end);
+
+    const blob = new Blob(mp3Data,{type:"audio/mp3"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "song.mp3";
+    a.click();
+  }
+
+  function floatTo16(buf){
+    const out = new Int16Array(buf.length);
+    for(let i=0;i<buf.length;i++){
+      let s = Math.max(-1,Math.min(1,buf[i]));
+      out[i] = s<0 ? s*0x8000 : s*0x7FFF;
+    }
+    return out;
+  }
+
+  function renderSynthOffline(ctx, when, row){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const base = 110;
+    const exp = (rows-1-row)/12;
+    osc.frequency.value = base*Math.pow(2,exp);
+    gain.gain.setValueAtTime(0.001,when);
+    gain.gain.exponentialRampToValueAtTime(0.3,when+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001,when+0.25);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(when);
+    osc.stop(when+0.3);
+  }
+
+  function renderBeatOffline(ctx,when){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type="sine";
+    osc.frequency.setValueAtTime(120,when);
+    osc.frequency.exponentialRampToValueAtTime(40,when+0.15);
+    gain.gain.setValueAtTime(1,when);
+    gain.gain.exponentialRampToValueAtTime(0.001,when+0.2);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(when);
+    osc.stop(when+0.2);
+  }
+
+  function renderSnareOffline(ctx,when){
+    const buffer = ctx.createBuffer(1,ctx.sampleRate*0.2,ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i] = Math.random()*2-1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.5,when);
+    gain.gain.exponentialRampToValueAtTime(0.001,when+0.2);
+    noise.connect(gain).connect(ctx.destination);
+    noise.start(when);
+  }
+
+  document.getElementById("exportMP3").addEventListener("click",exportToMP3);
+
+
+  // ----- MP3 IMPORT -----
+document.getElementById("importMP3").addEventListener("click", ()=>{
+  document.getElementById("mp3File").click();
+});
+
+document.getElementById("mp3File").addEventListener("change", async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  ensureAudioCtx();
+
+  const array = await file.arrayBuffer();
+  const audio = await audioCtx.decodeAudioData(array);
+
+  // === Mix to mono ===
+  const len = audio.length;
+  const ch = audio.numberOfChannels;
+  const sr = audio.sampleRate;
+  const mono = new Float32Array(len);
+  for (let c = 0; c < ch; c++) {
+    const data = audio.getChannelData(c);
+    for (let i = 0; i < len; i++) mono[i] += data[i] / ch;
+  }
+
+  // === High-pass filter to catch drum transients ===
+  for (let i = len-1; i >= 1; i--)
+    mono[i] = mono[i] - 0.995 * mono[i-1];
+
+  // === Compute short-time energy (transient detector) ===
+  const win = 512;
+  const hop = 256;
+  const energy = [];
+  for (let i = 0; i + win < mono.length; i += hop) {
+    let sum = 0;
+    for (let j=0; j<win; j++) {
+      const v = mono[i+j];
+      sum += v*v;
+    }
+    energy.push(sum);
+  }
+
+  // === Adaptive threshold ===
+  const sorted = [...energy].sort((a,b)=>a-b);
+  const median = sorted[Math.floor(sorted.length/2)];
+  const threshold = median * 4;
+
+  // === Peak-picking (onset detection) ===
+  const peaks = [];
+  for (let i = 1; i < energy.length - 1; i++) {
+    if (energy[i] > threshold &&
+        energy[i] > energy[i-1] &&
+        energy[i] > energy[i+1]) {
+      peaks.push(i);
+    }
+  }
+
+  // === Map peaks to grid columns ===
+  grid = makeEmptyGrid(rows, cols);
+
+  for (let p of peaks) {
+    const time = (p * hop) / sr;
+    const col = Math.floor((time / audio.duration) * cols);
+    if (col >= 0 && col < cols) {
+      grid[rows - 1][col] = true;   // Kick row
+    }
+  }
+
+  rerenderGrid();
+});
+})();
+</script>
+</body>
+</html>
