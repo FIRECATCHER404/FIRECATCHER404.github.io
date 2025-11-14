@@ -608,18 +608,36 @@ playBtn.addEventListener('click', () => {
     return out;
   }
 
-  function renderSynthOffline(ctx, when, row){
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const base = 110;
-    const exp = (rows-1-row)/12;
-    osc.frequency.value = base*Math.pow(2,exp);
-    gain.gain.setValueAtTime(0.001,when);
-    gain.gain.exponentialRampToValueAtTime(0.3,when+0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001,when+0.25);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(when);
-    osc.stop(when+0.3);
+  function renderSynthOffline(offCtx, when, row){
+      const baseFreq = 220;
+      const exp = (rows - 1 - row) / 12;
+      const freq = baseFreq * Math.pow(2, exp);
+  
+      const osc1 = offCtx.createOscillator();
+      const osc2 = offCtx.createOscillator();
+      const gain = offCtx.createGain();
+  
+      osc1.type = "sawtooth";
+      osc2.type = "sawtooth";
+  
+      osc1.frequency.value = freq;
+      osc2.frequency.value = freq;
+      osc2.detune.value = 12;
+  
+      // Envelope
+      gain.gain.setValueAtTime(0.0001, when);
+      gain.gain.linearRampToValueAtTime(0.2, when + 0.03);
+      gain.gain.linearRampToValueAtTime(0.1, when + 0.15);
+      gain.gain.linearRampToValueAtTime(0.0001, when + 0.35);
+  
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(offCtx.destination);
+  
+      osc1.start(when);
+      osc2.start(when);
+      osc1.stop(when + 0.4);
+      osc2.stop(when + 0.4);
   }
 
   function renderBeatOffline(ctx,when){
