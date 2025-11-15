@@ -176,6 +176,9 @@
 <div id="bootScreen">
   <div>Booting WebOS...</div>
   <div style="margin-top:12px;font-size:14px;color:var(--muted)">Loading modules...</div>
+  <div id="bootBarContainer">
+    <div id="bootBar"></div>
+  </div>
 </div>
 
 <div id="desktop" tabindex="0">
@@ -991,10 +994,21 @@ window.addEventListener("click", () => {
 const bootScreen = document.getElementById("bootScreen");
 
 window.addEventListener("load", () => {
-  // Simulate boot delay
-  setTimeout(() => {
-    bootScreen.classList.add("hidden");
-  }, 2500); // 2.5 seconds boot
+  const bootBar = document.getElementById("bootBar");
+  let progress = 0;
+
+  const interval = setInterval(() => {
+    // Increment progress gradually, with small randomness for realism
+    progress += Math.random() * 5;
+    if(progress > 100) progress = 100;
+    bootBar.style.width = progress + "%";
+
+    if(progress >= 100){
+      clearInterval(interval);
+      // Fade out boot screen
+      bootScreen.classList.add("hidden");
+    }
+  }, 100); // Update every 100ms
 });
 
 
