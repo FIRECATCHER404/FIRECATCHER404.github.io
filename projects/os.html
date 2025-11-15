@@ -14,6 +14,7 @@
     --glass-2: rgba(255,255,255,0.02);
     --text: #e6eef8;
     --taskbar: rgba(0,0,0,0.35);
+    --wallpaper: url('default.jpg');
   }
 
   /* Light theme variables (toggled by .light on <body>) */
@@ -42,6 +43,9 @@
     background-image:
       radial-gradient(circle at 10% 20%, rgba(124,58,237,0.06), transparent 6%),
       radial-gradient(circle at 80% 80%, rgba(124,58,237,0.04), transparent 10%);
+    background: var(--wallpaper);
+    background-size: cover;
+    background-position: center;
   }
 
   /* Launcher grid - used as "Start menu" */
@@ -124,6 +128,27 @@
     .launcher{width:220px;}
   }
 
+  .context-menu {
+  position: absolute;
+  background: var(--panel);
+  border: 1px solid rgba(0,0,0,0.4);
+  border-radius: 6px;
+  padding: 6px 0;
+  min-width: 160px;
+  display: none;
+  z-index: 99999;
+}
+
+.context-menu-item {
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.context-menu-item:hover {
+  background: rgba(255,255,255,0.08);
+}
+
 </style>
 </head>
 <body>
@@ -147,6 +172,8 @@
     <div id="themeToggle" style="cursor:pointer;padding:6px;border-radius:6px">🌓</div>
   </div>
 </div>
+<div id="contextMenu" class="context-menu"></div>
+
 
 <script>
 /* -----------------------
@@ -441,6 +468,56 @@ const APPS = [
       focusWindow(win.container);
     }
   },
+  {
+    id: "wallpaper",
+    title: "Wallpaper",
+    icon: "🖼️",
+    open() {
+      const win = createWindow({
+        id: this.id,
+        title: this.title,
+        width: 450,
+        height: 360
+      });
+  
+      const wrap = el("div", {
+        style: {
+          padding: "14px",
+          color: "var(--text)"
+        }
+      });
+  
+      wrap.innerHTML = `
+        <h3>Choose Wallpaper</h3>
+        <input type="file" id="wallFile" accept="image/*" style="margin-top:10px;">
+        <br><br>
+        <button id="setWallBtn">Set Wallpaper</button>
+      `;
+  
+      win.content.appendChild(wrap);
+  
+      const fileInput = wrap.querySelector("#wallFile");
+      const setBtn = wrap.querySelector("#setWallBtn");
+  
+      setBtn.onclick = () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+  
+        const reader = new FileReader();
+        reader.onload = () => {
+          localStorage.setItem("wallpaper", reader.result);
+          document.documentElement.style.setProperty("--wallpaper", `url('${reader.result}')`);
+        };
+        reader.readAsDataURL(file);
+      };
+  
+      // Load saved wallpaper
+      const saved = localStorage.getItem("wallpaper");
+      if (saved) {
+        document.documentElement.style.setProperty("--wallpaper", `url('${saved}')`);
+      }
+    }
+  }
 ];
 
 /* create app grid */
@@ -811,10 +888,40 @@ DESKTOP.addEventListener('pointerdown', (e)=>{
   }
 });
 
-/* good defaults: open two example apps */
-openApp('synth');
-openApp('notes');
+const contextMenu = document.getElementById("contextMenu");
 
+function showContextMenu(x, y, items) {
+  contextMenu.innerHTML = "";
+
+  for (const item of items) {
+    const el = document.createElement("div");
+    el.className = "context-menu-item";
+    el.textContent = item.label;
+    el.onclick = () => {
+      contextMenu.style.display = "none";
+      item.action();
+    };
+    contextMenu.appendChild(el);
+  }
+
+  contextMenu.style.left = x + "px";
+  contextMenu.style.top = y + "px";
+  contextMenu.style.display = "block";
+}
+
+window.addEventListener("click", () => {
+  contextMenu.style.display = "none";
+});
+
+  desktop.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+
+  showContextMenu(e.pageX, e.pageY, [
+    { label: "Change Wallpaper", action: openWallpaperSettings },
+    { label: "Refresh", action: () => {} },
+    { label: "Desktop Settings", action: openDesktopSettings }
+  ]);
+});
 
 
 </script>
