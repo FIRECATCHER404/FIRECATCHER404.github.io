@@ -1011,33 +1011,15 @@ const bootScreen = document.getElementById("bootScreen");
 
 window.addEventListener("load", () => {
   const bootBar = document.getElementById("bootBar");
-  let progress = 0;
-
-  const interval = setInterval(() => {
-    // Increment progress gradually, with small randomness for realism
-    progress += Math.random() * 5;
-    if(progress > 100) progress = 100;
-    bootBar.style.width = progress + "%";
-
-    if(progress >= 100){
-      clearInterval(interval);
-      // Fade out boot screen
-      bootScreen.classList.add("hidden");
-    }
-  }, 100); // Update every 100ms
-});
-
-window.addEventListener("load", () => {
-  const bootBar = document.getElementById("bootBar");
   const bootText = document.getElementById("bootText");
+  const bootScreen = document.getElementById("bootScreen");
 
   const lines = [
     "Initializing hardware...",
     "Loading kernel modules...",
     "Starting system services...",
     "Mounting file systems...",
-    "Checking configurations...",
-    "WebOS ready!"
+    "Checking configurations..."
   ];
 
   let progress = 0;
@@ -1045,21 +1027,38 @@ window.addEventListener("load", () => {
 
   const interval = setInterval(() => {
     progress += Math.random() * 5;
-    if(progress > 100) progress = 100;
+    if (progress > 100) progress = 100;
     bootBar.style.width = progress + "%";
 
-    // Add new boot line occasionally
-    if(lineIndex < lines.length && progress >= (lineIndex + 1) * (100 / lines.length)){
+    if (lineIndex < lines.length && progress >= (lineIndex + 1) * (100 / lines.length)) {
       bootText.innerHTML += lines[lineIndex] + "<br>";
       lineIndex++;
     }
 
-    if(progress >= 100){
+    if (progress >= 100) {
       clearInterval(interval);
-      // Fade out boot screen
-      bootScreen.classList.add("hidden");
+
+      // Fade out boot bar and text
+      bootBar.style.transition = "opacity 0.5s";
+      bootText.style.transition = "opacity 0.5s";
+      bootBar.style.opacity = 0;
+      bootText.style.opacity = 0;
+
+      // After fade out, show "WebOS loaded." message
+      setTimeout(() => {
+        bootText.innerHTML = "WebOS loaded.";
+        bootText.style.opacity = 1;
+        bootText.style.fontSize = "20px";
+        bootText.style.color = "var(--accent)";
+        bootText.style.textAlign = "center";
+
+        // Fade out message after 1.2s
+        setTimeout(() => {
+          bootScreen.classList.add("hidden");
+        }, 1200);
+      }, 600); // wait for boot bar fade out
     }
-  }, 100); // Update every 100ms
+  }, 100);
 });
 
 
