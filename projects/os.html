@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Web OS — launcher</title>
+<style>
+  :root{
+    --bg: #0f1724;
+    --panel: #0b1220;
+    --muted: #94a3b8;
+    --accent: #7c3aed;
+    --glass: rgba(255,255,255,0.03);
+    --glass-2: rgba(255,255,255,0.02);
+    --text: #e6eef8;
+    --taskbar: rgba(0,0,0,0.35);
+  }
+
+  /* Light theme variables (toggled by .light on <body>) */
+  body.light{
+    --bg: #f5f7fb;
+    --panel: #ffffff;
+    --muted: #475569;
+    --accent: #7c3aed;
+    --glass: rgba(0,0,0,0.03);
+    --glass-2: rgba(0,0,0,0.02);
+    --text: #031027;
+    --taskbar: rgba(255,255,255,0.8);
+  }
+
+  html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+  body{background: linear-gradient(180deg,var(--bg), #07111a); color:var(--text); -webkit-font-smoothing:antialiased; overflow:hidden;}
+
+  /* Desktop area */
+  #desktop{
+    position:relative;
+    width:100vw;
+    height:calc(100vh - 40px);
+    overflow:hidden;
+    padding:18px;
+    box-sizing:border-box;
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(124,58,237,0.06), transparent 6%),
+      radial-gradient(circle at 80% 80%, rgba(124,58,237,0.04), transparent 10%);
+  }
+
+  /* Launcher grid - used as "Start menu" */
+  .launcher{
+    position:absolute;
+    left:18px;
+    top:18px;
+    width:280px;
+    max-height:70vh;
+    background:linear-gradient(180deg,var(--glass),var(--glass-2));
+    border-radius:12px;
+    padding:12px;
+    box-shadow: 0 6px 30px rgba(2,6,23,0.6);
+    backdrop-filter: blur(6px);
+    border:1px solid rgba(255,255,255,0.03);
+  }
+  .launcher h3{margin:6px 8px;color:var(--muted);font-weight:600;font-size:13px;}
+  .apps-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:8px;}
+  .app-card{
+    background:transparent; border-radius:8px; padding:10px; display:flex; gap:10px; align-items:center; cursor:pointer;
+    transition:transform .12s ease, background .12s;
+  }
+  .app-card:hover{transform:translateY(-3px); background:rgba(255,255,255,0.02);}
+  .app-icon{width:36px;height:36px;border-radius:8px; display:grid;place-items:center; font-weight:700;}
+  .app-title{font-size:14px; color:var(--text);}
+
+  /* Taskbar */
+  .taskbar{
+    position:fixed; left:0; right:0; bottom:0; height:40px; display:flex; align-items:center; gap:8px;
+    padding:6px 10px; box-sizing:border-box; background:var(--taskbar); border-top:1px solid rgba(0,0,0,0.25);
+    backdrop-filter: blur(6px);
+  }
+  .task-left{display:flex; align-items:center; gap:8px;}
+  .start-btn{background:linear-gradient(180deg,rgba(255,255,255,0.03), rgba(255,255,255,0.01)); padding:6px 10px; border-radius:8px; cursor:pointer;}
+  .task-bar-items{display:flex; gap:6px; margin-left:6px;}
+  .task-item{padding:6px 10px; background:transparent;border-radius:8px;cursor:pointer; display:flex;align-items:center;gap:8px;}
+  .task-item.active{background:rgba(255,255,255,0.04);box-shadow:0 1px 0 rgba(0,0,0,0.2) inset;}
+
+  .task-right{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--muted); font-size:13px; padding-right:8px;}
+
+  /* Window system */
+  .window{
+    position:absolute;
+    width:720px;
+    height:420px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:10px;
+    overflow:hidden;
+    box-shadow: 0 18px 50px rgba(2,6,23,0.6);
+    border:1px solid rgba(255,255,255,0.04);
+    display:flex; flex-direction:column;
+  }
+  .window .titlebar{
+    height:36px; display:flex; align-items:center; gap:8px; padding:6px 10px; user-select:none; cursor:grab;
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+  }
+  .window .title{flex:1;font-weight:600;}
+  .window .controls{display:flex;gap:6px;}
+  .btn{
+    width:34px;height:28px;border-radius:6px; display:grid;place-items:center; cursor:pointer; user-select:none;
+  }
+  .btn:hover{background:rgba(255,255,255,0.03);}
+  .content{flex:1;padding:12px; overflow:auto;}
+
+  /* small app styles */
+  .terminal{background:#06121a;color:#9be7ff;padding:8px;border-radius:6px;font-family:monospace;font-size:13px; height:100%; display:flex;flex-direction:column;}
+  .term-lines{flex:1; overflow:auto; white-space:pre-wrap;}
+  .term-input{display:flex; gap:8px; margin-top:8px;}
+  .term-input input{flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:var(--text);}
+
+  .note-area{width:100%;height:100%;box-sizing:border-box;padding:8px;border-radius:6px;background:transparent;border:1px dashed rgba(255,255,255,0.03);font-size:14px;color:var(--text);}
+
+  .synth-grid{display:grid;grid-template-columns:repeat(8,1fr); gap:6px;}
+  .key{padding:10px;border-radius:6px;background:rgba(255,255,255,0.02);text-align:center; cursor:pointer; user-select:none;}
+  .key:active{transform:translateY(1px);}
+
+  /* responsive */
+  @media (max-width:820px){
+    .window{width:92vw;height:64vh;}
+    .launcher{width:220px;}
+  }
+
+</style>
+</head>
+<body>
+<div id="desktop" tabindex="0">
+  <div class="launcher" id="launcher">
+    <h3>Launcher</h3>
+    <div class="apps-grid" id="appsGrid"></div>
+  </div>
+
+  <!-- Windows container -->
+  <div id="windows"></div>
+</div>
+
+<div class="taskbar">
+  <div class="task-left">
+    <div class="start-btn" id="startBtn">☰ Start</div>
+    <div class="task-bar-items" id="taskbarItems"></div>
+  </div>
+  <div class="task-right">
+    <div id="timeClock"></div>
+    <div id="themeToggle" style="cursor:pointer;padding:6px;border-radius:6px">🌓</div>
+  </div>
+</div>
+
+<script>
+/* -----------------------
+   Simple Web OS Starter
+   - Add apps in `APPS` list
+   - Each app must have id, title, icon, open() function
+   ------------------------*/
+
+const DESKTOP = document.getElementById('desktop');
+const APPS_GRID = document.getElementById('appsGrid');
+const WINDOWS = document.getElementById('windows');
+const TASKBAR_ITEMS = document.getElementById('taskbarItems');
+const TIME = document.getElementById('timeClock');
+const THEME_TOGGLE = document.getElementById('themeToggle');
+
+let zCounter = 10;
+let windowsState = {}; // id -> DOM node
+
+/* --------- Utility: create DOM helpers --------- */
+function el(tag, attrs = {}, ...children){
+  const e = document.createElement(tag);
+  for(const k in attrs){
+    if(k === 'class') e.className = attrs[k];
+    else if(k === 'style') Object.assign(e.style, attrs[k]);
+    else if(k.startsWith('on')) e.addEventListener(k.substring(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  for(const c of children){ if(typeof c === 'string') e.appendChild(document.createTextNode(c)); else if(c) e.appendChild(c); }
+  return e;
+}
+
+/* --------- App definitions ---------
+   Add apps here. open(app) should create a window or focus existing
+-----------------------------------*/
+const APPS = [
+  {
+    id: 'terminal',
+    title: 'Terminal',
+    icon: '⌁',
+    open(){
+      const win = createWindow({id:this.id, title:this.title, width:640, height:360});
+      const content = el('div', {class:'terminal'});
+      const lines = el('div',{class:'term-lines'});
+      const inputWrap = el('div',{class:'term-input'});
+      const input = el('input',{placeholder:'type "help" and press Enter'});
+      input.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter'){
+          const cmd = input.value.trim();
+          runCommand(cmd, lines);
+          input.value = '';
+        }
+      });
+      content.appendChild(lines);
+      inputWrap.appendChild(input);
+      content.appendChild(inputWrap);
+      win.content.appendChild(content);
+      focusWindow(win.container);
+      // Write welcome
+      runCommand('welcome', lines, true);
+    }
+  },
+  {
+    id: 'notes',
+    title: 'Notes',
+    icon: '📝',
+    open(){
+      const win = createWindow({id:this.id, title:this.title, width:520, height:440});
+      const ta = el('textarea',{class:'note-area', placeholder:'Type notes here...'});
+      // persist notes per session (optional)
+      ta.value = localStorage.getItem('webos-notes') || '';
+      ta.addEventListener('input', ()=>localStorage.setItem('webos-notes', ta.value));
+      win.content.appendChild(ta);
+      focusWindow(win.container);
+    }
+  },
+  {
+    id: 'synth',
+    title: 'Mini Synth',
+    icon: '♫',
+    open(){
+      const win = createWindow({id:this.id, title:this.title, width:600, height:320});
+      const grid = el('div',{class:'synth-grid'});
+      // simple oscillator synth using WebAudio
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const baseFreq = 196; // G3
+      for(let i=0;i<16;i++){
+        const k = el('div',{class:'key'}, String(i+1));
+        k.addEventListener('pointerdown', ()=>playTone(ctx, baseFreq * Math.pow(2, i/12)));
+        grid.appendChild(k);
+      }
+      win.content.appendChild(grid);
+      focusWindow(win.container);
+    }
+  },
+  {
+    id: 'iframe-app',
+    title: 'Your App (iframe slot)',
+    icon: '▣',
+    open(){
+      const win = createWindow({id:this.id, title:this.title, width:900, height:520});
+      // Replace src with your real app URLs (music maker / chat / particle playground)
+      const src = 'about:blank';
+      const iframe = el('iframe',{style:{width:'100%',height:'100%',border:'0',background:'#000'}, src});
+      // show notice how to set source
+      const hint = el('div',{style:{fontSize:'13px',color:'var(--muted)',padding:'6px'}}, 'Tip: Edit the file and set the iframe src to your app URL.');
+      win.content.appendChild(hint);
+      win.content.appendChild(iframe);
+      focusWindow(win.container);
+    }
+  },
+  {
+    id: 'file-explorer',
+    title: 'Files (fake)',
+    icon: '📁',
+    open(){
+      const win = createWindow({id:this.id, title:this.title, width:640, height:420});
+      const content = el('div',{},);
+      const fakeFiles = ['project-music.json','chat-data.json','particles.json','readme.txt'];
+      const list = el('div',{style:{display:'grid',gap:'6px'}});
+      fakeFiles.forEach(f => {
+        const row = el('div',{style:{padding:'8px',borderRadius:'6px',background:'rgba(255,255,255,0.01)',display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          el('div',{},'📄 ' + f),
+          el('div',{}, el('button',{onclick:()=>alert('Pretend download: '+f)}, 'Download'))
+        );
+        list.appendChild(row);
+      });
+      content.appendChild(list);
+      win.content.appendChild(content);
+      focusWindow(win.container);
+    }
+  },
+  {
+    id: 'messages',
+    title: 'Messages',
+    icon: '💬',
+    open() {
+      const win = createWindow({
+        id: this.id,
+        title: this.title,
+        width: 420,
+        height: 520
+      });
+
+      const wrap = el('div', {
+        style: {
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%'
+        }
+      });
+
+      const messagesBox = el('div', {
+        style: {
+          flex: 1,
+          overflowY: 'auto',
+          padding: '8px',
+          fontSize: '14px'
+        }
+      });
+
+      function loadMessages() {
+        messagesBox.innerHTML = '';
+        const msgs = JSON.parse(localStorage.getItem('webos-messages') || '[]');
+        msgs.forEach(m => {
+          const bubble = el('div', {
+            style: {
+              background: 'rgba(255,255,255,0.06)',
+              padding: '6px 10px',
+              borderRadius: '8px',
+              marginBottom: '6px'
+            }
+          }, m);
+          messagesBox.appendChild(bubble);
+        });
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+      }
+      loadMessages();
+
+      const inputRow = el('div', {
+        style: {
+          display: 'flex',
+          gap: '8px',
+          padding: '8px'
+        }
+      });
+
+      const inp = el('input', {
+        style: {
+          flex: 1,
+          padding: '8px',
+          borderRadius: '6px',
+          background: 'rgba(255,255,255,0.04)',
+          color: 'var(--text)',
+          border: '1px solid rgba(255,255,255,0.06)'
+        },
+        placeholder: 'Type a message...'
+      });
+
+      const sendBtn = el('button', {
+        onclick() {
+          const msg = inp.value.trim();
+          if (!msg) return;
+          const msgs = JSON.parse(localStorage.getItem('webos-messages') || '[]');
+          msgs.push(msg);
+          localStorage.setItem('webos-messages', JSON.stringify(msgs));
+          inp.value = '';
+          loadMessages();
+        }
+      }, 'Send');
+
+      inputRow.appendChild(inp);
+      inputRow.appendChild(sendBtn);
+
+      wrap.appendChild(messagesBox);
+      wrap.appendChild(inputRow);
+
+      win.content.appendChild(wrap);
+      focusWindow(win.container);
+    }
+  },
+  {
+    id: 'browser',
+    title: 'Web Browser',
+    icon: '🌐',
+    open() {
+      const win = createWindow({
+        id: this.id,
+        title: this.title,
+        width: 900,
+        height: 550
+      });
+
+      const bar = el('div', {
+        style: {
+          padding: '8px',
+          display: 'flex',
+          gap: '8px',
+          background: 'rgba(255,255,255,0.03)',
+          borderRadius: '6px'
+        }
+      });
+
+      const urlInput = el('input', {
+        style: {
+          flex: 1,
+          padding: '8px',
+          borderRadius: '6px',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          color: 'var(--text)'
+        },
+        placeholder: 'Enter URL (example: https://example.com)'
+      });
+
+      const goBtn = el('button', {}, 'Go');
+
+      const frame = el('iframe', {
+        style: {
+          width: '100%',
+          height: '100%',
+          border: '0',
+          background: '#000'
+        },
+        src: 'about:blank'
+      });
+
+      goBtn.onclick = loadURL;
+      urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadURL(); });
+
+      function loadURL() {
+        let url = urlInput.value.trim();
+        if (!url) return;
+        if (!url.startsWith('http')) url = 'https://' + url;
+        frame.src = url;
+      }
+
+      const wrap = el('div', {
+        style: {
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%'
+        }
+      });
+
+      bar.appendChild(urlInput);
+      bar.appendChild(goBtn);
+
+      wrap.appendChild(bar);
+      wrap.appendChild(frame);
+
+      win.content.appendChild(wrap);
+      focusWindow(win.container);
+    }
+  },
+];
+
+/* create app grid */
+function buildLauncher(){
+  APPS.forEach(app=>{
+    const card = el('div',{class:'app-card', onclick:()=>openApp(app.id)});
+    const icon = el('div',{class:'app-icon'}, app.icon);
+    const title = el('div',{class:'app-title'}, app.title);
+    card.appendChild(icon);
+    card.appendChild(title);
+    APPS_GRID.appendChild(card);
+  });
+}
+
+/* open app by id */
+function openApp(id){
+  const app = APPS.find(a=>a.id===id);
+  if(!app) return;
+  // If a window exists, focus it
+  if(windowsState[id]){
+    focusWindow(windowsState[id]);
+    return;
+  }
+  app.open();
+  addTaskbarButton(id, app.title, app.icon);
+}
+
+/* create window helper */
+function createWindow({id, title, width=600, height=400}) {
+  // If already open → focus instead
+  if (windowsState[id]) {
+    focusWindow(windowsState[id].container);
+    return windowsState[id];
+  }
+
+  // Window container
+  const win = el('div', {
+    class: 'window',
+    style: {
+      width: width + 'px',
+      height: height + 'px',
+      left: (50 + Math.random()*80) + 'px',
+      top: (50 + Math.random()*80) + 'px',
+      zIndex: ++zCounter
+    }
+  });
+
+  const titlebar = el('div', {class:'titlebar'});
+  const titleEl = el('div', {class:'title'}, title);
+  const controls = el('div', {class:'controls'});
+
+  // Buttons
+  const btnMin = el('div', {class:'btn'}, '—');
+  const btnMax = el('div', {class:'btn'}, '▢');
+  const btnClose = el('div', {class:'btn'}, '✕');
+
+  controls.append(btnMin, btnMax, btnClose);
+  titlebar.append(titleEl, controls);
+
+  const content = el('div', {class:'content'});
+
+  win.append(titlebar, content);
+  WINDOWS.appendChild(win);
+
+  // Save state
+  windowsState[id] = {container: win, content, taskItem: null, maximized: false};
+
+  /* -----------------------
+        Taskbar Button
+  ------------------------*/
+  const taskItem = el('div', {class:'task-item'}, title);
+  TASKBAR_ITEMS.appendChild(taskItem);
+  windowsState[id].taskItem = taskItem;
+
+  taskItem.addEventListener('click', () => {
+    if (win.style.display === 'none') {
+      win.style.display = 'flex';
+      focusWindow(win);
+    } else {
+      focusWindow(win);
+    }
+  });
+
+  /* -----------------------
+        FOCUS HANDLING
+  ------------------------*/
+  win.addEventListener('mousedown', () => focusWindow(win));
+
+  /* -----------------------
+        DRAGGING
+  ------------------------*/
+  let offsetX = 0, offsetY = 0, dragging = false;
+
+  titlebar.addEventListener('mousedown', (e) => {
+    dragging = true;
+    offsetX = e.clientX - win.offsetLeft;
+    offsetY = e.clientY - win.offsetTop;
+    titlebar.style.cursor = "grabbing";
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+    titlebar.style.cursor = "grab";
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging || windowsState[id].maximized) return;
+    win.style.left = (e.clientX - offsetX) + "px";
+    win.style.top  = (e.clientY - offsetY) + "px";
+  });
+
+  /* -----------------------
+        CLOSE (✕)
+  ------------------------*/
+  btnClose.addEventListener('click', () => {
+    taskItem.remove();
+    win.remove();
+    delete windowsState[id];
+  });
+
+  /* -----------------------
+        MINIMIZE (—)
+  ------------------------*/
+  btnMin.addEventListener('click', () => {
+    win.style.display = 'none';
+  });
+
+  /* -----------------------
+        MAXIMIZE / RESTORE (▢)
+  ------------------------*/
+  let prev = {};
+
+  btnMax.addEventListener('click', () => {
+    const ws = windowsState[id];
+
+    if (!ws.maximized) {
+      // store old position/size
+      prev = {
+        left: win.style.left,
+        top: win.style.top,
+        width: win.style.width,
+        height: win.style.height
+      };
+
+      win.style.left = "0";
+      win.style.top = "0";
+      win.style.width = "100vw";
+      win.style.height = "calc(100vh - 40px)";
+
+      ws.maximized = true;
+    } else {
+      // restore
+      win.style.left = prev.left;
+      win.style.top = prev.top;
+      win.style.width = prev.width;
+      win.style.height = prev.height;
+      ws.maximized = false;
+    }
+  });
+
+  return windowsState[id];
+}
+
+/* focus window (bring to front) */
+function focusWindow(win){
+  if(!win) return;
+  // remove active from others
+  document.querySelectorAll('.window').forEach(w=>w.classList.remove('focused'));
+  win.classList.add('focused');
+  zCounter += 1;
+  win.style.zIndex = zCounter;
+}
+
+/* close, minimize, maximize */
+function closeWindow(win){
+  const id = win.dataset.winId;
+  if(windowsState[id]) delete windowsState[id];
+  // remove taskbar button
+  const btn = TASKBAR_ITEMS.querySelector(`[data-run="${id}"]`);
+  if(btn) btn.remove();
+  win.remove();
+}
+function minimizeWindow(win){
+  win.style.display = 'none';
+  const id = win.dataset.winId;
+  const btn = TASKBAR_ITEMS.querySelector(`[data-run="${id}"]`);
+  if(btn) btn.classList.remove('active');
+}
+function restoreWindow(win){
+  win.style.display = '';
+  focusWindow(win);
+}
+function toggleMaximize(win){
+  if(win.dataset.max === '1'){
+    // restore
+    win.style.left = win.dataset.prevLeft;
+    win.style.top = win.dataset.prevTop;
+    win.style.width = win.dataset.prevWidth;
+    win.style.height = win.dataset.prevHeight;
+    win.dataset.max = '0';
+  } else {
+    // save
+    win.dataset.prevLeft = win.style.left;
+    win.dataset.prevTop = win.style.top;
+    win.dataset.prevWidth = win.style.width;
+    win.dataset.prevHeight = win.style.height;
+    win.style.left = '8px';
+    win.style.top = '8px';
+    win.style.width = `calc(100vw - 16px)`;
+    win.style.height = `calc(100vh - 64px)`;
+    win.dataset.max = '1';
+  }
+}
+
+/* taskbar buttons */
+function addTaskbarButton(id,title,icon){
+  if(TASKBAR_ITEMS.querySelector(`[data-run="${id}"]`)) return;
+  const btn = el('div',{class:'task-item', 'data-run':id}, icon + ' ' + title);
+  btn.addEventListener('click', ()=>{
+    const win = windowsState[id];
+    if(!win) {
+      // open again if it was closed
+      openApp(id);
+      return;
+    }
+    if(win.style.display === 'none'){
+      restoreWindow(win);
+      btn.classList.add('active');
+    } else {
+      // toggle focus/minimize
+      if(document.activeElement === win || win.classList.contains('focused')) {
+        minimizeWindow(win);
+        btn.classList.remove('active');
+      } else {
+        restoreWindow(win);
+        btn.classList.add('active');
+      }
+    }
+  });
+  TASKBAR_ITEMS.appendChild(btn);
+  // set active
+  btn.classList.add('active');
+}
+
+/* draggable logic */
+function makeDraggable(win, handle){
+  let dragging = false, offsetX=0, offsetY=0;
+
+  handle.addEventListener('pointerdown', (e)=>{
+    dragging = true;
+    handle.setPointerCapture(e.pointerId);
+    offsetX = e.clientX - win.getBoundingClientRect().left;
+    offsetY = e.clientY - win.getBoundingClientRect().top;
+    win.style.cursor = 'grabbing';
+    focusWindow(win);
+  });
+  window.addEventListener('pointermove', (e)=>{
+    if(!dragging) return;
+    let nx = e.clientX - offsetX;
+    let ny = e.clientY - offsetY;
+    // bounds
+    nx = Math.max(6, Math.min(nx, window.innerWidth - win.offsetWidth - 6));
+    ny = Math.max(6, Math.min(ny, window.innerHeight - win.offsetHeight - 46));
+    win.style.left = nx + 'px';
+    win.style.top = ny + 'px';
+  });
+  window.addEventListener('pointerup', (e)=>{
+    if(!dragging) return;
+    dragging = false;
+    win.style.cursor = '';
+  });
+}
+
+/* simple command runner for the fake terminal */
+function runCommand(cmd, outputNode, initial=false){
+  if(initial){
+    outputNode.appendChild(el('div',{}, "Welcome to WebOS Terminal — type 'help'"));
+    scrollTerm(outputNode);
+    return;
+  }
+  if(!cmd) return;
+  appendLine(outputNode, `> ${cmd}`);
+  if(cmd === 'help'){
+    appendLine(outputNode, `Commands: help, echo [text], time, clear, about`);
+  } else if(cmd.startsWith('echo ')){
+    appendLine(outputNode, cmd.slice(5));
+  } else if(cmd === 'time'){
+    appendLine(outputNode, new Date().toString());
+  } else if(cmd === 'clear'){
+    outputNode.innerHTML = '';
+  } else if(cmd === 'about'){
+    appendLine(outputNode, 'This is a toy terminal inside the Web OS demo.');
+  } else {
+    appendLine(outputNode, `Unknown command: ${cmd}`);
+  }
+  scrollTerm(outputNode);
+}
+function appendLine(node, text){
+  const d = el('div',{}, text);
+  node.appendChild(d);
+}
+function scrollTerm(node){
+  node.scrollTop = node.scrollHeight;
+}
+
+/* very small synth helper */
+function playTone(ctx, freq){
+  if(!ctx || ctx.state === 'closed') return;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = 'sawtooth';
+  o.frequency.value = freq;
+  g.gain.value = 0.0001;
+  o.connect(g); g.connect(ctx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.55);
+  setTimeout(()=>{ o.stop(); o.disconnect(); g.disconnect(); }, 700);
+}
+
+/* start menu toggle (simple) */
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  const l = document.getElementById('launcher');
+  l.style.display = l.style.display === 'none' ? '' : 'none';
+});
+
+/* theme toggle */
+function initTheme(){
+  const saved = localStorage.getItem('webos-theme');
+  if(saved === 'light') document.body.classList.add('light');
+  updateClock();
+}
+THEME_TOGGLE.addEventListener('click', ()=>{
+  document.body.classList.toggle('light');
+  localStorage.setItem('webos-theme', document.body.classList.contains('light') ? 'light' : 'dark');
+});
+
+/* clock */
+function updateClock(){
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  TIME.textContent = hh + ':' + mm;
+}
+setInterval(updateClock, 1000);
+
+/* init launcher */
+buildLauncher();
+initTheme();
+
+/* keyboard: press 1..9 to open launcher apps quickly */
+window.addEventListener('keydown', (e)=>{
+  if(e.key >= '1' && e.key <= '9'){
+    const idx = Number(e.key)-1;
+    if(APPS[idx]) openApp(APPS[idx].id);
+  }
+});
+
+/* helper: clicking a taskbar button when window closed should reopen app
+   we already handle in addTaskbarButton. Also allow double-click desktop to open first app */
+DESKTOP.addEventListener('dblclick', ()=>openApp(APPS[0].id));
+
+/* focus desktop to close start menu */
+DESKTOP.addEventListener('pointerdown', (e)=>{
+  if(e.target === DESKTOP){
+    const l = document.getElementById('launcher');
+    l.style.display = 'none';
+  }
+});
+
+/* good defaults: open two example apps */
+openApp('synth');
+openApp('notes');
+
+
+
+</script>
+</body>
+</html>
