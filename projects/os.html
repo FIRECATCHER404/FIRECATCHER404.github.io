@@ -311,22 +311,61 @@ const APPS = [
     }
   },
   {
-    id: 'file-explorer',
-    title: 'Files (fake)',
-    icon: '📁',
-    open(){
-      const win = createWindow({id:this.id, title:this.title, width:640, height:420});
-      const content = el('div',{},);
-      const fakeFiles = ['project-music.json','chat-data.json','particles.json','readme.txt'];
-      const list = el('div',{style:{display:'grid',gap:'6px'}});
-      fakeFiles.forEach(f => {
-        const row = el('div',{style:{padding:'8px',borderRadius:'6px',background:'rgba(255,255,255,0.01)',display:'flex',justifyContent:'space-between',alignItems:'center'}},
-          el('div',{},'📄 ' + f),
-          el('div',{}, el('button',{onclick:()=>alert('Pretend download: '+f)}, 'Download'))
-        );
-        list.appendChild(row);
-      });
-      content.appendChild(list);
+    id: "file-explorer-real",
+    title: "Files",
+    icon: "📁",
+    open() {
+      const win = createWindow({id:this.id, title:this.title, width:600, height:400});
+      const content = el("div", {style:{padding:"12px"}});
+      
+      // Fake file system
+      const fs = {
+        "Documents": ["notes.txt","todo.txt"],
+        "Music": ["song1.mp3","song2.mp3"],
+        "Projects": ["webos.html","musicMaker.json"]
+      };
+  
+      function renderFolder(folderName) {
+        content.innerHTML = "";
+        const backBtn = el("button", {style:{marginBottom:"10px"}}, "⬅ Back");
+        backBtn.onclick = () => renderRoot();
+        if(folderName !== null) content.appendChild(backBtn);
+  
+        const files = folderName ? fs[folderName] : Object.keys(fs);
+        files.forEach(f => {
+          const row = el("div", {
+            style:{
+              padding:"8px",
+              borderRadius:"6px",
+              background:"rgba(255,255,255,0.01)",
+              marginBottom:"4px",
+              cursor:"pointer",
+              display:"flex",
+              justifyContent:"space-between",
+              alignItems:"center"
+            }
+          });
+  
+          const nameEl = el("div", {}, folderName ? f : "📁 " + f);
+          row.appendChild(nameEl);
+  
+          if(folderName){
+            const btn = el("button", {}, "Open");
+            btn.onclick = () => alert("Pretend open: "+f);
+            row.appendChild(btn);
+          }
+  
+          row.onclick = () => {
+            if(!folderName) renderFolder(f);
+          };
+  
+          content.appendChild(row);
+        });
+      }
+  
+      function renderRoot() { renderFolder(null); }
+  
+      renderRoot();
       win.content.appendChild(content);
       focusWindow(win.container);
     }
