@@ -668,74 +668,9 @@ playBtn.addEventListener('click', () => {
 
   document.getElementById("exportMP3").addEventListener("click",exportToMP3);
 
+  //------ share url -----
 
-  // ----- MP3 IMPORT -----
-document.getElementById("importMP3").addEventListener("click", ()=>{
-  document.getElementById("mp3File").click();
-});
-
-document.getElementById("mp3File").addEventListener("change", async (e)=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  ensureAudioCtx();
-
-  const array = await file.arrayBuffer();
-  const audio = await audioCtx.decodeAudioData(array);
-
-  // === Mix to mono ===
-  const len = audio.length;
-  const ch = audio.numberOfChannels;
-  const sr = audio.sampleRate;
-  const mono = new Float32Array(len);
-  for (let c = 0; c < ch; c++) {
-    const data = audio.getChannelData(c);
-    for (let i = 0; i < len; i++) mono[i] += data[i] / ch;
-  }
-
-  // === High-pass filter to catch drum transients ===
-  for (let i = len-1; i >= 1; i--)
-    mono[i] = mono[i] - 0.995 * mono[i-1];
-
-  // === Compute short-time energy (transient detector) ===
-  const win = 512;
-  const hop = 256;
-  const energy = [];
-  for (let i = 0; i + win < mono.length; i += hop) {
-    let sum = 0;
-    for (let j=0; j<win; j++) {
-      const v = mono[i+j];
-      sum += v*v;
-    }
-    energy.push(sum);
-  }
-
-  // === Adaptive threshold ===
-  const sorted = [...energy].sort((a,b)=>a-b);
-  const median = sorted[Math.floor(sorted.length/2)];
-  const threshold = median * 4;
-
-  // === Peak-picking (onset detection) ===
-  const peaks = [];
-  for (let i = 1; i < energy.length - 1; i++) {
-    if (energy[i] > threshold &&
-        energy[i] > energy[i-1] &&
-        energy[i] > energy[i+1]) {
-      peaks.push(i);
-    }
-  }
-
-  // === Map peaks to grid columns ===
-  grid = makeEmptyGrid(rows, cols);
-
-  for (let p of peaks) {
-    const time = (p * hop) / sr;
-    const col = Math.floor((time / audio.duration) * cols);
-    if (col >= 0 && col < cols) {
-      grid[rows - 1][col] = true;   // Kick row
-    }
-  }
-
-  function encodeSong() {
+    function encodeSong() {
     let lines = [];
   
     for (let r = 0; r < rows; r++) {
@@ -805,6 +740,72 @@ document.getElementById("mp3File").addEventListener("change", async (e)=>{
   if (params.has("song")) {
     const encoded = params.get("song");
     decodeSong(encoded);
+  }
+
+  // ----- MP3 IMPORT -----
+document.getElementById("importMP3").addEventListener("click", ()=>{
+  document.getElementById("mp3File").click();
+});
+
+document.getElementById("mp3File").addEventListener("change", async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  ensureAudioCtx();
+
+  const array = await file.arrayBuffer();
+  const audio = await audioCtx.decodeAudioData(array);
+
+  // === Mix to mono ===
+  const len = audio.length;
+  const ch = audio.numberOfChannels;
+  const sr = audio.sampleRate;
+  const mono = new Float32Array(len);
+  for (let c = 0; c < ch; c++) {
+    const data = audio.getChannelData(c);
+    for (let i = 0; i < len; i++) mono[i] += data[i] / ch;
+  }
+
+  // === High-pass filter to catch drum transients ===
+  for (let i = len-1; i >= 1; i--)
+    mono[i] = mono[i] - 0.995 * mono[i-1];
+
+  // === Compute short-time energy (transient detector) ===
+  const win = 512;
+  const hop = 256;
+  const energy = [];
+  for (let i = 0; i + win < mono.length; i += hop) {
+    let sum = 0;
+    for (let j=0; j<win; j++) {
+      const v = mono[i+j];
+      sum += v*v;
+    }
+    energy.push(sum);
+  }
+
+  // === Adaptive threshold ===
+  const sorted = [...energy].sort((a,b)=>a-b);
+  const median = sorted[Math.floor(sorted.length/2)];
+  const threshold = median * 4;
+
+  // === Peak-picking (onset detection) ===
+  const peaks = [];
+  for (let i = 1; i < energy.length - 1; i++) {
+    if (energy[i] > threshold &&
+        energy[i] > energy[i-1] &&
+        energy[i] > energy[i+1]) {
+      peaks.push(i);
+    }
+  }
+
+  // === Map peaks to grid columns ===
+  grid = makeEmptyGrid(rows, cols);
+
+  for (let p of peaks) {
+    const time = (p * hop) / sr;
+    const col = Math.floor((time / audio.duration) * cols);
+    if (col >= 0 && col < cols) {
+      grid[rows - 1][col] = true;   // Kick row
+    }
   }
   
   rerenderGrid();
