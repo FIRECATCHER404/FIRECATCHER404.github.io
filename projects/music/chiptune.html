@@ -266,6 +266,20 @@
         btn.addEventListener('click', () => {
           grid[r][c] = !grid[r][c];
           renderCell(btn, r, c);
+        
+          if (grid[r][c]) {
+            // Play preview sound for this row
+            ensureAudioCtx();
+            const now = audioCtx.currentTime + 0.01;
+        
+            if (r === rows - 1) {
+              playBeat(now);      // Kick
+            } else if (r === rows - 2) {
+              playSnare(now);     // Snare
+            } else {
+              playSynth(r, now);  // Melodic note
+            }
+          }
         });
         renderCell(btn, r, c);
         gridEl.appendChild(btn);
