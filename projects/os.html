@@ -169,6 +169,23 @@
     pointer-events: none;
   }
 
+  #bootBarContainer {
+    width: 60%;
+    height: 12px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 6px;
+    margin-top: 20px;
+    overflow: hidden;
+  }
+  
+  #bootBar {
+    width: 0%;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 6px;
+    transition: width 0.1s linear;
+  }
+
 
 </style>
 </head>
@@ -1001,6 +1018,41 @@ window.addEventListener("load", () => {
     progress += Math.random() * 5;
     if(progress > 100) progress = 100;
     bootBar.style.width = progress + "%";
+
+    if(progress >= 100){
+      clearInterval(interval);
+      // Fade out boot screen
+      bootScreen.classList.add("hidden");
+    }
+  }, 100); // Update every 100ms
+});
+
+window.addEventListener("load", () => {
+  const bootBar = document.getElementById("bootBar");
+  const bootText = document.getElementById("bootText");
+
+  const lines = [
+    "Initializing hardware...",
+    "Loading kernel modules...",
+    "Starting system services...",
+    "Mounting file systems...",
+    "Checking configurations...",
+    "WebOS ready!"
+  ];
+
+  let progress = 0;
+  let lineIndex = 0;
+
+  const interval = setInterval(() => {
+    progress += Math.random() * 5;
+    if(progress > 100) progress = 100;
+    bootBar.style.width = progress + "%";
+
+    // Add new boot line occasionally
+    if(lineIndex < lines.length && progress >= (lineIndex + 1) * (100 / lines.length)){
+      bootText.innerHTML += lines[lineIndex] + "<br>";
+      lineIndex++;
+    }
 
     if(progress >= 100){
       clearInterval(interval);
