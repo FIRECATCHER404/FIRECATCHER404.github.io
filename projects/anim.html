@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Growing Polygon + Gravity Ball</title>
+<style>
+  html,body { height:100%; margin:0; display:flex; align-items:center; justify-content:center; background:#111; color:#ddd; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;}
+  canvas { background: linear-gradient(180deg,#0b1220,#071021); border-radius:8px; box-shadow: 0 8px 30px rgba(0,0,0,0.7); }
+  .controls { position:fixed; right:12px; top:12px; background:rgba(255,255,255,0.04); padding:10px 12px; border-radius:8px; font-size:13px;}
+  label { display:block; margin-bottom:6px; }
+  button { margin-top:8px; }
+  a { color:#9cf; }
+</style>
+</head>
+<body>
+<canvas id="c" width="900" height="700"></canvas>
+
+<div class="controls">
+  <div><strong>Growing Polygon + Ball</strong></div>
+  <label>Gravity: <span id="gravVal">1200</span> px/s²</label>
+  <input id="grav" type="range" min="0" max="3000" value="1200" />
+  <label>Speed gain per collision: <span id="spdVal">1.12</span>x</label>
+  <input id="spd" type="range" min="100" max="200" value="112" />
+  <label>Ball radius: <span id="radVal">12</span> px</label>
+  <input id="rad" type="range" min="6" max="32" value="12" />
+  <label>Restitution (bounciness): <span id="restVal">0.98</span></label>
+  <input id="rest" type="range" min="50" max="120" value="98" />
+  <div style="margin-top:6px;">
+    Sides: <span id="sides">3</span><br/>
+    Speed: <span id="speed">0</span> px/s
+  </div>
+  <button id="reset">Reset</button>
+  <div style="margin-top:6px; font-size:12px; opacity:0.8;">
+    Save file and open in browser. Click canvas to apply an impulse.
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  // UI elements
+  const gravRange = document.getElementById('grav');
+  const gravVal = document.getElementById('gravVal');
+  const spdRange = document.getElementById('spd');
+  const spdVal = document.getElementById('spdVal');
+  const radRange = document.getElementById('rad');
+  const radVal = document.getElementById('radVal');
+  const restRange = document.getElementById('rest');
+  const restVal = document.getElementById('restVal');
+  const sidesDisplay = document.getElementById('sides');
+  const speedDisplay = document.getElementById('speed');
+  const resetBtn = document.getElementById('reset');
+
+  // World / simulation parameters
+  let gravity = parseFloat(gravRange.value); // px / s^2
+  let speedGain = parseFloat(spdRange.value) / 100; // multiplier each collision (1.12 means +12%)
+  let ballRadius = parseFloat(radRange.value);
+  let restitution = parseFloat(restRange.value) / 100; // energy preserved on reflection before speedGain
+
+  // Canvas size convenience
+  const W = canvas.width, H = canvas.height;
+  const center = { x: W/2, y: H/2 - 30 };
+
+  // Ball state
+  let ball = {
+    x: center.x,
+    y: center.y,
+    vx: 160, // px/s start with small horizontal velocity
+    vy: -40,
+    r: ballRadius
+  };
+
+  // Polygon state (regular polygon, centered)
+  let polygon = {
+    sides: 3,
+    // circumradius (distance center -> vertex). Will be computed so initial polygon fits nicely.
+    R: Math.min(W, H) * 0.28,
+    center: { x: center.x, y: center.y }
+  };
+
+  // Keep track of which edges were colliding previous frame to avoid multiple triggers per contact
+  let edgeCollisionFlags = [];
+
+  // init
+  function init() {
+    polygon.sides = 3;
+    polygon.R = Math.min(W, H) * 0.28;
+    polygon.center = { x: center.x, y: center.y };
+    ball.x = center.x;
+    ball.y = center.y;
+    ball.vx = 160 * (Math.random() > 0.5 ? 1 : -1);
+    ball.vy = -80;
+    ball.r = ballRadius;
+    edgeCollisionFlags = new Array(100).fill(false);
+    updateUI();
+  }
+
+  function updateUI() {
+    gravVal.textContent = Math.round(gravity);
+    spdVal.textContent = speedGain.toFixed(2);
+    radVal.textContent = Math.round(ball.r);
+    restVal.textContent = restitution.toFixed(2);
+    sidesDisplay.textContent = polygon.sides;
+    speedDisplay.textContent = Math.round(Math.hypot(ball.vx, ball.vy));
+  }
+
+  // Build polygon vertices as CCW array of points
+  function polygonVertices(sides, R, center) {
+    const verts = [];
+    // rotate so one vertex is upwards for aesthetic
+    const rot = -Math.PI / 2; // start at top
+    for (let i = 0; i < sides; i++) {
+      const a = rot + i * (2 * Math.PI / sides);
+      verts.push({ x: center.x + R * Math.cos(a), y: center.y + R * Math.sin(a) });
+    }
+    return verts;
+  }
+
+  // Compute inward normal for edge (from vA to vB). Normal points from edge toward polygon center.
+  function inwardNormal(vA, vB, center) {
+    // Edge vector
+    const ex = vB.x - vA.x;
+    const ey = vB.y - vA.y;
+    // Two possible normals (perp)
+    // perp1 = (-ey, ex), perp2 = (ey, -ex)
+    // Choose the one that points toward center
+    const mid = { x: (vA.x + vB.x)/2, y: (vA.y + vB.y)/2 };
+    const perp1 = { x: -ey, y: ex };
+    const dot1 = (center.x - mid.x) * perp1.x + (center.y - mid.y) * perp1.y;
+    let nx, ny;
+    if (dot1 > 0) {
+      nx = perp1.x; ny = perp1.y;
+    } else {
+      nx = -perp1.x; ny = -perp1.y;
+    }
+    const len = Math.hypot(nx, ny) || 1;
+    return { x: nx / len, y: ny / len };
+  }
+
+  // Distance from a point to a line (vA-vB) with signed distance using inward normal
+  function signedDistanceToEdge(px, py, vA, vB, normal) {
+    // any point on line: vA
+    return ( (px - vA.x) * normal.x + (py - vA.y) * normal.y );
+  }
+
+  // Add one side to polygon. To guarantee ball stays inside, compute new circumradius so new apothem >= old apothem.
+  function addSideKeepBallInside() {
+    const oldN = polygon.sides;
+    const newN = oldN + 1;
+    const oldR = polygon.R;
+    // apothem = R * cos(pi/n)
+    const oldApothem = oldR * Math.cos(Math.PI / oldN);
+    // choose newR such that newApothem >= oldApothem:
+    // newR = oldApothem / cos(pi/newN)
+    const newR = oldApothem / Math.cos(Math.PI / newN);
+
+    // Also ensure the ball plus margin fits: if ball is near edge, ensure apothem >= ball distance from center + ball.r
+    // compute current ball distance from center along radial
+    const dx = ball.x - polygon.center.x;
+    const dy = ball.y - polygon.center.y;
+    const ballDistFromCenter = Math.hypot(dx, dy);
+
+    const requiredApothem = ballDistFromCenter + ball.r + 1; // +1 px margin
+    const computedNewApothem = Math.max(oldApothem, requiredApothem);
+
+    const finalNewR = Math.max(newR, computedNewApothem / Math.cos(Math.PI / newN));
+
+    polygon.sides = newN;
+    polygon.R = finalNewR;
+    // reset flags large enough
+    edgeCollisionFlags = new Array(polygon.sides + 4).fill(false);
+    sidesDisplay.textContent = polygon.sides;
+  }
+
+  // Physics step: dt in seconds
+  function step(dt) {
+    // integrate velocity (gravity)
+    ball.vy += gravity * dt;
+
+    // integrate position
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+
+    // collision with polygon edges
+    const verts = polygonVertices(polygon.sides, polygon.R, polygon.center);
+    const n = verts.length;
+    // we'll accumulate collisions this frame
+    for (let i = 0; i < n; i++) {
+      const a = verts[i];
+      const b = verts[(i+1)%n];
+      const normal = inwardNormal(a,b, polygon.center); // points inward
+
+      // signed distance from ball center to edge along inward normal
+      const dist = signedDistanceToEdge(ball.x, ball.y, a, b, normal);
+
+      if (dist < ball.r) {
+        // collision (penetration = ball.r - dist)
+        const penetration = ball.r - dist;
+
+        // If previously not colliding (edgeCollisionFlags false), treat as a collision event
+        if (!edgeCollisionFlags[i]) {
+          edgeCollisionFlags[i] = true;
+          // increase speed and add side
+          // reflect velocity about normal
+          // project velocity onto normal
+          const vdotn = ball.vx * normal.x + ball.vy * normal.y;
+          // reflect
+          ball.vx = ball.vx - 2 * vdotn * normal.x;
+          ball.vy = ball.vy - 2 * vdotn * normal.y;
+          // apply restitution (bounciness) first
+          ball.vx *= restitution;
+          ball.vy *= restitution;
+          // then apply speed gain (increase magnitude)
+          const spd = Math.hypot(ball.vx, ball.vy);
+          const newSpd = spd * speedGain;
+          if (spd > 0.0001) {
+            ball.vx = ball.vx / spd * newSpd;
+            ball.vy = ball.vy / spd * newSpd;
+          } else {
+            // if nearly zero, give a small outward push along normal
+            ball.vx += normal.x * 80;
+            ball.vy += normal.y * 80;
+          }
+
+          // add one side
+          addSideKeepBallInside();
+        }
+
+        // positional correction: move ball outward along normal by penetration
+        ball.x += normal.x * penetration;
+        ball.y += normal.y * penetration;
+
+        // Additionally, to avoid "sticking" if velocities are tiny, make sure ball has slight outward velocity along normal
+        const vdotnAfter = ball.vx * normal.x + ball.vy * normal.y;
+        if (vdotnAfter < 0) { // if still pointing inward, push outward a bit
+          ball.vx -= normal.x * vdotnAfter * 1.1;
+          ball.vy -= normal.y * vdotnAfter * 1.1;
+        }
+      } else {
+        // no contact -> reset flag so future contact will count
+        edgeCollisionFlags[i] = false;
+      }
+    }
+
+    // small air drag so it doesn't spin out of control (optional)
+    const drag = 0.999;
+    ball.vx *= drag;
+    ball.vy *= drag;
+  }
+
+  // Rendering
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+
+    // background gradient (already via canvas background)
+    // draw polygon
+    const verts = polygonVertices(polygon.sides, polygon.R, polygon.center);
+    ctx.beginPath();
+    ctx.moveTo(verts[0].x, verts[0].y);
+    for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+    ctx.closePath();
+    // fill
+    ctx.fillStyle = '#081826';
+    ctx.fill();
+    // stroke
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#2fb4ff';
+    ctx.stroke();
+
+    // draw edges normals (for debugging) - optional
+    // draw ball shadow
+    ctx.beginPath();
+    ctx.ellipse(ball.x + 6, ball.y + 10, ball.r*0.9, ball.r*0.45, 0, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fill();
+
+    // ball
+    const grd = ctx.createRadialGradient(ball.x - 6, ball.y - 6, ball.r*0.15, ball.x, ball.y, ball.r);
+    grd.addColorStop(0, '#fffa');
+    grd.addColorStop(0.6, '#88d7ff');
+    grd.addColorStop(1, '#0374a6');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+    ctx.fill();
+
+    // ball outline
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.stroke();
+
+    // HUD text
+    ctx.fillStyle = '#bfefff';
+    ctx.font = '13px system-ui,Segoe UI,Roboto';
+    ctx.fillText('Sides: ' + polygon.sides, 12, 22);
+    ctx.fillText('Speed: ' + Math.round(Math.hypot(ball.vx, ball.vy)) + ' px/s', 12, 40);
+
+  }
+
+  // animation loop using fixed-step integration
+  let last = performance.now();
+  let acc = 0;
+  const stepMs = 1000/120; // physics at 120Hz
+  function frame(t) {
+    const now = t;
+    let delta = now - last;
+    if (delta > 100) delta = 100; // clamp big jumps
+    last = now;
+    acc += delta;
+    while (acc >= stepMs) {
+      step(stepMs / 1000);
+      acc -= stepMs;
+    }
+    draw();
+    updateUI();
+    requestAnimationFrame(frame);
+  }
+
+  // Interaction: click to give a random impulse
+  canvas.addEventListener('click', (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = ev.clientX - rect.left;
+    const my = ev.clientY - rect.top;
+    // give impulse away from click
+    const dx = ball.x - mx;
+    const dy = ball.y - my;
+    const d = Math.hypot(dx, dy) || 1;
+    const impulse = 300; // px/s
+    ball.vx += (dx / d) * impulse;
+    ball.vy += (dy / d) * impulse;
+  });
+
+  // controls wiring
+  gravRange.addEventListener('input', (e) => { gravity = +e.target.value; gravVal.textContent = Math.round(gravity); });
+  spdRange.addEventListener('input', (e) => { speedGain = +e.target.value / 100; spdVal.textContent = speedGain.toFixed(2); });
+  radRange.addEventListener('input', (e) => {
+    ballRadius = +e.target.value;
+    ball.r = ballRadius;
+    radVal.textContent = Math.round(ball.r);
+  });
+  restRange.addEventListener('input', (e) => { restitution = +e.target.value / 100; restVal.textContent = restitution.toFixed(2); });
+
+  resetBtn.addEventListener('click', () => {
+    init();
+  });
+
+  // initialize and start
+  init();
+  requestAnimationFrame(frame);
+
+  // expose for console tinkering
+  window._sim = { ball, polygon, addSideKeepBallInside, step, polygonVertices };
+
+})();
+</script>
+</body>
+</html>
