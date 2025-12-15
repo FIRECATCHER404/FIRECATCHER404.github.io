@@ -69,44 +69,6 @@
     .button:hover {
       filter: brightness(1.2);
     }
-      /* Modal background */
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 9999;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.7);
-    }
-    
-    /* Centered popup */
-    .modal-content {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #111;
-      padding: 10px;
-      border-radius: 12px;
-      max-width: 90vw;
-      box-shadow: 0 0 20px #000;
-    }
-    
-    /* Close button */
-    .close {
-      float: right;
-      font-size: 30px;
-      cursor: pointer;
-      color: #fff;
-    }
-    @media (max-width: 768px) {
-      #buttons {
-        max-height: 35vh;
-        overflow-y: auto;
-      }
-    }
   </style>
 </head>
 <body>
@@ -118,23 +80,6 @@
     <div style="margin-top: 1rem;">
       <a href="index.html"><button class="button" style="background-color: #555;">Main Menu</button></a>
       <button class="button" style="background-color: #555; margin-left: 20px;" onclick="clearGrid()">Clear</button>
-      <button id="openGuide", class="button" style="background-color: #555; margin-left: 20px;">Guide</button>
-    <!-- Modal -->
-    <div id="videoModal" class="modal">
-      <div class="modal-content">
-        <span class="close">&times;</span>
-    
-        <iframe 
-          id="guideFrame"
-          width="560"
-          height="315"
-          src="https://www.youtube.com/embed/g-CXs-jTUiI"
-          frameborder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen>
-        </iframe>
-      </div>
-    </div>
     </div>
     <canvas id="canvas" width="900" height="600"></canvas>
   </div>
@@ -368,6 +313,44 @@
                 grid[y + 1][x] = { type: 'rain', ...particles.rain };
               } else {
                 grid[y + 1][x] = { type: 'lightning', ...particles.lightning };
+              }
+            }
+          }
+          if (y > 0 && !grid[y - 1][x]) {
+            grid[y - 1][x] = grid[y][x];
+            grid[y][x] = null;
+          }
+        }
+      },
+      acid_storm: {
+        color: '#84FFD4',
+        update: (x, y) => {
+          if (Math.random() < 0.05) {
+            const below = grid[y + 1]?.[x];
+            if (!below) {
+              if (Math.random() < 0.5) {
+                grid[y + 1][x] = { type: 'acid', ...particles.acid };
+              } else {
+                grid[y + 1][x] = { type: 'acid', ...particles.acid };
+              }
+            }
+          }
+          if (y > 0 && !grid[y - 1][x]) {
+            grid[y - 1][x] = grid[y][x];
+            grid[y][x] = null;
+          }
+        }
+      },
+      sandrm: {
+        color: '#FFF071',
+        update: (x, y) => {
+          if (Math.random() < 0.05) {
+            const below = grid[y + 1]?.[x];
+            if (!below) {
+              if (Math.random() < 0.5) {
+                grid[y + 1][x] = { type: 'acid', ...particles.sand };
+              } else {
+                grid[y + 1][x] = { type: 'acid', ...particles.sand };
               }
             }
           }
@@ -2146,11 +2129,52 @@ tag_bridge: {
         // Passive segment, does nothing (yet)
     }
 },
-      firewall: {
-        color: '#ff3300',
-        update: () => {}
-      }
+firewall: {
+  color: '#ff3300',
+  update: () => {}
+},
+nanodel: {
+  color: '#ff0055',
+  update: (x, y) => {
+    // find any nanobot in the grid
+    for (let ny = 0; ny < gridHeight; ny++) {
+      for (let nx = 0; nx < gridWidth; nx++) {
+        if (grid[ny][nx]?.type === 'nanobot') {
+          // delete the nanobot
+          grid[ny][nx] = null;
 
+          // teleport nanodel to that position
+          grid[ny][nx] = grid[y][x];
+          grid[y][x] = null;
+          return;
+        }
+      }
+    }
+
+    // no nanobots left → self-destruct
+    grid[y][x] = null;
+  }
+},
+spreader: {
+  color: '#aa00ff',
+  update: (x, y) => {
+    const dirs = [[0,1],[1,0],[-1,0],[0,-1]];
+
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx;
+      const ny = y + dy;
+
+      if (
+        nx >= 0 && nx < gridWidth &&
+        ny >= 0 && ny < gridHeight &&
+        !grid[ny][nx] &&
+        Math.random() < 0.01   // 👈 tune this
+      ) {
+        grid[ny][nx] = { type: 'spreader', ...particles.spreader };
+      }
+    }
+  }
+},
     };
 
     const tools = Object.keys(particles);
@@ -2387,30 +2411,6 @@ function isPowered(x, y) {
     return false;
 }
 
-const modal = document.getElementById("videoModal");
-const btn = document.getElementById("openGuide");
-const span = document.querySelector(".close");
-const iframe = document.getElementById("guideFrame");
-
-// Open modal
-btn.onclick = function() {
-  modal.style.display = "block";
-}
-
-// Close modal
-span.onclick = function() {
-  modal.style.display = "none";
-  iframe.src = iframe.src; // stops the video
-}
-
-// Close by clicking outside popup
-window.onclick = function(event) {
-  if (event.target == modal) {
-    modal.style.display = "none";
-    iframe.src = iframe.src; // stops the video
-  }
-}
-
 
     function updateGrid() {
       // First pass: update all non-exempt particles
@@ -2464,7 +2464,3 @@ window.onclick = function(event) {
   </script>
 </body>
 </html>
-
-
-
-
