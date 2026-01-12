@@ -51,23 +51,61 @@ opacity: 0.7;
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, onValue, runTransaction, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
+import {
+  getDatabase,
+  ref,
+  onValue,
+  runTransaction,
+  push,
+  onChildAdded
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
   authDomain: "website-11b5c.firebaseapp.com",
   databaseURL: "https://website-11b5c-default-rtdb.firebaseio.com",
   projectId: "website-11b5c",
-  storageBucket: "website-11b5c.firebasestorage.app",
+  storageBucket: "website-11b5c.appspot.com",
   messagingSenderId: "821866548441",
   appId: "1:821866548441:web:d6941bf79099255f7902c8"
 };
 
-
-
+// 🔥 Init Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+
+// 🔗 Refs
+const countRef = ref(db, "count");
+const msgRef   = ref(db, "messages");
+
+// 🧩 Elements
+const btn = document.getElementById("btn");
+const countEl = document.getElementById("count");
+
+// 🔄 Live counter sync
+onValue(countRef, snap => {
+  countEl.textContent = snap.val() ?? 0;
+});
+
+// 🖱️ Button click
+btn.addEventListener("click", () => {
+  runTransaction(countRef, current => (current || 0) + 1);
+});
+
+// 🔒 SECRET: console broadcast
+window.say = (message) => {
+  push(msgRef, {
+    text: String(message),
+    time: Date.now()
+  });
+};
+
+// 👁️ Listen for broadcasts (console only)
+onChildAdded(msgRef, snap => {
+  const msg = snap.val();
+  console.log("%c[broadcast]", "color:#7aa2ff", msg.text);
+});
+
 
 
 const countRef = ref(db, 'count');
