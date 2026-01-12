@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>The Button</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+
+<style>
+html, body {
+margin: 0;
+height: 100%;
+background: #0f1117;
+color: #eaeaf0;
+font-family: system-ui, sans-serif;
+display: flex;
+align-items: center;
+justify-content: center;
+flex-direction: column;
+}
+
+
+button {
+font-size: 2rem;
+padding: 1.2rem 3rem;
+border-radius: 12px;
+border: none;
+cursor: pointer;
+background: #5865f2;
+color: white;
+transition: transform 0.1s ease;
+}
+
+
+button:active {
+transform: scale(0.95);
+}
+
+
+.count {
+margin-top: 1rem;
+opacity: 0.7;
+}
+</style>
+</head>
+<body>
+<button id="btn">CLICK</button>
+<div class="count" id="count">0</div>
+
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, onValue, runTransaction, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
+  authDomain: "website-11b5c.firebaseapp.com",
+  databaseURL: "https://website-11b5c-default-rtdb.firebaseio.com",
+  projectId: "website-11b5c",
+  storageBucket: "website-11b5c.firebasestorage.app",
+  messagingSenderId: "821866548441",
+  appId: "1:821866548441:web:d6941bf79099255f7902c8"
+};
+
+
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+
+const countRef = ref(db, 'count');
+</html>
