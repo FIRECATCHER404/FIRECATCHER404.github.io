@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>voidspace</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #0f0f12;
+      overflow: hidden;
+      background-color: #192833
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+
+  <script>
+    const canvas = document.getElementById('bg');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const particles = [];
+
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+
+    window.addEventListener('click', e => {
+      const size = Math.random() * 3 + 2;
+      const speed = 0.3 + Math.random();
+      const angle = Math.random() * Math.PI * 2;
+
+      particles.push(new Particle(
+        e.clientX,
+        e.clientY,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        size,
+        '#ffffff'
+      ));
+    });
+
+    class Particle {
+      constructor(x, y, dx, dy, size, color) {
+        this.x = x;
+        this.y = y;
+        this.dx = dx;
+        this.dy = dy;
+        this.size = size;
+        this.color = color;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+      }
+
+      update() {
+        if (this.x + this.size > canvas.width || this.x - this.size < 0) {
+          this.dx *= -1;
+        }
+        if (this.y + this.size > canvas.height || this.y - this.size < 0) {
+          this.dy *= -1;
+        }
+
+        this.x += this.dx;
+        this.y += this.dy;
+        this.draw();
+      }
+    }
+
+    function connect() {
+      for (let a = 0; a < particles.length; a++) {
+        for (let b = a + 1; b < particles.length; b++) {
+          const dx = particles[a].x - particles[b].x;
+          const dy = particles[a].y - particles[b].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 120) {
+            const opacity = 1 - dist / 120;
+            ctx.strokeStyle = `rgba(255,255,255,${opacity})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(particles[a].x, particles[a].y);
+            ctx.lineTo(particles[b].x, particles[b].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const p of particles) {
+        p.update();
+      }
+
+      connect();
+    }
+
+    animate();
+  </script>
+</body>
+</html>
