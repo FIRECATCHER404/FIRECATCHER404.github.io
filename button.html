@@ -48,7 +48,6 @@ opacity: 0.7;
 <div class="count" id="count">0</div>
 
 
-<!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
@@ -92,8 +91,8 @@ btn.addEventListener("click", () => {
   runTransaction(countRef, current => (current || 0) + 1);
 });
 
-// 🔒 SECRET: console broadcast
-window.say = (message) => {
+// 💬 Console-only chat
+globalThis.say = (message) => {
   push(msgRef, {
     text: String(message),
     time: Date.now()
@@ -105,8 +104,6 @@ onChildAdded(msgRef, snap => {
   const msg = snap.val();
   console.log("%c[broadcast]", "color:#7aa2ff", msg.text);
 });
+</script>
 
-
-
-const countRef = ref(db, 'count');
 </html>
