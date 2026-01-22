@@ -12,7 +12,6 @@
       --text: #e6efe7;
       --muted: #9ab2a0;
     
-      /* green accent */
       --accent: #4dff88;
       --accent-strong: #2ee673;
       --glow: rgba(77,255,136,0.25);
@@ -161,7 +160,7 @@
 
     .bg-square {
       position: absolute;
-      background: rgb(20, 26, 22); /* base dark tone */
+      background: rgb(20, 26, 22); 
       border-radius: 2px;
       will-change: transform;
     }
@@ -226,7 +225,6 @@
   </footer>
 
   <script>
-    // subtle glow follows mouse
     document.querySelectorAll('.card').forEach(card => {
       card.addEventListener('mousemove', e => {
         const r = card.getBoundingClientRect();
@@ -249,14 +247,13 @@
       return Math.random() * (max - min) + min;
     }
 
-    // create squares
     for (let i = 0; i < SQUARE_COUNT; i++) {
       const el = document.createElement('div');
       el.className = 'bg-square';
 
       const size = rand(30, 110);
-      const depth = rand(0.4, 2.0); // higher = closer
-      const brightness = Math.floor(40 / depth); // farther = darker
+      const depth = rand(0.4, 2.0);
+      const brightness = Math.floor(40 / depth); 
 
       el.style.width = `${size}px`;
       el.style.height = `${size}px`;
