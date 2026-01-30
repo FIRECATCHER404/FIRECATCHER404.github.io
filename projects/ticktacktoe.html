@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Online Tic-Tac-Toe</title>
+<style>
+  body { font-family: sans-serif; text-align: center; }
+  #board { display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; margin: 20px auto; }
+  .cell {
+    width: 100px;
+    height: 100px;
+    font-size: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #333;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h1>Tic-Tac-Toe</h1>
+<div id="menu">
+  <button onclick="startAI()">Play vs AI</button>
+  <button onclick="startOnline()">Play Online</button>
+</div>
+
+<div id="status"></div>
+<div id="board"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
+  authDomain: "website-11b5c.firebaseapp.com",
+  databaseURL: "https://website-11b5c-default-rtdb.firebaseio.com",
+  projectId: "website-11b5c",
+  storageBucket: "website-11b5c.appspot.com",
+  messagingSenderId: "821866548441",
+  appId: "1:821866548441:web:d6941bf79099255f7902c8"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const boardEl = document.getElementById("board");
+const statusEl = document.getElementById("status");
+const menuEl = document.getElementById("menu");
+
+let board = Array(9).fill("");
+let mySymbol = "X";
+let gameRef = null;
+let myTurn = true;
+
+/* ---------- UI ---------- */
+
+function drawBoard() {
+  boardEl.innerHTML = "";
+  board.forEach((v, i) => {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.textContent = v;
+    cell.onclick = () => clickCell(i);
+    boardEl.appendChild(cell);
+  });
+}
+
+function clickCell(i) {
+  if (board[i] || !myTurn) return;
+
+  board[i] = mySymbol;
+  myTurn = false;
+  drawBoard();
+
+  if (gameRef) {
+    update(gameRef, { board, turn: other(mySymbol) });
+  } else {
+    aiMove();
+  }
+}
+
+/* ---------- AI MODE ---------- */
+
+window.startAI = () => {
+  menuEl.style.display = "none";
+  statusEl.textContent = "You are X";
+  board = Array(9).fill("");
+  myTurn = true;
+  drawBoard();
+};
+
+function aiMove() {
+  const empty = board.map((v,i)=>v===""?i:null).filter(v=>v!==null);
+  if (empty.length === 0) return;
+
+  setTimeout(() => {
+    const move = empty[Math.floor(Math.random()*empty.length)];
+    board[move] = "O";
+    myTurn = true;
+    drawBoard();
+  }, 400);
+}
+
+/* ---------- ONLINE MODE ---------- */
+
+window.startOnline = async () => {
+  menuEl.style.display = "none";
+  statusEl.textContent = "Looking for opponent...";
+
+  const waitingRef = ref(db, "waiting");
+  const snapshot = await get(waitingRef);
+
+  if (snapshot.exists()) {
+    const opponentId = Object.keys(snapshot.val())[0];
+    await remove(ref(db, "waiting/" + opponentId));
+
+    const gameId = crypto.randomUUID();
+    gameRef = ref(db, "games/" + gameId);
+
+    mySymbol = "O";
+    myTurn = false;
+
+    await set(gameRef, {
+      board: Array(9).fill(""),
+      turn: "X"
+    });
+
+    listenGame();
+  } else {
+    const myId = crypto.randomUUID();
+    await set(ref(db, "waiting/" + myId), true);
+
+    onValue(ref(db, "games"), snap => {
+      snap.forEach(game => {
+        if (!gameRef) {
+          gameRef = ref(db, "games/" + game.key);
+          mySymbol = "X";
+          myTurn = true;
+          listenGame();
+        }
+      });
+    });
+  }
+};
+
+function listenGame() {
+  statusEl.textContent = "Game started! You are " + mySymbol;
+
+  onValue(gameRef, snap => {
+    const data = snap.val();
+    board = data.board;
+    myTurn = data.turn === mySymbol;
+    drawBoard();
+  });
+}
+
+function other(s) {
+  return s === "X" ? "O" : "X";
+}
+</script>
+</body>
+</html>
