@@ -252,6 +252,12 @@ function listen() {
 }
 
 window.startOnline = async () => {
+  // Reset local game state
+  board = Array(9).fill("");
+  myTurn = true;
+  gameOver = false;
+  drawBoard();
+  
   menuEl.style.display = "none";
   statusEl.textContent = "Searching for opponent…";
 
@@ -259,6 +265,7 @@ window.startOnline = async () => {
   const snap = await get(waitingRef);
 
   if (snap.exists()) {
+    // Someone is waiting → join as O
     const opponent = Object.keys(snap.val())[0];
     await remove(ref(db, "waiting/" + opponent));
 
@@ -269,6 +276,7 @@ window.startOnline = async () => {
     await set(gameRef, { board: Array(9).fill(""), turn: "X" });
     listen();
   } else {
+    // No one waiting → join as X
     const id = crypto.randomUUID();
     await set(ref(db, "waiting/" + id), true);
 
@@ -283,7 +291,6 @@ window.startOnline = async () => {
     });
   }
 };
-
 function endGame(result) {
   gameOver = true;
   if (result.winner === "draw") {
