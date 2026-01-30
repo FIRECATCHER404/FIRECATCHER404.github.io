@@ -2,36 +2,110 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Online Tic-Tac-Toe</title>
+<title>Tic-Tac-Toe Online</title>
+
 <style>
-  body { font-family: sans-serif; text-align: center; }
-  #board { display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; margin: 20px auto; }
-  .cell {
-    width: 100px;
-    height: 100px;
-    font-size: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid #333;
-    cursor: pointer;
-  }
+:root {
+  --bg: #0f1220;
+  --card: #1a1f3c;
+  --accent: #6cf2c2;
+  --danger: #ff6b6b;
+  --text: #eaeaff;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: radial-gradient(circle at top, #1b1f4a, var(--bg));
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+.card {
+  background: var(--card);
+  padding: 28px;
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.4);
+  width: 340px;
+  text-align: center;
+}
+
+h1 {
+  margin-top: 0;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  font-size: 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--accent);
+  color: #003b2a;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: #2b3170;
+  color: var(--text);
+}
+
+#status {
+  margin: 12px 0;
+  font-weight: 500;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.cell {
+  aspect-ratio: 1;
+  font-size: 42px;
+  background: #11153a;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform .1s, background .2s;
+}
+
+.cell:hover {
+  background: #181d55;
+  transform: scale(1.04);
+}
+
+.cell.win {
+  background: var(--accent);
+  color: #003b2a;
+}
 </style>
 </head>
+
 <body>
+<div class="card">
+  <h1>Tic-Tac-Toe</h1>
 
-<h1>Tic-Tac-Toe</h1>
-<div id="menu">
-  <button onclick="startAI()">Play vs AI</button>
-  <button onclick="startOnline()">Play Online</button>
+  <div id="menu">
+    <button onclick="startAI()">Play vs AI</button>
+    <button class="secondary" onclick="startOnline()">Play Online</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="board"></div>
 </div>
-
-<div id="status"></div>
-<div id="board"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, get, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, get, update, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
@@ -46,115 +120,141 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+const WIN_LINES = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6]
+];
+
+let board = Array(9).fill("");
+let mySymbol = "X";
+let myTurn = true;
+let gameOver = false;
+let gameRef = null;
+
 const boardEl = document.getElementById("board");
 const statusEl = document.getElementById("status");
 const menuEl = document.getElementById("menu");
 
-let board = Array(9).fill("");
-let mySymbol = "X";
-let gameRef = null;
-let myTurn = true;
-
-/* ---------- UI ---------- */
-
-function drawBoard() {
+function drawBoard(winLine = null) {
   boardEl.innerHTML = "";
-  board.forEach((v, i) => {
+  board.forEach((v,i) => {
     const cell = document.createElement("div");
     cell.className = "cell";
+    if (winLine && winLine.includes(i)) cell.classList.add("win");
     cell.textContent = v;
     cell.onclick = () => clickCell(i);
     boardEl.appendChild(cell);
   });
 }
 
+function checkWinner() {
+  for (const line of WIN_LINES) {
+    const [a,b,c] = line;
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      return { winner: board[a], line };
+    }
+  }
+  if (board.every(c => c)) return { winner: "draw" };
+  return null;
+}
+
 function clickCell(i) {
-  if (board[i] || !myTurn) return;
+  if (board[i] || !myTurn || gameOver) return;
 
   board[i] = mySymbol;
   myTurn = false;
-  drawBoard();
+
+  const result = checkWinner();
+  if (result) endGame(result);
+
+  drawBoard(result?.line);
 
   if (gameRef) {
-    update(gameRef, { board, turn: other(mySymbol) });
-  } else {
+    update(gameRef, { board, turn: myTurn ? mySymbol : other(mySymbol) });
+  } else if (!result) {
     aiMove();
   }
 }
 
-/* ---------- AI MODE ---------- */
+/* ---------- AI ---------- */
 
 window.startAI = () => {
   menuEl.style.display = "none";
   statusEl.textContent = "You are X";
   board = Array(9).fill("");
   myTurn = true;
+  gameOver = false;
   drawBoard();
 };
 
 function aiMove() {
   const empty = board.map((v,i)=>v===""?i:null).filter(v=>v!==null);
-  if (empty.length === 0) return;
+  if (!empty.length) return;
 
   setTimeout(() => {
-    const move = empty[Math.floor(Math.random()*empty.length)];
-    board[move] = "O";
+    board[empty[Math.floor(Math.random()*empty.length)]] = "O";
     myTurn = true;
-    drawBoard();
+    const result = checkWinner();
+    if (result) endGame(result);
+    drawBoard(result?.line);
   }, 400);
 }
 
-/* ---------- ONLINE MODE ---------- */
+/* ---------- ONLINE ---------- */
 
 window.startOnline = async () => {
   menuEl.style.display = "none";
-  statusEl.textContent = "Looking for opponent...";
+  statusEl.textContent = "Searching for opponent…";
 
   const waitingRef = ref(db, "waiting");
-  const snapshot = await get(waitingRef);
+  const snap = await get(waitingRef);
 
-  if (snapshot.exists()) {
-    const opponentId = Object.keys(snapshot.val())[0];
-    await remove(ref(db, "waiting/" + opponentId));
+  if (snap.exists()) {
+    const opponent = Object.keys(snap.val())[0];
+    await remove(ref(db, "waiting/" + opponent));
 
-    const gameId = crypto.randomUUID();
-    gameRef = ref(db, "games/" + gameId);
-
+    gameRef = ref(db, "games/" + crypto.randomUUID());
     mySymbol = "O";
     myTurn = false;
 
-    await set(gameRef, {
-      board: Array(9).fill(""),
-      turn: "X"
-    });
-
-    listenGame();
+    await set(gameRef, { board: Array(9).fill(""), turn: "X" });
+    listen();
   } else {
-    const myId = crypto.randomUUID();
-    await set(ref(db, "waiting/" + myId), true);
+    const id = crypto.randomUUID();
+    await set(ref(db, "waiting/" + id), true);
 
-    onValue(ref(db, "games"), snap => {
-      snap.forEach(game => {
-        if (!gameRef) {
-          gameRef = ref(db, "games/" + game.key);
-          mySymbol = "X";
-          myTurn = true;
-          listenGame();
-        }
-      });
+    onValue(ref(db, "games"), s => {
+      if (!gameRef && s.exists()) {
+        const g = Object.keys(s.val())[0];
+        gameRef = ref(db, "games/" + g);
+        mySymbol = "X";
+        myTurn = true;
+        listen();
+      }
     });
   }
 };
 
-function listenGame() {
-  statusEl.textContent = "Game started! You are " + mySymbol;
-
+function listen() {
+  statusEl.textContent = "You are " + mySymbol;
   onValue(gameRef, snap => {
     const data = snap.val();
     board = data.board;
     myTurn = data.turn === mySymbol;
-    drawBoard();
+    const result = checkWinner();
+    if (result) endGame(result);
+    drawBoard(result?.line);
   });
+}
+
+function endGame(result) {
+  gameOver = true;
+  if (result.winner === "draw") {
+    statusEl.textContent = "Draw!";
+  } else {
+    statusEl.textContent = result.winner + " wins!";
+  }
 }
 
 function other(s) {
