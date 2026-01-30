@@ -375,6 +375,11 @@ function resetToMenu() {
 function other(s) {
   return s === "X" ? "O" : "X";
 }
+
+if (gameRef) {
+  remove(gameRef);
+}
+
 </script>
 </body>
 </html>
