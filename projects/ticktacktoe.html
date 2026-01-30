@@ -252,45 +252,65 @@ function listen() {
 }
 
 window.startOnline = async () => {
-  // Reset local game state
+  // Reset local state
   board = Array(9).fill("");
   myTurn = true;
   gameOver = false;
   drawBoard();
-  
+
   menuEl.style.display = "none";
   statusEl.textContent = "Searching for opponent…";
 
-  const waitingRef = ref(db, "waiting");
-  const snap = await get(waitingRef);
+  const myId = crypto.randomUUID();
+  const waitingRoot = ref(db, "waiting");
+  const waitingSnap = await get(waitingRoot);
 
-  if (snap.exists()) {
-    // Someone is waiting → join as O
-    const opponent = Object.keys(snap.val())[0];
-    await remove(ref(db, "waiting/" + opponent));
+  // 1️⃣ Someone is already waiting → join them
+  if (waitingSnap.exists()) {
+    const entries = Object.entries(waitingSnap.val());
 
-    gameRef = ref(db, "games/" + crypto.randomUUID());
-    mySymbol = "O";
-    myTurn = false;
+    for (const [otherId, data] of entries) {
+      if (data.gameId === null) {
+        const gameId = crypto.randomUUID();
 
-    await set(gameRef, { board: Array(9).fill(""), turn: "X" });
-    listen();
-  } else {
-    // No one waiting → join as X
-    const id = crypto.randomUUID();
-    await set(ref(db, "waiting/" + id), true);
+        gameRef = ref(db, "games/" + gameId);
+        mySymbol = "O";
+        myTurn = false;
 
-    onValue(ref(db, "games"), s => {
-      if (!gameRef && s.exists()) {
-        const g = Object.keys(s.val())[0];
-        gameRef = ref(db, "games/" + g);
-        mySymbol = "X";
-        myTurn = true;
+        await set(gameRef, {
+          board: Array(9).fill(""),
+          turn: "X"
+        });
+
+        // Assign game to waiting player
+        await update(ref(db, "waiting/" + otherId), {
+          gameId
+        });
+
         listen();
+        return;
       }
-    });
+    }
   }
+
+  // 2️⃣ Nobody waiting → put *yourself* in waiting
+  const myWaitingRef = ref(db, "waiting/" + myId);
+  await set(myWaitingRef, { gameId: null });
+
+  mySymbol = "X";
+  myTurn = true;
+
+  // Listen ONLY to your waiting entry
+  onValue(myWaitingRef, snap => {
+    const data = snap.val();
+    if (data?.gameId && !gameRef) {
+      gameRef = ref(db, "games/" + data.gameId);
+      remove(myWaitingRef); // cleanup
+      listen();
+    }
+  });
 };
+
 function endGame(result) {
   gameOver = true;
   if (result.winner === "draw") {
