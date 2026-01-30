@@ -250,13 +250,40 @@ function aiMove() {
 
 function listen() {
   statusEl.textContent = "You are " + mySymbol;
+
+  const presenceRef = ref(db, gameRef.key + "/players/" + mySymbol);
+  set(presenceRef, true);
+
+  // Auto-remove player on disconnect
+  import("https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js")
+    .then(({ onDisconnect }) => {
+      onDisconnect(presenceRef).remove();
+    });
+
+  // Listen for game updates
   onValue(gameRef, snap => {
     const data = snap.val();
+    if (!data) return;
+
     board = data.board;
     myTurn = data.turn === mySymbol;
+
     const result = checkWinner();
     if (result) endGame(result);
+
     drawBoard(result?.line);
+  });
+
+  // 🔴 Detect opponent quit
+  const opponentSymbol = other(mySymbol);
+  const opponentRef = ref(db, gameRef.key + "/players/" + opponentSymbol);
+
+  onValue(opponentRef, snap => {
+    if (!snap.exists()) {
+      // Opponent left
+      showQuitBanner();
+      resetToMenu();
+    }
   });
 }
 
@@ -329,6 +356,22 @@ function endGame(result) {
   }
 }
 
+function showQuitBanner() {
+  const banner = document.getElementById("banner");
+  banner.style.display = "block";
+  setTimeout(() => banner.style.display = "none", 4000);
+}
+
+function resetToMenu() {
+  gameOver = true;
+  gameRef = null;
+  board = Array(9).fill("");
+  drawBoard();
+  statusEl.textContent = "";
+  menuEl.style.display = "block";
+}
+
+  
 function other(s) {
   return s === "X" ? "O" : "X";
 }
