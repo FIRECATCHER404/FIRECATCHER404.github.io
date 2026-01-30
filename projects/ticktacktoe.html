@@ -251,6 +251,39 @@ function listen() {
   });
 }
 
+window.startOnline = async () => {
+  menuEl.style.display = "none";
+  statusEl.textContent = "Searching for opponent…";
+
+  const waitingRef = ref(db, "waiting");
+  const snap = await get(waitingRef);
+
+  if (snap.exists()) {
+    const opponent = Object.keys(snap.val())[0];
+    await remove(ref(db, "waiting/" + opponent));
+
+    gameRef = ref(db, "games/" + crypto.randomUUID());
+    mySymbol = "O";
+    myTurn = false;
+
+    await set(gameRef, { board: Array(9).fill(""), turn: "X" });
+    listen();
+  } else {
+    const id = crypto.randomUUID();
+    await set(ref(db, "waiting/" + id), true);
+
+    onValue(ref(db, "games"), s => {
+      if (!gameRef && s.exists()) {
+        const g = Object.keys(s.val())[0];
+        gameRef = ref(db, "games/" + g);
+        mySymbol = "X";
+        myTurn = true;
+        listen();
+      }
+    });
+  }
+};
+
 function endGame(result) {
   gameOver = true;
   if (result.winner === "draw") {
