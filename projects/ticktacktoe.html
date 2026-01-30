@@ -189,52 +189,55 @@ window.startAI = () => {
 };
 
 function aiMove() {
-  const empty = board.map((v,i)=>v===""?i:null).filter(v=>v!==null);
-  if (!empty.length) return;
+  if (gameOver) return;
 
-  setTimeout(() => {
-    board[empty[Math.floor(Math.random()*empty.length)]] = "O";
+  const empty = board.map((v,i)=>v===""?i:null).filter(v=>v!==null);
+
+  // 1️⃣ Try to win
+  for (const i of empty) {
+    board[i] = "O";
+    if (checkWinner()?.winner === "O") {
+      myTurn = true;
+      const result = checkWinner();
+      if (result) endGame(result);
+      drawBoard(result?.line);
+      return;
+    }
+    board[i] = "";
+  }
+
+  // 2️⃣ Try to block player
+  for (const i of empty) {
+    board[i] = "X";
+    if (checkWinner()?.winner === "X") {
+      board[i] = "O"; // block
+      myTurn = true;
+      const result = checkWinner();
+      if (result) endGame(result);
+      drawBoard(result?.line);
+      return;
+    }
+    board[i] = "";
+  }
+
+  // 3️⃣ Pick center if free
+  if (board[4] === "") {
+    board[4] = "O";
     myTurn = true;
     const result = checkWinner();
     if (result) endGame(result);
     drawBoard(result?.line);
-  }, 400);
-}
-
-/* ---------- ONLINE ---------- */
-
-window.startOnline = async () => {
-  menuEl.style.display = "none";
-  statusEl.textContent = "Searching for opponent…";
-
-  const waitingRef = ref(db, "waiting");
-  const snap = await get(waitingRef);
-
-  if (snap.exists()) {
-    const opponent = Object.keys(snap.val())[0];
-    await remove(ref(db, "waiting/" + opponent));
-
-    gameRef = ref(db, "games/" + crypto.randomUUID());
-    mySymbol = "O";
-    myTurn = false;
-
-    await set(gameRef, { board: Array(9).fill(""), turn: "X" });
-    listen();
-  } else {
-    const id = crypto.randomUUID();
-    await set(ref(db, "waiting/" + id), true);
-
-    onValue(ref(db, "games"), s => {
-      if (!gameRef && s.exists()) {
-        const g = Object.keys(s.val())[0];
-        gameRef = ref(db, "games/" + g);
-        mySymbol = "X";
-        myTurn = true;
-        listen();
-      }
-    });
+    return;
   }
-};
+
+  // 4️⃣ Pick random
+  const move = empty[Math.floor(Math.random()*empty.length)];
+  board[move] = "O";
+  myTurn = true;
+  const result = checkWinner();
+  if (result) endGame(result);
+  drawBoard(result?.line);
+}
 
 function listen() {
   statusEl.textContent = "You are " + mySymbol;
