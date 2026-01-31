@@ -125,7 +125,7 @@ import {
   onDisconnect
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-/* ---------------- Firebase ---------------- */
+/* ---------- Firebase ---------- */
 
 const firebaseConfig = {
   apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
@@ -140,7 +140,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/* ---------------- Game State ---------------- */
+/* ---------- Game Data ---------- */
 
 const WIN_LINES = [
   [0,1,2],[3,4,5],[6,7,8],
@@ -153,17 +153,23 @@ let mySymbol = "X";
 let myTurn = true;
 let gameOver = false;
 let gameRef = null;
-let mode = null; // "AI" | "ONLINE"
+
+/* ---------- Elements ---------- */
 
 const boardEl = document.getElementById("board");
 const statusEl = document.getElementById("status");
 const menuEl = document.getElementById("menu");
+const bannerEl = document.getElementById("banner");
 
-/* ---------------- UI ---------------- */
+/* ---------- Helpers ---------- */
+
+function other(s) {
+  return s === "X" ? "O" : "X";
+}
 
 function drawBoard(winLine = null) {
   boardEl.innerHTML = "";
-  board.forEach((v, i) => {
+  board.forEach((v,i) => {
     const cell = document.createElement("div");
     cell.className = "cell";
     if (winLine && winLine.includes(i)) cell.classList.add("win");
@@ -172,28 +178,6 @@ function drawBoard(winLine = null) {
     boardEl.appendChild(cell);
   });
 }
-
-function showQuitBanner() {
-  const banner = document.getElementById("banner");
-  banner.style.display = "block";
-  setTimeout(() => banner.style.display = "none", 4000);
-}
-
-function resetToMenu() {
-  gameOver = true;
-
-  if (gameRef) {
-    remove(gameRef);
-    gameRef = null;
-  }
-
-  board = Array(9).fill("");
-  drawBoard();
-  statusEl.textContent = "";
-  menuEl.style.display = "block";
-}
-
-/* ---------------- Game Logic ---------------- */
 
 function checkWinner() {
   for (const line of WIN_LINES) {
@@ -206,6 +190,30 @@ function checkWinner() {
   return null;
 }
 
+function endGame(result) {
+  gameOver = true;
+  statusEl.textContent =
+    result.winner === "draw"
+      ? "Draw!"
+      : result.winner + " wins!";
+}
+
+function showQuitBanner() {
+  bannerEl.style.display = "block";
+  setTimeout(() => bannerEl.style.display = "none", 4000);
+}
+
+function resetToMenu() {
+  gameOver = true;
+  gameRef = null;
+  board = Array(9).fill("");
+  drawBoard();
+  statusEl.textContent = "";
+  menuEl.style.display = "block";
+}
+
+/* ---------- Gameplay ---------- */
+
 function clickCell(i) {
   if (board[i] || !myTurn || gameOver) return;
 
@@ -217,40 +225,24 @@ function clickCell(i) {
 
   drawBoard(result?.line);
 
-  if (mode === "ONLINE" && gameRef) {
+  if (gameRef) {
     update(gameRef, {
       board,
-      turn: myTurn ? mySymbol : other(mySymbol)
+      turn: other(mySymbol)
     });
   }
-
-  if (mode === "AI" && !result) {
-    aiMove();
-  }
 }
 
-function endGame(result) {
-  gameOver = true;
-  statusEl.textContent =
-    result.winner === "draw"
-      ? "Draw!"
-      : `${result.winner} wins!`;
-}
-
-/* ---------------- AI ---------------- */
+/* ---------- AI ---------- */
 
 window.startAI = () => {
-  mode = "AI";
-  gameRef = null;
-
   menuEl.style.display = "none";
   statusEl.textContent = "You are X";
-
   board = Array(9).fill("");
   mySymbol = "X";
   myTurn = true;
   gameOver = false;
-
+  gameRef = null;
   drawBoard();
 };
 
@@ -259,47 +251,37 @@ function aiMove() {
 
   const empty = board.map((v,i)=>v===""?i:null).filter(i=>i!==null);
 
-  // Win
   for (const i of empty) {
     board[i] = "O";
-    if (checkWinner()?.winner === "O") return finishAIMove();
+    if (checkWinner()?.winner === "O") return finalizeAIMove(i);
     board[i] = "";
   }
 
-  // Block
   for (const i of empty) {
     board[i] = "X";
-    if (checkWinner()?.winner === "X") {
-      board[i] = "O";
-      return finishAIMove();
-    }
+    if (checkWinner()?.winner === "X") return finalizeAIMove(i);
     board[i] = "";
   }
 
-  // Center
-  if (board[4] === "") {
-    board[4] = "O";
-    return finishAIMove();
-  }
+  if (board[4] === "") return finalizeAIMove(4);
 
-  // Random
-  board[empty[Math.floor(Math.random()*empty.length)]] = "O";
-  finishAIMove();
+  finalizeAIMove(empty[Math.floor(Math.random()*empty.length)]);
 }
 
-function finishAIMove() {
+function finalizeAIMove(i) {
+  board[i] = "O";
   myTurn = true;
   const result = checkWinner();
   if (result) endGame(result);
   drawBoard(result?.line);
 }
 
-/* ---------------- Online ---------------- */
+/* ---------- Online ---------- */
 
-function listen() {
+function listenGame() {
   statusEl.textContent = "You are " + mySymbol;
 
-  const presenceRef = ref(db, `${gameRef.key}/players/${mySymbol}`);
+  const presenceRef = ref(db, "games/" + gameRef.key + "/players/" + mySymbol);
   set(presenceRef, true);
   onDisconnect(presenceRef).remove();
 
@@ -316,9 +298,13 @@ function listen() {
     drawBoard(result?.line);
   });
 
-  const opponentRef = ref(db, `${gameRef.key}/players/${other(mySymbol)}`);
+  const opponentRef = ref(
+    db,
+    "games/" + gameRef.key + "/players/" + other(mySymbol)
+  );
+
   onValue(opponentRef, snap => {
-    if (!snap.exists()) {
+    if (!snap.exists() && !gameOver) {
       showQuitBanner();
       resetToMenu();
     }
@@ -326,31 +312,33 @@ function listen() {
 }
 
 window.startOnline = async () => {
-  mode = "ONLINE";
-  gameOver = false;
-  board = Array(9).fill("");
-  drawBoard();
-
   menuEl.style.display = "none";
   statusEl.textContent = "Searching for opponent…";
 
+  board = Array(9).fill("");
+  gameOver = false;
+  drawBoard();
+
   const myId = crypto.randomUUID();
   const waitingRoot = ref(db, "waiting");
-  const snap = await get(waitingRoot);
+  const waitingSnap = await get(waitingRoot);
 
-  if (snap.exists()) {
-    for (const [id, entry] of Object.entries(snap.val())) {
-      if (!entry.gameId) {
+  if (waitingSnap.exists()) {
+    const entries = Object.entries(waitingSnap.val());
+    for (const [id, data] of entries) {
+      if (!data.gameId) {
         const gameId = crypto.randomUUID();
         gameRef = ref(db, "games/" + gameId);
-
         mySymbol = "O";
         myTurn = false;
 
-        await set(gameRef, { board: Array(9).fill(""), turn: "X" });
-        await update(ref(db, "waiting/" + id), { gameId });
+        await set(gameRef, {
+          board: Array(9).fill(""),
+          turn: "X"
+        });
 
-        listen();
+        await update(ref(db, "waiting/" + id), { gameId });
+        listenGame();
         return;
       }
     }
@@ -362,28 +350,22 @@ window.startOnline = async () => {
   mySymbol = "X";
   myTurn = true;
 
-onValue(myWaitingRef, async snap => {
-  const data = snap.val();
-  if (data?.gameId && !gameRef) {
-    gameRef = ref(db, "games/" + data.gameId);
-    await remove(myWaitingRef);
+  onValue(myWaitingRef, async snap => {
+    const data = snap.val();
+    if (data?.gameId && !gameRef) {
+      gameRef = ref(db, "games/" + data.gameId);
+      await remove(myWaitingRef);
 
-    // 🔴 FORCE initial sync so we don't miss the game creation
-    const gameSnap = await get(gameRef);
-    if (gameSnap.exists()) {
-      const g = gameSnap.val();
-      board = g.board;
-      myTurn = g.turn === mySymbol;
-      drawBoard();
+      const gameSnap = await get(gameRef);
+      if (gameSnap.exists()) {
+        board = gameSnap.val().board;
+        drawBoard();
+      }
+
+      listenGame();
     }
-
-    listen();
-  }
-});
-
-function other(s) {
-  return s === "X" ? "O" : "X";
-}
+  });
+};
 </script>
 </body>
 </html>
