@@ -362,15 +362,24 @@ window.startOnline = async () => {
   mySymbol = "X";
   myTurn = true;
 
-  onValue(myWaitingRef, snap => {
-    const data = snap.val();
-    if (data?.gameId && !gameRef) {
-      gameRef = ref(db, "games/" + data.gameId);
-      remove(myWaitingRef);
-      listen();
+onValue(myWaitingRef, async snap => {
+  const data = snap.val();
+  if (data?.gameId && !gameRef) {
+    gameRef = ref(db, "games/" + data.gameId);
+    await remove(myWaitingRef);
+
+    // 🔴 FORCE initial sync so we don't miss the game creation
+    const gameSnap = await get(gameRef);
+    if (gameSnap.exists()) {
+      const g = gameSnap.val();
+      board = g.board;
+      myTurn = g.turn === mySymbol;
+      drawBoard();
     }
-  });
-};
+
+    listen();
+  }
+});
 
 function other(s) {
   return s === "X" ? "O" : "X";
