@@ -1,297 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Projects</title>
-  <style>
-    :root {
-      --bg: #0b100b;
-      --card: #121b14;
-      --card-hover: #1a2a1d;
-      --text: #e6efe7;
-      --muted: #9ab2a0;
-    
-      --accent: #4dff88;
-      --accent-strong: #2ee673;
-      --glow: rgba(77,255,136,0.25);
-    }
-    
-    * { box-sizing: border-box; }
-    
+<meta charset="UTF-8">
+<title>DT File Encryptor</title>
+<style>
     body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, sans-serif;
-      background:
-        linear-gradient(
-          rgba(255,255,255,0.035) 1px,
-          transparent 1px
-        ),
-        linear-gradient(
-          90deg,
-          rgba(255,255,255,0.035) 1px,
-          transparent 1px
-        ),
-        radial-gradient(1200px 600px at 10% -10%, #0f2a1a 0%, transparent 60%),
-        radial-gradient(900px 500px at 90% 10%, #0b1f14 0%, transparent 55%),
-        var(--bg);
-
-      background-size:
-        120px 120px,
-        120px 120px,
-        auto,
-        auto,
-        auto;
-      color: var(--text);
-    }
-    
-    header {
-      padding: 28px 22px 10px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    
-    header h1 {
-      margin: 0 0 6px;
-      font-size: 2rem;
-      letter-spacing: 0.4px;
-    }
-    
-    header p {
-      margin: 0;
-      color: var(--muted);
-    }
-    
-    main {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 18px 22px 40px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 18px;
-    }
-    
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)), var(--card);
-      border-radius: 16px;
-      padding: 18px 18px 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-      border: 1px solid rgba(255,255,255,0.06);
-      transition: transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .card::after {
-      content: "";
-      position: absolute;
-      inset: -1px;
-      background: radial-gradient(120px 120px at var(--mx,50%) var(--my,0%), var(--glow), transparent 40%);
-      opacity: 0;
-      transition: opacity .15s ease;
-      pointer-events: none;
-    }
-    
-    .card:hover {
-      transform: translateY(-3px);
-      background: var(--card-hover);
-      box-shadow: 0 16px 40px rgba(0,0,0,0.45);
-      border-color: rgba(77,255,136,0.45);
-    }
-    
-    .card:hover::after { opacity: 1; }
-    
-    .card h2 {
-      margin: 0 0 6px;
-      font-size: 1.2rem;
-    }
-    
-    .card p {
-      margin: 0 0 14px;
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-    
-    .card button {
-      appearance: none;
-      border: 1px solid rgba(77,255,136,0.55);
-      background: rgba(77,255,136,0.14);
-      color: var(--text);
-      border-radius: 999px;
-      padding: 8px 14px;
-      cursor: pointer;
-      transition: background .12s ease, transform .12s ease, box-shadow .12s ease;
-    }
-    
-    .card button:hover {
-      background: rgba(77,255,136,0.26);
-      box-shadow: 0 0 0 6px rgba(77,255,136,0.14);
-      transform: translateY(-1px);
-    }
-    
-    footer {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 22px 26px;
-      color: var(--muted);
-      font-size: 0.85rem;
-    }
-    
-    .tag {
-      display: inline-block;
-      margin-left: 8px;
-      font-size: 0.7rem;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: rgba(77,255,136,0.2);
-      border: 1px solid rgba(77,255,136,0.45);
-      color: var(--text);
-      vertical-align: middle;
+        font-family: monospace;
+        background: #0f0f0f;
+        color: #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 50px;
     }
 
-    #bg-field {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      overflow: hidden;
+    .box {
+        border: 2px dashed #555;
+        padding: 30px;
+        width: 400px;
+        text-align: center;
+        margin-bottom: 20px;
     }
 
-    .bg-square {
-      position: absolute;
-      background: rgb(20, 26, 22); 
-      border-radius: 2px;
-      will-change: transform;
+    button {
+        background: #222;
+        color: #fff;
+        border: 1px solid #555;
+        padding: 10px 20px;
+        cursor: pointer;
+        margin: 5px;
     }
 
-    header, main, footer {
-      position: relative;
-      z-index: 1;
+    button:hover {
+        background: #333;
     }
-
-    .bg-square {
-      box-shadow: 0 0 20px rgba(0,0,0,0.4);
-    }
-  </style>
+</style>
 </head>
 <body>
-  <div id="bg-field"></div>
-  <header>
-    <h1>My Projects</h1>
-    <p>All my random ideas and pages ive made over time. All are generated by ChatGPT and refined by me.</p>
-  </header>
 
-  <main>
-    <div class="card" data-link="../index.html">
-      <h2>Main Menu</h2>
-      <p>Back to the home page</p>
-    </div>
-    
-    <div class="card" data-link="sandbox.html">
-      <h2>Particle Playground <span class="tag">First thing i made</span></h2>
-      <p>Mess with way too many little colored pixels that do way too many things</p>
-    </div>
+<h1>DT File Encryptor</h1>
 
-    <div class="card" data-link="music/">
-      <h2>Music Maker <span class="tag">audio</span></h2>
-      <p>Create different tunes using the different instrument pages</p>
-    </div>
+<div class="box">
+    <input type="file" id="fileInput">
+</div>
 
-    <div class="card" data-link="../chat/">
-      <h2>Chat<span class="tag">:P</span></h2>
-      <p>Real-time chat room where you can make groups, join them, and customize what it looks like</p>
-    </div>
+<div>
+    <button onclick="processFile('encode')">Encrypt</button>
+    <button onclick="processFile('decode')">Decrypt</button>
+</div>
 
-    <div class="card" data-link="anim.html">
-      <h2>Bouncing Ball Thing</h2>
-      <p>Just a ball bouncing around in a shape. nothing to see here.</p>
-    </div>
+<script>
+const KEY = 0x5A;
 
-    <div class="card" data-link="voidspace.html">
-      <h2>Voidspace <span class="tag">satisfying</span></h2>
-      <p>Make yourself a desktop background</p>
-    </div>
-
-    <div class="card" data-link="../button.html">
-      <h2>Clickable Button</h2>
-      <p>It does something. Probably.</p>
-    </div>
-
-    <div class="card" data-link="ticktacktoe.html">
-      <h2>Tick Tack Toe</h2>
-      <p>Play Tick Tack Toe online or with an ai</p>
-    </div>
-    
-    <div class="card" data-link="dt.html">
-      <h2>File Encoder / Decoder</h2>
-      <p>A simple, client-side file encryptor that uses XOR and reverse to encode or decode files with a `.dt_e` file extension.</p>
-    </div>
-  </main>
-
-  <footer>
-    <span>Made by FIRECATCHER303. Discord: firecatcher_303</span>
-  </footer>
-
-  <script>
-    document.querySelectorAll('.card').forEach(card => {
-      card.addEventListener('mousemove', e => {
-        const r = card.getBoundingClientRect();
-        card.style.setProperty('--mx', `${e.clientX - r.left}px`);
-        card.style.setProperty('--my', `${e.clientY - r.top}px`);
-      });
-
-      card.addEventListener('click', () => {
-        const link = card.getAttribute('data-link');
-        if (link) window.location.href = link;
-      });
-    });
-
-    const field = document.getElementById('bg-field');
-
-    const SQUARE_COUNT = 42;
-    const squares = [];
-
-    function rand(min, max) {
-      return Math.random() * (max - min) + min;
+function transform(uint8Array) {
+    // XOR
+    for (let i = 0; i < uint8Array.length; i++) {
+        uint8Array[i] ^= KEY;
     }
 
-    for (let i = 0; i < SQUARE_COUNT; i++) {
-      const el = document.createElement('div');
-      el.className = 'bg-square';
+    // reverse
+    uint8Array.reverse();
+    return uint8Array;
+}
 
-      const size = rand(30, 110);
-      const depth = rand(0.4, 2.0);
-      const brightness = Math.floor(40 / depth); 
-
-      el.style.width = `${size}px`;
-      el.style.height = `${size}px`;
-      el.style.left = `${rand(0, window.innerWidth)}px`;
-      el.style.top = `${rand(0, window.innerHeight)}px`;
-      el.style.background = `rgb(${brightness}, ${brightness + 8}, ${brightness})`;
-
-      field.appendChild(el);
-      squares.push({ el, depth });
+function processFile(mode) {
+    const input = document.getElementById("fileInput");
+    if (!input.files.length) {
+        alert("No file selected");
+        return;
     }
 
-    let mx = 0;
-    let my = 0;
+    const file = input.files[0];
+    const reader = new FileReader();
 
-    document.addEventListener('mousemove', e => {
-      mx = (e.clientX / window.innerWidth - 0.5);
-      my = (e.clientY / window.innerHeight - 0.5);
-    });
+    reader.onload = () => {
+        let data = new Uint8Array(reader.result);
 
-    function animate() {
-      for (const s of squares) {
-        const tx = mx * 40 * s.depth;
-        const ty = my * 40 * s.depth;
-        s.el.style.transform = `translate(${tx}px, ${ty}px)`;
-      }
-      requestAnimationFrame(animate);
-    }
+        if (mode === "encode" && file.name.endsWith(".dt_e")) {
+            alert("File is already encoded.");
+            return;
+        }
 
-    animate();
-  </script>
+        if (mode === "decode" && !file.name.endsWith(".dt_e")) {
+            alert("File is not encoded.");
+            return;
+        }
+
+        data = transform(data);
+
+        let newName;
+        if (mode === "encode") {
+            newName = file.name + ".dt_e";
+        } else {
+            newName = file.name.slice(0, -5);
+        }
+
+        const blob = new Blob([data]);
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = newName;
+        a.click();
+
+        URL.revokeObjectURL(url);
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+</script>
+
 </body>
 </html>
