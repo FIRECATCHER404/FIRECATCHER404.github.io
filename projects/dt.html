@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DT File Encryptor</title>
+<style>
+    body {
+        font-family: monospace;
+        background: #0f0f0f;
+        color: #e0e0e0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 50px;
+    }
+
+    .box {
+        border: 2px dashed #555;
+        padding: 30px;
+        width: 400px;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    button {
+        background: #222;
+        color: #fff;
+        border: 1px solid #555;
+        padding: 10px 20px;
+        cursor: pointer;
+        margin: 5px;
+    }
+
+    button:hover {
+        background: #333;
+    }
+</style>
+</head>
+<body>
+
+<h1>DT File Encryptor</h1>
+
+<div class="box">
+    <input type="file" id="fileInput">
+</div>
+
+<div>
+    <button onclick="processFile('encode')">Encrypt</button>
+    <button onclick="processFile('decode')">Decrypt</button>
+</div>
+
+<script>
+const KEY = 0x5A;
+
+function transform(uint8Array) {
+    // XOR
+    for (let i = 0; i < uint8Array.length; i++) {
+        uint8Array[i] ^= KEY;
+    }
+
+    // reverse
+    uint8Array.reverse();
+    return uint8Array;
+}
+
+function processFile(mode) {
+    const input = document.getElementById("fileInput");
+    if (!input.files.length) {
+        alert("No file selected");
+        return;
+    }
+
+    const file = input.files[0];
+    const reader = new FileReader();
+
+    reader.onload = () => {
+        let data = new Uint8Array(reader.result);
+
+        if (mode === "encode" && file.name.endsWith(".dt_e")) {
+            alert("File is already encoded.");
+            return;
+        }
+
+        if (mode === "decode" && !file.name.endsWith(".dt_e")) {
+            alert("File is not encoded.");
+            return;
+        }
+
+        data = transform(data);
+
+        let newName;
+        if (mode === "encode") {
+            newName = file.name + ".dt_e";
+        } else {
+            newName = file.name.slice(0, -5);
+        }
+
+        const blob = new Blob([data]);
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = newName;
+        a.click();
+
+        URL.revokeObjectURL(url);
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+</script>
+
+</body>
+</html>
