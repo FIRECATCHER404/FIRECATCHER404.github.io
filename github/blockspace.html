@@ -1,1 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Blockspace</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --text: #f0f6fc;
+      --muted: #8b949e;
+      --line: #30363d;
+      --white: #ffffff;
+    }
 
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(transparent 96%, rgba(255,255,255,0.05) 100%) 0 0 / 100% 28px,
+        linear-gradient(90deg, transparent 96%, rgba(255,255,255,0.04) 100%) 0 0 / 28px 100%,
+        radial-gradient(circle at 15% 10%, rgba(255,255,255,0.07), transparent 42%),
+        radial-gradient(circle at 80% 90%, rgba(255,255,255,0.05), transparent 46%),
+        var(--bg);
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      width: min(900px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--panel);
+      box-shadow: 0 22px 70px rgba(0,0,0,0.45);
+      padding: 28px;
+    }
+
+    .kicker {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(30px, 6vw, 54px);
+      line-height: 1;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin: 0 0 24px;
+      font-size: 15px;
+    }
+
+    p {
+      margin: 0 0 14px;
+      line-height: 1.65;
+      color: #d9e1e8;
+      max-width: 75ch;
+    }
+
+    .list {
+      margin: 12px 0 24px;
+      padding-left: 18px;
+      color: #d9e1e8;
+    }
+
+    .list li {
+      margin: 8px 0;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+      border-radius: 10px;
+      border: 1px solid var(--white);
+      padding: 12px 16px;
+      font-weight: 700;
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+
+    .btn.primary {
+      color: var(--bg);
+      background: var(--white);
+      box-shadow: 0 10px 26px rgba(255,255,255,0.14);
+    }
+
+    .btn.primary:hover {
+      background: #f6f8fa;
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(255,255,255,0.2);
+    }
+
+    .btn.ghost {
+      color: var(--white);
+      background: transparent;
+      border-color: var(--line);
+    }
+
+    .btn.ghost:hover {
+      border-color: #8b949e;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+
+  <main class="card">
+    <div class="kicker">Project</div>
+    <h1>Blockspace</h1>
+    <p class="subtitle">A lightweight 3D sandbox with physics-driven block interactions.</p>
+
+    <p>
+      Blockspace is a Java + LWJGL/OpenGL sandbox game focused on building,
+      interactive physics, and just having fun. You can place and erase blocks easily, shoot
+      projectiles at movable blocks, and move through the world in first or third person.
+    </p>
+    <p>
+      The base game includes world saving/loading with slots, an in-game pause/settings menu,
+      chat support, and a stylized main menu experience. It is designed as a clean,
+      expandable foundation for future features like multiplayer and richer world systems.
+    </p>
+
+    <ul class="list">
+      <li>Option to place blocks in the air or where you're looking</li>
+      <li>Physics updates for dynamic objects and projectiles</li>
+      <li>Save-slot based world persistence</li>
+      <li>First-person and third-person gameplay views</li>
+    </ul>
+
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/FIRECATCHER404/Blockspace" target="_blank" rel="noopener noreferrer">
+        View on GitHub
+      </a>
+      <a class="btn ghost" href="index3.html">Back to Projects</a>
+    </div>
+  </main>
+</body>
+</html>
