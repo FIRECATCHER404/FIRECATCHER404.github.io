@@ -109,6 +109,17 @@
     .btn:active {
       transform: translateY(0);
     }
+
+    .btn.ghost {
+      color: var(--white);
+      background: transparent;
+      border-color: var(--line);
+    }
+
+    .btn.ghost:hover {
+      border-color: #8b949e;
+      transform: translateY(-2px);
+    }
   </style>
 </head>
 <body>
@@ -117,7 +128,8 @@
     <div class="label">GitHub Projects</div>
     <h1>Project Index</h1>
     <div class="code-line">const featured = "Blockspace";</div>
-    <a class="btn" href="github/blockspace.html">Open Blockspace</a>
+    <a class="btn" href="blockspace.html">Open Blockspace</a>
+    <a class="btn ghost" href="index.html">Back to Main Menu</a>
   </main>
 </body>
 </html>
