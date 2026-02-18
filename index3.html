@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Projects</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --text: #f0f6fc;
+      --muted: #8b949e;
+      --line: #30363d;
+      --accent: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      overflow: hidden;
+    }
+
+    .bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(transparent 96%, rgba(255,255,255,0.06) 100%) 0 0 / 100% 24px,
+        linear-gradient(90deg, transparent 96%, rgba(255,255,255,0.05) 100%) 0 0 / 24px 100%,
+        radial-gradient(circle at 20% 10%, rgba(255,255,255,0.08), transparent 40%),
+        radial-gradient(circle at 80% 90%, rgba(255,255,255,0.06), transparent 45%),
+        #0d1117;
+      animation: drift 14s linear infinite;
+    }
+
+    @keyframes drift {
+      from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; }
+      to { background-position: 0 24px, 24px 0, 0 0, 0 0, 0 0; }
+    }
+
+    .panel {
+      position: relative;
+      z-index: 1;
+      width: min(92vw, 680px);
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--panel);
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 20px 70px rgba(0,0,0,0.45);
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0 0 20px;
+      font-size: clamp(28px, 5vw, 44px);
+      line-height: 1.1;
+    }
+
+    .code-line {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 24px;
+      white-space: nowrap;
+      overflow: hidden;
+      border-right: 1px solid rgba(255,255,255,0.5);
+      width: max-content;
+      animation: typing 3.5s steps(34, end), caret .75s step-end infinite;
+    }
+
+    @keyframes typing { from { max-width: 0; } to { max-width: 100%; } }
+    @keyframes caret { 50% { border-color: transparent; } }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--bg);
+      background: var(--accent);
+      border: 1px solid rgba(255,255,255,0.92);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+      box-shadow: 0 8px 24px rgba(255,255,255,0.12);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      background: #f6f8fa;
+      box-shadow: 0 12px 28px rgba(255,255,255,0.18);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <main class="panel">
+    <div class="label">GitHub Projects</div>
+    <h1>Project Index</h1>
+    <div class="code-line">const featured = "Blockspace";</div>
+    <a class="btn" href="blockspace.html">Open Blockspace</a>
+  </main>
+</body>
+</html>
