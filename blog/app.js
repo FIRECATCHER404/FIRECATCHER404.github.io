@@ -70,7 +70,8 @@ function renderPosts(posts) {
   posts.forEach((post) => {
     const fragment = template.content.cloneNode(true);
     const card = fragment.querySelector('.post-card');
-    const meta = fragment.querySelector('.meta');
+    const metaDate = fragment.querySelector('.meta-date');
+    const metaAuthor = fragment.querySelector('.meta-author');
     const title = fragment.querySelector('.title');
     const excerpt = fragment.querySelector('.excerpt');
     const content = fragment.querySelector('.content');
@@ -81,13 +82,13 @@ function renderPosts(posts) {
     const body = String(post.body || '').trim();
     const short = safeText(post.excerpt || body.slice(0, 180) || 'No content provided.');
 
-    meta.textContent = `${formatDate(post.publishedAt || post.createdAt)} • ${author}`;
+    metaDate.textContent = formatDate(post.publishedAt || post.createdAt);
+    metaAuthor.textContent = author;
     title.textContent = postTitle;
     excerpt.textContent = short;
     content.textContent = body;
 
-    readMore.addEventListener('click', (event) => {
-      event.preventDefault();
+    readMore.addEventListener('click', () => {
       content.classList.toggle('hidden');
       readMore.textContent = content.classList.contains('hidden') ? 'Read post' : 'Hide';
     });
