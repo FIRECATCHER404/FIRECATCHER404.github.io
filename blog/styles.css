@@ -1,0 +1,257 @@
+:root {
+  --bg: #0d1117;
+  --bg-elev: #121a24cc;
+  --fg: #e6edf3;
+  --muted: #95a3b8;
+  --line: #2a3545;
+  --brand: #3cbec9;
+  --brand-2: #4ddf9a;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-theme="light"] {
+  --bg: #f4f8fb;
+  --bg-elev: #ffffffcc;
+  --fg: #0f1723;
+  --muted: #495a70;
+  --line: #cdd8e5;
+  --brand: #00737f;
+  --brand-2: #008a56;
+  --shadow: 0 10px 30px rgba(4, 22, 41, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Manrope", sans-serif;
+  color: var(--fg);
+  background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 35%),
+              radial-gradient(circle at 80% 20%, rgba(45, 212, 191, 0.13), transparent 32%),
+              var(--bg);
+  min-height: 100vh;
+  line-height: 1.6;
+  transition: background 240ms ease, color 240ms ease;
+}
+
+.container {
+  width: min(1000px, 92vw);
+  margin: 0 auto;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(12px);
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 68px;
+}
+
+.brand {
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.theme-toggle {
+  border: 1px solid var(--line);
+  background: var(--bg-elev);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--brand) 38%, var(--line));
+}
+
+.hero {
+  margin-top: 3.2rem;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 0.77rem;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2rem, 3.6vw, 3.2rem);
+  margin-top: 0.55rem;
+  max-width: 15ch;
+}
+
+.lede {
+  color: var(--muted);
+  max-width: 60ch;
+  margin-top: 1rem;
+}
+
+.admin-card,
+.post-list {
+  margin-top: 2rem;
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: var(--bg-elev);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 1.2rem;
+}
+
+.list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.list-head p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.9rem;
+}
+
+.post-card {
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--bg-elev) 88%, var(--bg));
+  padding: 1rem;
+}
+
+.meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.title {
+  margin-top: 0.35rem;
+  font-size: 1.1rem;
+}
+
+.excerpt {
+  color: var(--muted);
+  margin: 0.7rem 0;
+}
+
+.read-more {
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.content {
+  margin-top: 0.7rem;
+  border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  padding-top: 0.7rem;
+  font-family: "Source Serif 4", serif;
+  white-space: pre-wrap;
+}
+
+.site-footer {
+  color: var(--muted);
+  padding: 2.6rem 0;
+  font-size: 0.9rem;
+}
+
+.hidden {
+  display: none;
+}
+
+.empty {
+  color: var(--muted);
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.bg-orb {
+  position: fixed;
+  filter: blur(55px);
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.45;
+}
+
+.bg-orb-a {
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  top: -90px;
+  right: 10%;
+  background: color-mix(in oklab, var(--brand) 70%, transparent);
+}
+
+.bg-orb-b {
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  bottom: -120px;
+  left: 8%;
+  background: color-mix(in oklab, var(--brand-2) 60%, transparent);
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: fade-up 500ms ease forwards;
+}
+
+.reveal:nth-child(2) {
+  animation-delay: 100ms;
+}
+
+.reveal:nth-child(3) {
+  animation-delay: 190ms;
+}
+
+@keyframes fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .list-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

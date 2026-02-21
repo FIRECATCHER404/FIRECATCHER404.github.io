@@ -1,0 +1,11 @@
+{
+  "name": "codexblog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "publish": "node scripts/publish-post.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.2"
+  }
+}
