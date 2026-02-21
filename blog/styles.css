@@ -35,7 +35,7 @@ body {
 }
 
 body {
-  font-family: "Manrope", sans-serif;
+  font-family: "Helvetica Neue", Arial, sans-serif;
   color: var(--fg);
   background:
     radial-gradient(circle at 13% 7%, color-mix(in oklab, var(--brand) 18%, transparent), transparent 40%),
@@ -234,7 +234,7 @@ h1 {
   border-radius: 12px;
   background: color-mix(in oklab, var(--bg-soft) 78%, var(--bg));
   padding: 0.8rem 0.85rem;
-  font-family: "Manrope", sans-serif;
+  font-family: "Helvetica Neue", Arial, sans-serif;
   font-size: 1rem;
   white-space: pre-wrap;
 }
@@ -324,6 +324,7 @@ h1 {
     padding: 1rem;
   }
 }
+
 
 
 
