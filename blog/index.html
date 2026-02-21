@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A modern Firebase-backed blog" />
+  <title>Modern Firebase Blog</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="bg-orb bg-orb-a" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-b" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="container nav">
+      <a class="brand" href="#">Codex Blog</a>
+      <div class="controls">
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark and light mode">
+          <span class="theme-icon">?</span>
+          <span id="themeLabel">Theme</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero reveal">
+      <p class="eyebrow">Realtime Database + GitHub Pages</p>
+      <h1>A clean, modern blog with secure publishing controls.</h1>
+      <p class="lede">
+        Public readers can view posts instantly. Publishing is blocked by default for maximum security.
+      </p>
+    </section>
+
+    <section class="admin-card reveal" id="postingStatus" aria-live="polite">
+      <h2>Publishing</h2>
+      <p>
+        Client-side posting is disabled. Add posts through trusted admin tooling only.
+      </p>
+    </section>
+
+    <section class="post-list reveal" aria-label="Blog posts">
+      <div class="list-head">
+        <h2>Latest Posts</h2>
+        <p id="postCount">Loading...</p>
+      </div>
+      <div id="posts" class="cards"></div>
+      <p id="emptyState" class="empty hidden">No posts yet. Add entries under <code>/posts</code> in Firebase.</p>
+    </section>
+  </main>
+
+  <footer class="container site-footer">
+    <p>Built for GitHub Pages. Data powered by Firebase Realtime Database.</p>
+  </footer>
+
+  <template id="postTemplate">
+    <article class="post-card">
+      <p class="meta"></p>
+      <h3 class="title"></h3>
+      <p class="excerpt"></p>
+      <a class="read-more" href="#">Read post</a>
+      <div class="content hidden"></div>
+    </article>
+  </template>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
