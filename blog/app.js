@@ -70,6 +70,7 @@ function renderPosts(posts) {
   posts.forEach((post) => {
     const fragment = template.content.cloneNode(true);
     const card = fragment.querySelector('.post-card');
+    const legacyMeta = fragment.querySelector('.meta');
     const metaDate = fragment.querySelector('.meta-date');
     const metaAuthor = fragment.querySelector('.meta-author');
     const title = fragment.querySelector('.title');
@@ -82,18 +83,23 @@ function renderPosts(posts) {
     const body = String(post.body || '').trim();
     const short = safeText(post.excerpt || body.slice(0, 180) || 'No content provided.');
 
-    metaDate.textContent = formatDate(post.publishedAt || post.createdAt);
-    metaAuthor.textContent = author;
-    title.textContent = postTitle;
-    excerpt.textContent = short;
-    content.textContent = body;
+    const publishedText = formatDate(post.publishedAt || post.createdAt);
 
-    readMore.addEventListener('click', () => {
-      content.classList.toggle('hidden');
-      readMore.textContent = content.classList.contains('hidden') ? 'Read post' : 'Hide';
-    });
+    if (legacyMeta) legacyMeta.textContent = `${publishedText} • ${author}`;
+    if (metaDate) metaDate.textContent = publishedText;
+    if (metaAuthor) metaAuthor.textContent = author;
+    if (title) title.textContent = postTitle;
+    if (excerpt) excerpt.textContent = short;
+    if (content) content.textContent = body;
 
-    card.dataset.id = post.id;
+    if (readMore && content) {
+      readMore.addEventListener('click', () => {
+        content.classList.toggle('hidden');
+        readMore.textContent = content.classList.contains('hidden') ? 'Read post' : 'Hide';
+      });
+    }
+
+    if (card) card.dataset.id = post.id;
     postsEl.appendChild(fragment);
   });
 }
