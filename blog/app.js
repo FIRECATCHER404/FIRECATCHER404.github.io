@@ -25,7 +25,7 @@ const themeLabel = document.getElementById('themeLabel');
 function setTheme(theme) {
   root.setAttribute('data-theme', theme);
   localStorage.setItem(THEME_KEY, theme);
-  themeLabel.textContent = theme === 'dark' ? 'Dark' : 'Light';
+  if (themeLabel) themeLabel.textContent = theme === 'dark' ? 'Dark' : 'Light';
 }
 
 function initThemeToggle() {
@@ -111,13 +111,16 @@ function connectPosts() {
     },
     (error) => {
       console.error(error);
-      postingStatusEl.innerHTML = '<h2>Publishing</h2><p>Could not load posts. Confirm Firebase rules allow read access to <code>/posts</code>.</p>';
+      if (postingStatusEl) {
+        postingStatusEl.innerHTML = '<h2>Publishing</h2><p>Could not load posts. Confirm Firebase rules allow read access to <code>/posts</code>.</p>';
+      }
       postCountEl.textContent = 'Load error';
     }
   );
 }
 
 function markSecurePostingStatus() {
+  if (!postingStatusEl) return;
   postingStatusEl.innerHTML = `
     <h2>Publishing</h2>
     <p>Posting from this public site is intentionally blocked. Use Firebase Console or a private admin tool tied to service-account credentials.</p>
