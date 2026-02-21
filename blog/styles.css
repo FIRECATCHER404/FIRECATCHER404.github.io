@@ -239,6 +239,16 @@ h1 {
   white-space: pre-wrap;
 }
 
+
+.content a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.content a:hover {
+  color: var(--brand-2);
+}
 .site-footer {
   color: var(--muted);
   padding: 2.6rem 0;
@@ -314,6 +324,7 @@ h1 {
     padding: 1rem;
   }
 }
+
 
 
 

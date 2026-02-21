@@ -44,6 +44,24 @@ function safeText(value = '') {
   return String(value).replace(/\s+/g, ' ').trim();
 }
 
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function linkifyText(value = '') {
+  const escaped = escapeHtml(value);
+  const urlPattern = /(https?:\/\/[^\s<]+)/g;
+  return escaped.replace(urlPattern, (url) => {
+    return <a href="" target="_blank" rel="noopener noreferrer"></a>;
+  });
+}
+
 function formatDate(value) {
   if (!value) return 'Undated';
   const date = new Date(value);
@@ -86,7 +104,7 @@ function renderPosts(posts) {
     if (metaDate) metaDate.textContent = publishedText;
     if (metaAuthor) metaAuthor.textContent = author;
     if (title) title.textContent = postTitle;
-    if (content) content.textContent = body;
+    if (content) content.innerHTML = linkifyText(body);
 
     if (card) card.dataset.id = post.id;
     postsEl.appendChild(fragment);
@@ -130,3 +148,6 @@ function markSecurePostingStatus() {
 initThemeToggle();
 markSecurePostingStatus();
 connectPosts();
+
+
+
