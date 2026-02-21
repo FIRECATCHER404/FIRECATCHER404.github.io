@@ -57,11 +57,13 @@ function escapeHtml(value = '') {
 function linkifyText(value = '') {
   const escaped = escapeHtml(value);
   const urlPattern = /(https?:\/\/[^\s<]+)/g;
+
   return escaped.replace(urlPattern, (url) => {
-    return <a href="" target="_blank" rel="noopener noreferrer"></a>;
+    const cleanUrl = url.replace(/[),.;!?]+$/g, '');
+    const trailing = url.slice(cleanUrl.length);
+    return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
   });
 }
-
 function formatDate(value) {
   if (!value) return 'Undated';
   const date = new Date(value);
@@ -148,6 +150,8 @@ function markSecurePostingStatus() {
 initThemeToggle();
 markSecurePostingStatus();
 connectPosts();
+
+
 
 
 
