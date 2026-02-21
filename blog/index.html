@@ -19,7 +19,7 @@
       <a class="brand" href="#">Codex Blog</a>
       <div class="controls">
         <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark and light mode">
-          <span class="theme-icon">?</span>
+          <span class="theme-icon" aria-hidden="true"></span>
           <span id="themeLabel">Theme</span>
         </button>
       </div>
@@ -58,10 +58,13 @@
 
   <template id="postTemplate">
     <article class="post-card">
-      <p class="meta"></p>
+      <div class="post-top">
+        <p class="meta-date"></p>
+        <p class="meta-author"></p>
+      </div>
       <h3 class="title"></h3>
       <p class="excerpt"></p>
-      <a class="read-more" href="#">Read post</a>
+      <button class="read-more" type="button">Read post</button>
       <div class="content hidden"></div>
     </article>
   </template>
@@ -69,3 +72,4 @@
   <script type="module" src="./app.js"></script>
 </body>
 </html>
+
