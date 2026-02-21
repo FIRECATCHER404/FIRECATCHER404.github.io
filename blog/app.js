@@ -1,4 +1,4 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js';
+﻿import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js';
 import { getDatabase, ref, onValue, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
 
 const firebaseConfig = {
@@ -74,14 +74,11 @@ function renderPosts(posts) {
     const metaDate = fragment.querySelector('.meta-date');
     const metaAuthor = fragment.querySelector('.meta-author');
     const title = fragment.querySelector('.title');
-    const excerpt = fragment.querySelector('.excerpt');
     const content = fragment.querySelector('.content');
-    const readMore = fragment.querySelector('.read-more');
 
     const author = safeText(post.author || 'Anonymous');
     const postTitle = safeText(post.title || 'Untitled');
     const body = String(post.body || '').trim();
-    const short = safeText(post.excerpt || body.slice(0, 180) || 'No content provided.');
 
     const publishedText = formatDate(post.publishedAt || post.createdAt);
 
@@ -89,15 +86,7 @@ function renderPosts(posts) {
     if (metaDate) metaDate.textContent = publishedText;
     if (metaAuthor) metaAuthor.textContent = author;
     if (title) title.textContent = postTitle;
-    if (excerpt) excerpt.textContent = short;
     if (content) content.textContent = body;
-
-    if (readMore && content) {
-      readMore.addEventListener('click', () => {
-        content.classList.toggle('hidden');
-        readMore.textContent = content.classList.contains('hidden') ? 'Read post' : 'Hide';
-      });
-    }
 
     if (card) card.dataset.id = post.id;
     postsEl.appendChild(fragment);
