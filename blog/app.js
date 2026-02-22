@@ -67,19 +67,7 @@ function linkifyText(value = '') {
   });
 }
 
-function resolveImageSource(rawName = '') {
-  const name = String(rawName).trim();
-  if (!name) return null;
-
-  if (/^https?:\/\//i.test(name)) return name;
-
-  const cleaned = name.replace(/^\/+/, '');
-  if (cleaned.includes('..')) return null;
-
-  if (/^(images|assets)\//i.test(cleaned)) return cleaned;
-
-  return `images/${cleaned}`;
-}
+function resolveImageSource(rawName = '') {`r`n  const name = String(rawName).trim();`r`n  if (!name) return null;`r`n`r`n  if (/^https?:\/\//i.test(name)) {`r`n    return { primary: name, fallback: null };`r`n  }`r`n`r`n  const cleaned = name.replace(/^\/+/, '');`r`n  if (cleaned.includes('..')) return null;`r`n`r`n  if (/^(images|assets)\//i.test(cleaned)) {`r`n    return { primary: cleaned, fallback: null };`r`n  }`r`n`r`n  return { primary: cleaned, fallback: `images/${cleaned}` };`r`n}`r`n
 
 function renderBodyContent(value = '') {
   let out = '';
@@ -89,12 +77,7 @@ function renderBodyContent(value = '') {
   while (match) {
     out += linkifyText(value.slice(lastIndex, match.index));
 
-    const source = resolveImageSource(match[1]);
-    if (source) {
-      const safeSrc = escapeHtml(source);
-      const safeAlt = escapeHtml(match[1]);
-      out += `<figure class="post-image-wrap"><img class="post-image" src="${safeSrc}" alt="${safeAlt}" loading="lazy" decoding="async"></figure>`;
-    } else {
+    const source = resolveImageSource(match[1]);`r`n    if (source) {`r`n      const safePrimary = escapeHtml(source.primary);`r`n      const safeFallback = source.fallback ? escapeHtml(source.fallback) : '';`r`n      const safeAlt = escapeHtml(match[1]);`r`n      const fallbackAttr = source.fallback`r`n        ? ` onerror="if(!this.dataset.fbk){this.dataset.fbk=1;this.src='${safeFallback}';}"``r`n        : '';`r`n      out += `<figure class="post-image-wrap"><img class="post-image" src="${safePrimary}" alt="${safeAlt}" loading="lazy" decoding="async"${fallbackAttr}></figure>`;`r`n    } else {
       out += escapeHtml(match[0]);
     }
 
@@ -293,6 +276,7 @@ function markSecurePostingStatus() {
 initThemeToggle();
 markSecurePostingStatus();
 connectPosts();
+
 
 
 
