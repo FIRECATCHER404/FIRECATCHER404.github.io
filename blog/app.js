@@ -120,9 +120,9 @@ function addFilteredBackButton() {
   const btn = document.createElement('button');
   btn.className = 'post-link-btn';
   btn.type = 'button';
-  btn.textContent = 'Back to all messages';
+  btn.textContent = 'Back to posts';
   btn.addEventListener('click', () => {
-    window.location.href = '/';
+    window.location.href = window.location.pathname;
   });
 
   wrap.appendChild(btn);
@@ -254,3 +254,5 @@ function markSecurePostingStatus() {
 initThemeToggle();
 markSecurePostingStatus();
 connectPosts();
+
+
