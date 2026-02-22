@@ -122,7 +122,7 @@ function addFilteredBackButton() {
   btn.type = 'button';
   btn.textContent = 'Back to posts';
   btn.addEventListener('click', () => {
-    window.location.href = window.location.pathname;
+    window.location.href = `${window.location.origin}/blog/`;
   });
 
   wrap.appendChild(btn);
@@ -254,5 +254,7 @@ function markSecurePostingStatus() {
 initThemeToggle();
 markSecurePostingStatus();
 connectPosts();
+
+
 
 
