@@ -67,6 +67,45 @@ function linkifyText(value = '') {
   });
 }
 
+function resolveImageSource(rawName = '') {
+  const name = String(rawName).trim();
+  if (!name) return null;
+
+  if (/^https?:\/\//i.test(name)) return name;
+
+  const cleaned = name.replace(/^\/+/, '');
+  if (cleaned.includes('..')) return null;
+
+  if (/^(images|assets)\//i.test(cleaned)) return cleaned;
+
+  return `images/${cleaned}`;
+}
+
+function renderBodyContent(value = '') {
+  let out = '';
+  let lastIndex = 0;
+  let match = IMAGE_TOKEN_RE.exec(value);
+
+  while (match) {
+    out += linkifyText(value.slice(lastIndex, match.index));
+
+    const source = resolveImageSource(match[1]);
+    if (source) {
+      const safeSrc = escapeHtml(source);
+      const safeAlt = escapeHtml(match[1]);
+      out += `<figure class="post-image-wrap"><img class="post-image" src="${safeSrc}" alt="${safeAlt}" loading="lazy" decoding="async"></figure>`;
+    } else {
+      out += escapeHtml(match[0]);
+    }
+
+    lastIndex = match.index + match[0].length;
+    match = IMAGE_TOKEN_RE.exec(value);
+  }
+
+  out += linkifyText(value.slice(lastIndex));
+  IMAGE_TOKEN_RE.lastIndex = 0;
+  return out;
+}
 function formatDate(value) {
   if (!value) return 'Undated';
   const date = new Date(value);
@@ -254,6 +293,7 @@ function markSecurePostingStatus() {
 initThemeToggle();
 markSecurePostingStatus();
 connectPosts();
+
 
 
 

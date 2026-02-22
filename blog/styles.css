@@ -378,3 +378,17 @@ h1 {
 }
 
 
+
+.post-image-wrap {
+  margin: 0.85rem 0;
+}
+
+.post-image {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--bg-soft) 72%, var(--bg));
+}
+
