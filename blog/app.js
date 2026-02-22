@@ -20,7 +20,6 @@ const auth = getAuth(app);
 const THEME_KEY = 'blog_theme';
 const POST_ID_PARAM = 'postId';
 const VISITOR_KEY = 'blog_visitor_id';
-const COMMENT_NAME_KEY = 'blog_comment_name';
 const IMAGE_TOKEN_RE = /\$\{image:([^}]+)\}/gi;
 
 const root = document.documentElement;
@@ -170,11 +169,14 @@ function getVisitorId() {
   return generated;
 }
 
-function getCommentDisplayName() {
-  const fromProfile = currentUser?.displayName ? safeText(currentUser.displayName) : '';
-  if (fromProfile) return fromProfile;
-  const fromLocal = safeText(localStorage.getItem(COMMENT_NAME_KEY) || '');
-  return fromLocal || 'Reader';
+function getSignedInCommentName() {
+  const preferred = safeText(currentUser?.displayName || '');
+  const fromEmail = safeText((currentUser?.email || '').split('@')[0] || '');
+  let name = preferred || fromEmail || 'User';
+
+  if (name.length > 32) name = name.slice(0, 32).trim();
+  if (name.length < 2) name = 'User';
+  return name;
 }
 
 function isPublishedPost(post) {
@@ -255,14 +257,11 @@ function createCommentItem(comment) {
 }
 
 function bindCommentForm(form, postId) {
-  const nameInput = form.querySelector('.comment-name');
   const textInput = form.querySelector('.comment-text');
   const statusEl = form.querySelector('.comment-status');
   const submitBtn = form.querySelector('button[type="submit"]');
 
-  if (!nameInput || !textInput || !statusEl || !submitBtn) return;
-
-  nameInput.value = getCommentDisplayName();
+  if (!textInput || !statusEl || !submitBtn) return;
 
   if (!currentUser) {
     textInput.disabled = true;
@@ -282,13 +281,8 @@ function bindCommentForm(form, postId) {
       return;
     }
 
-    const name = safeText(nameInput.value);
+    const name = getSignedInCommentName();
     const text = String(textInput.value || '').trim();
-
-    if (!name || name.length < 2 || name.length > 32) {
-      statusEl.textContent = 'Name must be 2-32 characters.';
-      return;
-    }
 
     if (!text || text.length < 2 || text.length > 1000) {
       statusEl.textContent = 'Comment must be 2-1000 characters.';
@@ -306,7 +300,6 @@ function bindCommentForm(form, postId) {
         text,
         createdAt: Date.now()
       });
-      localStorage.setItem(COMMENT_NAME_KEY, name);
       textInput.value = '';
       statusEl.textContent = 'Posted.';
     } catch (error) {
