@@ -33,6 +33,31 @@
         <h1>Posts</h1>
         <p id="postCount">Loading...</p>
       </div>
+      <div class="list-tools">
+        <div class="search-wrap">
+          <label class="sr-only" for="searchInput">Search posts</label>
+          <input id="searchInput" type="search" placeholder="Search title or content..." autocomplete="off" />
+          <button id="searchClear" type="button" class="post-link-btn">Clear</button>
+        </div>
+        <p id="searchStatus" class="search-status hidden" aria-live="polite"></p>
+      </div>
+      <section id="commentAuth" class="comment-auth" aria-label="Comment account">
+        <div class="comment-auth-head">
+          <h2>Comment Account</h2>
+          <p id="authStateText">Sign in to comment.</p>
+        </div>
+        <form id="authForm" class="comment-auth-form">
+          <input id="authUsername" type="text" placeholder="Username (sign up)" maxlength="32" />
+          <input id="authEmail" type="email" placeholder="Email" autocomplete="email" required />
+          <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password" minlength="8" required />
+          <div class="comment-auth-actions">
+            <button id="authSignIn" type="submit" class="post-link-btn">Sign in</button>
+            <button id="authSignUp" type="button" class="post-link-btn">Sign up</button>
+            <button id="authSignOut" type="button" class="post-link-btn hidden">Sign out</button>
+          </div>
+        </form>
+        <p id="authStatus" class="auth-status" aria-live="polite"></p>
+      </section>
       <div id="posts" class="cards"></div>
       <p id="emptyState" class="empty hidden">No posts yet.</p>
     </section>
@@ -59,6 +84,19 @@
         </button>
         <span class="like-count">0 likes</span>
       </div>
+      <section class="comments">
+        <h4>Comments</h4>
+        <p class="comment-empty">No comments yet.</p>
+        <div class="comment-list"></div>
+        <form class="comment-form">
+          <input class="comment-name" type="text" maxlength="32" placeholder="Display name" required />
+          <textarea class="comment-text" rows="3" maxlength="1000" placeholder="Write a comment..." required></textarea>
+          <div class="comment-actions">
+            <button type="submit" class="post-link-btn">Post comment</button>
+          </div>
+          <p class="comment-status" aria-live="polite"></p>
+        </form>
+      </section>
       <p class="post-id"></p>
     </article>
   </template>

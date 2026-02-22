@@ -159,6 +159,92 @@ h1 {
   color: var(--muted);
 }
 
+.list-tools {
+  margin-bottom: 1rem;
+}
+
+.search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+#searchInput {
+  width: min(520px, 100%);
+  border: 1px solid color-mix(in oklab, var(--line) 86%, transparent);
+  background: color-mix(in oklab, var(--bg-elev) 92%, var(--bg-soft));
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 0.48rem 0.82rem;
+}
+
+#searchInput::placeholder {
+  color: var(--muted);
+}
+
+.search-status {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.comment-auth {
+  margin-bottom: 1rem;
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--bg-elev) 90%, var(--bg-soft));
+  padding: 0.8rem;
+}
+
+.comment-auth-head h2 {
+  font-size: 1rem;
+}
+
+.comment-auth-head p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.comment-auth-form {
+  margin-top: 0.65rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.comment-auth-form input,
+.comment-form input,
+.comment-form textarea {
+  border: 1px solid color-mix(in oklab, var(--line) 86%, transparent);
+  background: color-mix(in oklab, var(--bg-elev) 93%, var(--bg-soft));
+  color: var(--fg);
+  border-radius: 10px;
+  padding: 0.45rem 0.65rem;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.95rem;
+}
+
+.comment-auth-form input::placeholder,
+.comment-form input::placeholder,
+.comment-form textarea::placeholder {
+  color: var(--muted);
+}
+
+.comment-auth-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.auth-status {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .cards {
   display: grid;
   grid-template-columns: 1fr;
@@ -290,6 +376,70 @@ h1 {
   opacity: 0.86;
 }
 
+.comments {
+  margin-top: 0.95rem;
+  border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  padding-top: 0.8rem;
+}
+
+.comments h4 {
+  margin: 0 0 0.5rem;
+}
+
+.comment-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.comment-list {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.comment-item {
+  border: 1px solid color-mix(in oklab, var(--line) 78%, transparent);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  background: color-mix(in oklab, var(--bg-soft) 80%, transparent);
+}
+
+.comment-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.comment-text-view {
+  margin-top: 0.35rem;
+  white-space: pre-wrap;
+}
+
+.comment-form {
+  margin-top: 0.7rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.comment-form textarea {
+  resize: vertical;
+  min-height: 92px;
+}
+
+.comment-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.comment-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .site-footer {
   color: var(--muted);
   padding: 2.6rem 0;
@@ -306,6 +456,18 @@ h1 {
   border: 1px dashed var(--line);
   border-radius: 12px;
   padding: 1rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .bg-orb {
@@ -359,6 +521,19 @@ h1 {
   .list-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .search-wrap {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #searchInput {
+    width: 100%;
+  }
+
+  .comment-auth-form {
+    grid-template-columns: 1fr;
   }
 
   .post-card {

@@ -42,6 +42,12 @@
             ".write": "newData.val() === true && !data.exists() && $clientId.matches(/^[A-Za-z0-9_-]{8,128}$/)",
             ".validate": "newData.val() === true"
           }
+        },
+        "comments": {
+          "$commentId": {
+            ".write": "auth != null && root.child('posts/' + $postId + '/published').val() === true && !data.exists() && newData.hasChildren(['uid','name','text','createdAt']) && newData.child('uid').val() === auth.uid",
+            ".validate": "newData.hasChildren(['uid','name','text','createdAt']) && newData.child('uid').isString() && newData.child('uid').val().matches(/^[A-Za-z0-9:_-]{6,128}$/) && newData.child('name').isString() && newData.child('name').val().matches(/^.{2,32}$/) && newData.child('text').isString() && newData.child('text').val().matches(/^.{2,1000}$/) && newData.child('createdAt').isNumber()"
+          }
         }
       }
     }
