@@ -33,6 +33,23 @@
         <h1>Posts</h1>
         <p id="postCount">Loading...</p>
       </div>
+      <details id="globalAuthPanel" class="collapsible global-auth">
+        <summary class="collapsible-summary">Sign in / Sign up</summary>
+        <div class="collapsible-content">
+          <p class="auth-state-text">Sign in to comment.</p>
+          <form class="comment-auth-form">
+            <input class="auth-username" type="text" placeholder="Username (for sign up)" maxlength="32" />
+            <input class="auth-email" type="email" placeholder="Email" autocomplete="email" required />
+            <input class="auth-password" type="password" placeholder="Password" autocomplete="current-password" minlength="8" required />
+            <div class="comment-auth-actions">
+              <button type="submit" class="post-link-btn">Sign in</button>
+              <button type="button" class="post-link-btn auth-sign-up">Sign up</button>
+              <button type="button" class="post-link-btn auth-sign-out hidden">Sign out</button>
+            </div>
+          </form>
+          <p class="auth-status" aria-live="polite"></p>
+        </div>
+      </details>
       <div class="list-tools">
         <div class="search-wrap">
           <label class="sr-only" for="searchInput">Search posts</label>
@@ -71,23 +88,6 @@
         <details class="collapsible comments-collapsible">
           <summary class="collapsible-summary">Comments <span class="comment-count-badge">0</span></summary>
           <div class="collapsible-content">
-            <details class="collapsible auth-collapsible">
-              <summary class="collapsible-summary">Sign in / Sign up</summary>
-              <div class="collapsible-content">
-                <p class="auth-state-text">Sign in to comment.</p>
-                <form class="comment-auth-form">
-                  <input class="auth-username" type="text" placeholder="Username (for sign up)" maxlength="32" />
-                  <input class="auth-email" type="email" placeholder="Email" autocomplete="email" required />
-                  <input class="auth-password" type="password" placeholder="Password" autocomplete="current-password" minlength="8" required />
-                  <div class="comment-auth-actions">
-                    <button type="submit" class="post-link-btn">Sign in</button>
-                    <button type="button" class="post-link-btn auth-sign-up">Sign up</button>
-                    <button type="button" class="post-link-btn auth-sign-out hidden">Sign out</button>
-                  </div>
-                </form>
-                <p class="auth-status" aria-live="polite"></p>
-              </div>
-            </details>
             <p class="comment-empty">No comments yet.</p>
             <div class="comment-list"></div>
             <form class="comment-form">

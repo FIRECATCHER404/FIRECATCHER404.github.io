@@ -163,6 +163,10 @@ h1 {
   margin-bottom: 1rem;
 }
 
+.global-auth {
+  margin-bottom: 1rem;
+}
+
 .search-wrap {
   display: flex;
   align-items: center;

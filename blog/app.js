@@ -33,6 +33,7 @@ const themeLabel = document.getElementById('themeLabel');
 const searchInput = document.getElementById('searchInput');
 const searchClear = document.getElementById('searchClear');
 const searchStatus = document.getElementById('searchStatus');
+const globalAuthPanel = document.getElementById('globalAuthPanel');
 
 let allPosts = [];
 let singlePostMode = false;
@@ -384,20 +385,31 @@ function bindAuthPanel(panel) {
 
   if (!authForm || !authEmail || !authPassword || !authSignUp || !authSignOut) return;
 
-  const signedIn = !!currentUser;
-  if (authStateText) {
-    authStateText.textContent = signedIn
-      ? `Signed in as ${safeText(currentUser.displayName || currentUser.email || 'user')}`
-      : 'Sign in to comment.';
+  const syncAuthPanel = () => {
+    const signedIn = !!currentUser;
+    if (authStateText) {
+      authStateText.textContent = signedIn
+        ? `Signed in as ${safeText(currentUser.displayName || currentUser.email || 'user')}`
+        : 'Sign in to comment.';
+    }
+
+    authSignOut.classList.toggle('hidden', !signedIn);
+    if (authUsername) authUsername.disabled = signedIn;
+    authEmail.disabled = signedIn;
+    authPassword.disabled = signedIn;
+    authSignUp.disabled = signedIn;
+    const signInButton = authForm.querySelector('button[type="submit"]');
+    if (signInButton) signInButton.disabled = signedIn;
+  };
+
+  if (panel.dataset.bound === 'true') {
+    syncAuthPanel();
+    return;
   }
 
-  authSignOut.classList.toggle('hidden', !signedIn);
-  if (authUsername) authUsername.disabled = signedIn;
-  authEmail.disabled = signedIn;
-  authPassword.disabled = signedIn;
-  authSignUp.disabled = signedIn;
-  const signInButton = authForm.querySelector('button[type="submit"]');
-  if (signInButton) signInButton.disabled = signedIn;
+  panel.dataset.bound = 'true';
+
+  syncAuthPanel();
 
   authForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -457,7 +469,6 @@ function renderPosts(posts, options = {}) {
     const commentEmpty = fragment.querySelector('.comment-empty');
     const commentList = fragment.querySelector('.comment-list');
     const commentForm = fragment.querySelector('.comment-form');
-    const authPanel = fragment.querySelector('.auth-collapsible');
     const commentCountBadge = fragment.querySelector('.comment-count-badge');
 
     const author = safeText(post.author || 'Anonymous');
@@ -504,10 +515,6 @@ function renderPosts(posts, options = {}) {
           commentList.appendChild(createCommentItem(comment));
         });
       }
-    }
-
-    if (authPanel) {
-      bindAuthPanel(authPanel);
     }
 
     if (commentForm) {
@@ -559,8 +566,10 @@ function initSearch() {
 }
 
 function initAuth() {
+  if (globalAuthPanel) bindAuthPanel(globalAuthPanel);
   onAuthStateChanged(auth, (user) => {
     currentUser = user;
+    if (globalAuthPanel) bindAuthPanel(globalAuthPanel);
     applySearchAndRender();
   });
 }
