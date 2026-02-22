@@ -335,3 +335,46 @@ h1 {
 
 
 
+
+.post-actions {
+  margin-top: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.like-btn {
+  border: 1px solid color-mix(in oklab, var(--line) 86%, transparent);
+  background: color-mix(in oklab, var(--bg-elev) 92%, var(--bg-soft));
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.like-btn:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--brand) 45%, var(--line));
+}
+
+.like-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.like-count {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.post-link {
+  margin-left: auto;
+  color: var(--brand);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.post-link:hover {
+  text-decoration: underline;
+}

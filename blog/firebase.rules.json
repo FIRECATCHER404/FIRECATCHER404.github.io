@@ -1,4 +1,4 @@
-{
+﻿{
   "rules": {
     ".read": false,
     ".write": false,
@@ -35,7 +35,14 @@
       ".read": "(query.orderByChild === 'published' && query.equalTo === true) || (auth != null && auth.token.admin === true)",
       ".indexOn": ["published"],
       "$postId": {
-        ".write": false
+        ".read": "data.child('published').val() === true || (auth != null && auth.token.admin === true)",
+        ".write": false,
+        "likesBy": {
+          "$clientId": {
+            ".write": "newData.val() === true && !data.exists() && $clientId.matches(/^[A-Za-z0-9_-]{8,128}$/)",
+            ".validate": "newData.val() === true"
+          }
+        }
       }
     }
   }

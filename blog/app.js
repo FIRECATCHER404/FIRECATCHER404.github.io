@@ -1,5 +1,5 @@
 ﻿import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js';
-import { getDatabase, ref, onValue, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, query, orderByChild, equalTo } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw',
@@ -15,6 +15,9 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const THEME_KEY = 'blog_theme';
+const BLOG_ID_PARAM = 'blogId';
+const VISITOR_KEY = 'blog_visitor_id';
+
 const root = document.documentElement;
 const postsEl = document.getElementById('posts');
 const emptyStateEl = document.getElementById('emptyState');
@@ -44,13 +47,12 @@ function safeText(value = '') {
   return String(value).replace(/\s+/g, ' ').trim();
 }
 
-
 function escapeHtml(value = '') {
   return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/\"/g, '&quot;')
+    .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
 
@@ -64,6 +66,7 @@ function linkifyText(value = '') {
     return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailing}`;
   });
 }
+
 function formatDate(value) {
   if (!value) return 'Undated';
   const date = new Date(value);
@@ -75,45 +78,121 @@ function formatDate(value) {
   }).format(date);
 }
 
-function renderPosts(posts) {
+function getBlogIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get(BLOG_ID_PARAM) || '').trim();
+}
+
+function getVisitorId() {
+  const existing = localStorage.getItem(VISITOR_KEY);
+  if (existing) return existing;
+
+  const generated = (window.crypto && typeof window.crypto.randomUUID === 'function')
+    ? window.crypto.randomUUID().replace(/-/g, '')
+    : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+
+  localStorage.setItem(VISITOR_KEY, generated);
+  return generated;
+}
+
+function isPublishedPost(post) {
+  return !!post && post.published === true;
+}
+
+function getLikeCount(post) {
+  if (!post || !post.likesBy || typeof post.likesBy !== 'object') return 0;
+  return Object.keys(post.likesBy).length;
+}
+
+function hasLiked(post, visitorId) {
+  return !!(post && post.likesBy && post.likesBy[visitorId]);
+}
+
+function likeLabel(count) {
+  return `${count} like${count === 1 ? '' : 's'}`;
+}
+
+function renderPosts(posts, isFiltered = false) {
   postsEl.innerHTML = '';
-  postCountEl.textContent = `${posts.length} post${posts.length === 1 ? '' : 's'}`;
+  postCountEl.textContent = isFiltered ? `${posts.length} post` : `${posts.length} post${posts.length === 1 ? '' : 's'}`;
 
   if (posts.length === 0) {
+    emptyStateEl.textContent = isFiltered ? 'Post not found or not published.' : 'No posts yet.';
     emptyStateEl.classList.remove('hidden');
     return;
   }
 
   emptyStateEl.classList.add('hidden');
   const template = document.getElementById('postTemplate');
+  const visitorId = getVisitorId();
 
   posts.forEach((post) => {
     const fragment = template.content.cloneNode(true);
     const card = fragment.querySelector('.post-card');
-    const legacyMeta = fragment.querySelector('.meta');
     const metaDate = fragment.querySelector('.meta-date');
     const metaAuthor = fragment.querySelector('.meta-author');
     const title = fragment.querySelector('.title');
     const content = fragment.querySelector('.content');
+    const likeBtn = fragment.querySelector('.like-btn');
+    const likeCount = fragment.querySelector('.like-count');
+    const postLink = fragment.querySelector('.post-link');
 
     const author = safeText(post.author || 'Anonymous');
     const postTitle = safeText(post.title || 'Untitled');
     const body = String(post.body || '').trim();
 
-    const publishedText = formatDate(post.publishedAt || post.createdAt);
-
-    if (legacyMeta) legacyMeta.textContent = `${publishedText} • ${author}`;
-    if (metaDate) metaDate.textContent = publishedText;
+    if (metaDate) metaDate.textContent = formatDate(post.publishedAt || post.createdAt);
     if (metaAuthor) metaAuthor.textContent = author;
     if (title) title.textContent = postTitle;
     if (content) content.innerHTML = linkifyText(body);
 
+    const count = getLikeCount(post);
+    const liked = hasLiked(post, visitorId);
+
+    if (likeCount) likeCount.textContent = likeLabel(count);
+    if (likeBtn) {
+      likeBtn.textContent = liked ? 'Liked' : 'Like';
+      likeBtn.disabled = liked;
+      likeBtn.addEventListener('click', async () => {
+        likeBtn.disabled = true;
+        try {
+          await set(ref(db, `posts/${post.id}/likesBy/${visitorId}`), true);
+        } catch (error) {
+          console.error(error);
+          likeBtn.disabled = false;
+        }
+      });
+    }
+
+    if (postLink) postLink.href = `?${BLOG_ID_PARAM}=${encodeURIComponent(post.id)}`;
     if (card) card.dataset.id = post.id;
     postsEl.appendChild(fragment);
   });
 }
 
 function connectPosts() {
+  const blogId = getBlogIdFromUrl();
+
+  if (blogId) {
+    const singlePostRef = ref(db, `posts/${blogId}`);
+    onValue(
+      singlePostRef,
+      (snapshot) => {
+        const post = snapshot.val();
+        if (!isPublishedPost(post)) {
+          renderPosts([], true);
+          return;
+        }
+        renderPosts([{ id: blogId, ...post }], true);
+      },
+      (error) => {
+        console.error(error);
+        postCountEl.textContent = 'Load error';
+      }
+    );
+    return;
+  }
+
   const postsRef = query(ref(db, 'posts'), orderByChild('published'), equalTo(true));
 
   onValue(
@@ -127,7 +206,7 @@ function connectPosts() {
           const bTime = new Date(b.publishedAt || b.createdAt || 0).getTime();
           return bTime - aTime;
         });
-      renderPosts(posts);
+      renderPosts(posts, false);
     },
     (error) => {
       console.error(error);
@@ -150,9 +229,3 @@ function markSecurePostingStatus() {
 initThemeToggle();
 markSecurePostingStatus();
 connectPosts();
-
-
-
-
-
-
