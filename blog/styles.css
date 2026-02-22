@@ -96,6 +96,7 @@ body {
 .home-link:hover {
   color: var(--fg);
 }
+
 .theme-toggle {
   border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
   background: var(--bg-elev);
@@ -122,18 +123,6 @@ body {
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand) 20%, transparent);
 }
 
-.hero {
-  margin-top: 3.3rem;
-}
-
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--brand);
-  font-weight: 800;
-  font-size: 0.75rem;
-}
-
 h1,
 h2,
 h3 {
@@ -148,13 +137,6 @@ h1 {
   text-wrap: balance;
 }
 
-.lede {
-  color: var(--muted);
-  max-width: 64ch;
-  margin-top: 1rem;
-}
-
-.admin-card,
 .post-list {
   margin-top: 2rem;
   border: 1px solid color-mix(in oklab, var(--line) 74%, transparent);
@@ -239,7 +221,6 @@ h1 {
   white-space: pre-wrap;
 }
 
-
 .content a {
   color: var(--brand);
   text-decoration: underline;
@@ -249,6 +230,66 @@ h1 {
 .content a:hover {
   color: var(--brand-2);
 }
+
+.post-actions {
+  margin-top: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.like-btn,
+.post-link-btn {
+  border: 1px solid color-mix(in oklab, var(--line) 86%, transparent);
+  background: color-mix(in oklab, var(--bg-elev) 92%, var(--bg-soft));
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 0.3rem 0.72rem;
+  cursor: pointer;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.like-btn:hover:not(:disabled),
+.post-link-btn:hover {
+  border-color: color-mix(in oklab, var(--brand) 45%, var(--line));
+}
+
+.like-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.like-btn.liked {
+  border-color: color-mix(in oklab, var(--brand) 45%, var(--line));
+}
+
+.like-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  display: block;
+  fill: currentColor;
+}
+
+.like-count {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.post-link-btn {
+  margin-left: auto;
+}
+
+.post-id {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  opacity: 0.86;
+}
+
 .site-footer {
   color: var(--muted);
   padding: 2.6rem 0;
@@ -323,58 +364,8 @@ h1 {
   .post-card {
     padding: 1rem;
   }
-}
 
-
-
-
-
-
-
-
-
-
-
-
-.post-actions {
-  margin-top: 0.8rem;
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  flex-wrap: wrap;
-}
-
-.like-btn {
-  border: 1px solid color-mix(in oklab, var(--line) 86%, transparent);
-  background: color-mix(in oklab, var(--bg-elev) 92%, var(--bg-soft));
-  color: var(--fg);
-  border-radius: 999px;
-  padding: 0.3rem 0.7rem;
-  cursor: pointer;
-  font-weight: 700;
-}
-
-.like-btn:hover:not(:disabled) {
-  border-color: color-mix(in oklab, var(--brand) 45%, var(--line));
-}
-
-.like-btn:disabled {
-  opacity: 0.65;
-  cursor: default;
-}
-
-.like-count {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.post-link {
-  margin-left: auto;
-  color: var(--brand);
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.post-link:hover {
-  text-decoration: underline;
+  .post-link-btn {
+    margin-left: 0;
+  }
 }

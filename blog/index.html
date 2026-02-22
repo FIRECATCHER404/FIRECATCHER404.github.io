@@ -51,10 +51,16 @@
       <h3 class="title"></h3>
       <div class="content"></div>
       <div class="post-actions">
-        <button class="like-btn" type="button">Like</button>
+        <button class="like-btn" type="button" aria-label="Like this post">
+          <svg class="like-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M14 10V5.5c0-1.9-1.6-3.5-3.5-3.5L7 10v12h10.3c1.2 0 2.2-.8 2.5-1.9l1.5-6c.4-1.6-.8-3.1-2.5-3.1H14zM2 10h4v12H2z"/>
+          </svg>
+          <span>Like</span>
+        </button>
         <span class="like-count">0 likes</span>
-        <a class="post-link" href="#">Permalink</a>
+        <button class="post-link-btn" type="button">Open post</button>
       </div>
+      <p class="post-id"></p>
     </article>
   </template>
 

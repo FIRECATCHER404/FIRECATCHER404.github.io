@@ -83,6 +83,12 @@ function getBlogIdFromUrl() {
   return (params.get(BLOG_ID_PARAM) || '').trim();
 }
 
+function buildPostUrl(postId) {
+  const params = new URLSearchParams(window.location.search);
+  params.set(BLOG_ID_PARAM, postId);
+  return `${window.location.pathname}?${params.toString()}`;
+}
+
 function getVisitorId() {
   const existing = localStorage.getItem(VISITOR_KEY);
   if (existing) return existing;
@@ -134,8 +140,10 @@ function renderPosts(posts, isFiltered = false) {
     const title = fragment.querySelector('.title');
     const content = fragment.querySelector('.content');
     const likeBtn = fragment.querySelector('.like-btn');
+    const likeBtnLabel = fragment.querySelector('.like-btn span');
     const likeCount = fragment.querySelector('.like-count');
-    const postLink = fragment.querySelector('.post-link');
+    const postLinkBtn = fragment.querySelector('.post-link-btn');
+    const postIdText = fragment.querySelector('.post-id');
 
     const author = safeText(post.author || 'Anonymous');
     const postTitle = safeText(post.title || 'Untitled');
@@ -145,26 +153,37 @@ function renderPosts(posts, isFiltered = false) {
     if (metaAuthor) metaAuthor.textContent = author;
     if (title) title.textContent = postTitle;
     if (content) content.innerHTML = linkifyText(body);
+    if (postIdText) postIdText.textContent = `Post ID: ${post.id}`;
 
     const count = getLikeCount(post);
     const liked = hasLiked(post, visitorId);
 
     if (likeCount) likeCount.textContent = likeLabel(count);
-    if (likeBtn) {
-      likeBtn.textContent = liked ? 'Liked' : 'Like';
+    if (likeBtn && likeBtnLabel) {
+      likeBtnLabel.textContent = liked ? 'Liked' : 'Like';
       likeBtn.disabled = liked;
+      if (liked) likeBtn.classList.add('liked');
+
       likeBtn.addEventListener('click', async () => {
         likeBtn.disabled = true;
         try {
           await set(ref(db, `posts/${post.id}/likesBy/${visitorId}`), true);
+          likeBtn.classList.add('liked');
+          likeBtnLabel.textContent = 'Liked';
         } catch (error) {
           console.error(error);
           likeBtn.disabled = false;
+          if (likeCount) likeCount.textContent = 'Like failed';
         }
       });
     }
 
-    if (postLink) postLink.href = `?${BLOG_ID_PARAM}=${encodeURIComponent(post.id)}`;
+    if (postLinkBtn) {
+      postLinkBtn.addEventListener('click', () => {
+        window.location.href = buildPostUrl(post.id);
+      });
+    }
+
     if (card) card.dataset.id = post.id;
     postsEl.appendChild(fragment);
   });
