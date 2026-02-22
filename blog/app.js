@@ -122,7 +122,7 @@ function addFilteredBackButton() {
   btn.type = 'button';
   btn.textContent = 'Back to all messages';
   btn.addEventListener('click', () => {
-    window.location.href = 'posts/';
+    window.location.href = '/';
   });
 
   wrap.appendChild(btn);
