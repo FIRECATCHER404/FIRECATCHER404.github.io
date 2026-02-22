@@ -3,14 +3,15 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, si
 import { getDatabase, ref, set, onValue, query, orderByChild, equalTo, push } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw',
-  authDomain: 'website-11b5c.firebaseapp.com',
-  databaseURL: 'https://website-11b5c-default-rtdb.firebaseio.com',
-  projectId: 'website-11b5c',
-  storageBucket: 'website-11b5c.firebasestorage.app',
-  messagingSenderId: '821866548441',
-  appId: '1:821866548441:web:00a08e534699a6f97902c8'
+  apiKey: "AIzaSyD9BhsdriZgLViOjQeOnDolnQs9C99-uKY",
+  authDomain: "myblog-ff9f8.firebaseapp.com",
+  databaseURL: "https://myblog-ff9f8-default-rtdb.firebaseio.com",
+  projectId: "myblog-ff9f8",
+  storageBucket: "myblog-ff9f8.firebasestorage.app",
+  messagingSenderId: "670000361031",
+  appId: "1:670000361031:web:ca4663d5eb63a3c6f28b62"
 };
+
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -32,15 +33,6 @@ const themeLabel = document.getElementById('themeLabel');
 const searchInput = document.getElementById('searchInput');
 const searchClear = document.getElementById('searchClear');
 const searchStatus = document.getElementById('searchStatus');
-
-const authForm = document.getElementById('authForm');
-const authUsername = document.getElementById('authUsername');
-const authEmail = document.getElementById('authEmail');
-const authPassword = document.getElementById('authPassword');
-const authSignUp = document.getElementById('authSignUp');
-const authSignOut = document.getElementById('authSignOut');
-const authStatus = document.getElementById('authStatus');
-const authStateText = document.getElementById('authStateText');
 
 let allPosts = [];
 let singlePostMode = false;
@@ -103,7 +95,7 @@ function resolveImageSource(rawName = '') {
     return { primary: cleaned, fallback: null };
   }
 
-  return { primary: cleaned, fallback: `images/${cleaned}` };
+  return { primary: `images/${cleaned}`, fallback: null };
 }
 
 function renderBodyContent(value = '') {
@@ -274,7 +266,7 @@ function bindCommentForm(form, postId) {
   if (!currentUser) {
     textInput.disabled = true;
     submitBtn.disabled = true;
-    statusEl.textContent = 'Sign in above to post a comment.';
+    statusEl.textContent = 'Open Sign in / Sign up to post a comment.';
   } else {
     textInput.disabled = false;
     submitBtn.disabled = false;
@@ -285,7 +277,7 @@ function bindCommentForm(form, postId) {
     event.preventDefault();
 
     if (!currentUser) {
-      statusEl.textContent = 'Sign in above to post a comment.';
+      statusEl.textContent = 'Open Sign in / Sign up to post a comment.';
       return;
     }
 
@@ -325,6 +317,114 @@ function bindCommentForm(form, postId) {
   });
 }
 
+function setAuthStatus(statusEl, message = '') {
+  if (statusEl) statusEl.textContent = message;
+}
+
+function getAuthErrorMessage(error, fallback) {
+  const code = String(error?.code || '');
+  if (code === 'auth/email-already-in-use') return 'Email already in use. Sign in instead.';
+  if (code === 'auth/invalid-email') return 'Invalid email format.';
+  if (code === 'auth/weak-password') return 'Password is too weak.';
+  if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+    return 'Sign in failed. Check email/password.';
+  }
+  return fallback;
+}
+
+async function handleSignInWithCredentials(email, password, statusEl) {
+  if (!email || !password) {
+    setAuthStatus(statusEl, 'Email and password are required.');
+    return;
+  }
+
+  setAuthStatus(statusEl, 'Signing in...');
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    setAuthStatus(statusEl, 'Signed in.');
+  } catch (error) {
+    console.error(error);
+    setAuthStatus(statusEl, getAuthErrorMessage(error, 'Sign in failed.'));
+  }
+}
+
+async function handleSignUpWithCredentials(username, email, password, statusEl) {
+  if (!username || username.length < 2 || username.length > 32) {
+    setAuthStatus(statusEl, 'Username must be 2-32 characters.');
+    return;
+  }
+
+  if (!email || password.length < 8) {
+    setAuthStatus(statusEl, 'Email and password (min 8 chars) are required.');
+    return;
+  }
+
+  setAuthStatus(statusEl, 'Creating account...');
+
+  try {
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(credential.user, { displayName: username });
+    setAuthStatus(statusEl, 'Account created and signed in.');
+  } catch (error) {
+    console.error(error);
+    setAuthStatus(statusEl, getAuthErrorMessage(error, 'Sign up failed.'));
+  }
+}
+
+function bindAuthPanel(panel) {
+  const authStateText = panel.querySelector('.auth-state-text');
+  const authForm = panel.querySelector('.comment-auth-form');
+  const authUsername = panel.querySelector('.auth-username');
+  const authEmail = panel.querySelector('.auth-email');
+  const authPassword = panel.querySelector('.auth-password');
+  const authSignUp = panel.querySelector('.auth-sign-up');
+  const authSignOut = panel.querySelector('.auth-sign-out');
+  const authStatus = panel.querySelector('.auth-status');
+
+  if (!authForm || !authEmail || !authPassword || !authSignUp || !authSignOut) return;
+
+  const signedIn = !!currentUser;
+  if (authStateText) {
+    authStateText.textContent = signedIn
+      ? `Signed in as ${safeText(currentUser.displayName || currentUser.email || 'user')}`
+      : 'Sign in to comment.';
+  }
+
+  authSignOut.classList.toggle('hidden', !signedIn);
+  if (authUsername) authUsername.disabled = signedIn;
+  authEmail.disabled = signedIn;
+  authPassword.disabled = signedIn;
+  authSignUp.disabled = signedIn;
+  const signInButton = authForm.querySelector('button[type="submit"]');
+  if (signInButton) signInButton.disabled = signedIn;
+
+  authForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = safeText(authEmail.value || '');
+    const password = String(authPassword.value || '');
+    await handleSignInWithCredentials(email, password, authStatus);
+  });
+
+  authSignUp.addEventListener('click', async () => {
+    const username = safeText(authUsername?.value || '');
+    const email = safeText(authEmail.value || '');
+    const password = String(authPassword.value || '');
+    await handleSignUpWithCredentials(username, email, password, authStatus);
+  });
+
+  authSignOut.addEventListener('click', async () => {
+    setAuthStatus(authStatus, 'Signing out...');
+    try {
+      await signOut(auth);
+      setAuthStatus(authStatus, 'Signed out.');
+    } catch (error) {
+      console.error(error);
+      setAuthStatus(authStatus, 'Sign out failed.');
+    }
+  });
+}
+
 function renderPosts(posts, options = {}) {
   const { isFiltered = false, emptyMessage = 'No posts yet.' } = options;
 
@@ -357,6 +457,8 @@ function renderPosts(posts, options = {}) {
     const commentEmpty = fragment.querySelector('.comment-empty');
     const commentList = fragment.querySelector('.comment-list');
     const commentForm = fragment.querySelector('.comment-form');
+    const authPanel = fragment.querySelector('.auth-collapsible');
+    const commentCountBadge = fragment.querySelector('.comment-count-badge');
 
     const author = safeText(post.author || 'Anonymous');
     const postTitle = safeText(post.title || 'Untitled');
@@ -393,6 +495,7 @@ function renderPosts(posts, options = {}) {
 
     if (commentList && commentEmpty) {
       const comments = getComments(post);
+      if (commentCountBadge) commentCountBadge.textContent = String(comments.length);
       if (comments.length === 0) {
         commentEmpty.classList.remove('hidden');
       } else {
@@ -401,6 +504,10 @@ function renderPosts(posts, options = {}) {
           commentList.appendChild(createCommentItem(comment));
         });
       }
+    }
+
+    if (authPanel) {
+      bindAuthPanel(authPanel);
     }
 
     if (commentForm) {
@@ -451,105 +558,9 @@ function initSearch() {
   }
 }
 
-function setAuthStatus(message = '') {
-  if (authStatus) authStatus.textContent = message;
-}
-
-function updateAuthUi() {
-  const signedIn = !!currentUser;
-
-  if (authStateText) {
-    authStateText.textContent = signedIn
-      ? `Signed in as ${safeText(currentUser.displayName || currentUser.email || 'user')}`
-      : 'Sign in to comment.';
-  }
-
-  if (authSignOut) authSignOut.classList.toggle('hidden', !signedIn);
-
-  if (authUsername) authUsername.disabled = signedIn;
-  if (authEmail) authEmail.disabled = signedIn;
-  if (authPassword) authPassword.disabled = signedIn;
-  if (authSignUp) authSignUp.disabled = signedIn;
-
-  if (authForm) {
-    const submitButton = authForm.querySelector('button[type="submit"]');
-    if (submitButton) submitButton.disabled = signedIn;
-  }
-}
-
-async function handleSignIn(event) {
-  event.preventDefault();
-  const email = safeText(authEmail?.value || '');
-  const password = String(authPassword?.value || '');
-
-  if (!email || !password) {
-    setAuthStatus('Email and password are required.');
-    return;
-  }
-
-  setAuthStatus('Signing in...');
-
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-    setAuthStatus('Signed in.');
-  } catch (error) {
-    console.error(error);
-    setAuthStatus('Sign in failed. Check email/password.');
-  }
-}
-
-async function handleSignUp() {
-  const username = safeText(authUsername?.value || '');
-  const email = safeText(authEmail?.value || '');
-  const password = String(authPassword?.value || '');
-
-  if (!username || username.length < 2 || username.length > 32) {
-    setAuthStatus('Username must be 2-32 characters.');
-    return;
-  }
-
-  if (!email || password.length < 8) {
-    setAuthStatus('Email and password (min 8 chars) are required.');
-    return;
-  }
-
-  setAuthStatus('Creating account...');
-
-  try {
-    const credential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(credential.user, { displayName: username });
-    setAuthStatus('Account created and signed in.');
-  } catch (error) {
-    console.error(error);
-    setAuthStatus('Sign up failed.');
-  }
-}
-
 function initAuth() {
-  if (authForm) {
-    authForm.addEventListener('submit', handleSignIn);
-  }
-
-  if (authSignUp) {
-    authSignUp.addEventListener('click', handleSignUp);
-  }
-
-  if (authSignOut) {
-    authSignOut.addEventListener('click', async () => {
-      setAuthStatus('Signing out...');
-      try {
-        await signOut(auth);
-        setAuthStatus('Signed out.');
-      } catch (error) {
-        console.error(error);
-        setAuthStatus('Sign out failed.');
-      }
-    });
-  }
-
   onAuthStateChanged(auth, (user) => {
     currentUser = user;
-    updateAuthUi();
     applySearchAndRender();
   });
 }
