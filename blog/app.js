@@ -15,7 +15,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const THEME_KEY = 'blog_theme';
-const BLOG_ID_PARAM = 'blogId';
+const POST_ID_PARAM = 'postId';
 const VISITOR_KEY = 'blog_visitor_id';
 
 const root = document.documentElement;
@@ -78,15 +78,10 @@ function formatDate(value) {
   }).format(date);
 }
 
-function getBlogIdFromUrl() {
+function getPostIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  return (params.get(BLOG_ID_PARAM) || '').trim();
-}
-
-function buildPostUrl(postId) {
-  const params = new URLSearchParams(window.location.search);
-  params.set(BLOG_ID_PARAM, postId);
-  return `${window.location.pathname}?${params.toString()}`;
+  // Keep backwards compatibility for old links (?blogId=...)
+  return (params.get(POST_ID_PARAM) || params.get('blogId') || '').trim();
 }
 
 function getVisitorId() {
@@ -118,6 +113,22 @@ function likeLabel(count) {
   return `${count} like${count === 1 ? '' : 's'}`;
 }
 
+function addFilteredBackButton() {
+  const wrap = document.createElement('div');
+  wrap.className = 'filtered-nav';
+
+  const btn = document.createElement('button');
+  btn.className = 'post-link-btn';
+  btn.type = 'button';
+  btn.textContent = 'Back to all messages';
+  btn.addEventListener('click', () => {
+    window.location.href = 'posts/';
+  });
+
+  wrap.appendChild(btn);
+  postsEl.appendChild(wrap);
+}
+
 function renderPosts(posts, isFiltered = false) {
   postsEl.innerHTML = '';
   postCountEl.textContent = isFiltered ? `${posts.length} post` : `${posts.length} post${posts.length === 1 ? '' : 's'}`;
@@ -142,7 +153,6 @@ function renderPosts(posts, isFiltered = false) {
     const likeBtn = fragment.querySelector('.like-btn');
     const likeBtnLabel = fragment.querySelector('.like-btn span');
     const likeCount = fragment.querySelector('.like-count');
-    const postLinkBtn = fragment.querySelector('.post-link-btn');
     const postIdText = fragment.querySelector('.post-id');
 
     const author = safeText(post.author || 'Anonymous');
@@ -178,22 +188,18 @@ function renderPosts(posts, isFiltered = false) {
       });
     }
 
-    if (postLinkBtn) {
-      postLinkBtn.addEventListener('click', () => {
-        window.location.href = buildPostUrl(post.id);
-      });
-    }
-
     if (card) card.dataset.id = post.id;
     postsEl.appendChild(fragment);
   });
+
+  if (isFiltered) addFilteredBackButton();
 }
 
 function connectPosts() {
-  const blogId = getBlogIdFromUrl();
+  const postId = getPostIdFromUrl();
 
-  if (blogId) {
-    const singlePostRef = ref(db, `posts/${blogId}`);
+  if (postId) {
+    const singlePostRef = ref(db, `posts/${postId}`);
     onValue(
       singlePostRef,
       (snapshot) => {
@@ -202,7 +208,7 @@ function connectPosts() {
           renderPosts([], true);
           return;
         }
-        renderPosts([{ id: blogId, ...post }], true);
+        renderPosts([{ id: postId, ...post }], true);
       },
       (error) => {
         console.error(error);

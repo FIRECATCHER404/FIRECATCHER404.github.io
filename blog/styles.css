@@ -369,3 +369,12 @@ h1 {
     margin-left: 0;
   }
 }
+
+
+.filtered-nav {
+  margin-top: 0.9rem;
+  display: flex;
+  justify-content: flex-start;
+}
+
+
