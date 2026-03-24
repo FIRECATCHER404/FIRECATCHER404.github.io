@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tree Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f9f9f9; }
+        button { margin: 10px; padding: 15px; font-size: 16px; }
+        #tree { display: none; margin-top: 20px; border: 1px solid #ccc; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Welcome to the Tree Generator</h1>
+    <button id="createTreeButton">Create Tree</button>
+    <button id="importTreeButton">Import Tree</button>
+    
+    <div id="wizard" style="display:none;">
+        <h2>Create Tree Wizard</h2>
+        <label for="treeType">Select Tree Type:</label>
+        <select id="treeType">
+            <option value="oak">Oak</option>
+            <option value="pine">Pine</option>
+            <option value="maple">Maple</option>
+        </select>
+        <button id="nextStep">Next Step</button>
+    </div>
+    
+    <div id="tree">
+        <h2>Your Tree Rendering:</h2>
+        <!-- 3D rendering placeholder -->
+        <canvas id="treeCanvas" width="600" height="400"></canvas>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        document.getElementById('createTreeButton').onclick = function() {
+            document.getElementById('wizard').style.display = 'block';
+        };
+
+        document.getElementById('nextStep').onclick = function() {
+            alert('Next stage of the tree creation wizard not yet implemented.');
+            document.getElementById('tree').style.display = 'block';
+        };
+        
+        document.getElementById('importTreeButton').onclick = function() {
+            alert('Tree import functionality not yet implemented.');
+        };
+    </script>
+</body>
+</html>
