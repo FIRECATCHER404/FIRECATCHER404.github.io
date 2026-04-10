@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>gameCR</title>
+    <link rel="stylesheet" href="src/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="workspace">
+        <nav class="menu-launcher" aria-label="Editor menus">
+          <button class="menu-square" type="button" data-menu-open="build" title="Build tools" aria-label="Build tools">
+            <img class="menu-icon" src="assets/menu-icons/build.png" alt="" aria-hidden="true">
+            <span class="menu-square-label">Build</span>
+          </button>
+          <button class="menu-square" type="button" data-menu-open="actions" title="Quick actions" aria-label="Quick actions">
+            <img class="menu-icon" src="assets/menu-icons/actions.png" alt="" aria-hidden="true">
+            <span class="menu-square-label">Act</span>
+          </button>
+          <button class="menu-square" type="button" data-menu-open="project" title="Project" aria-label="Project">
+            <img class="menu-icon" src="assets/menu-icons/project.png" alt="" aria-hidden="true">
+            <span class="menu-square-label">File</span>
+          </button>
+          <button class="menu-square" type="button" data-menu-open="inspect" title="Selected thing" aria-label="Selected thing">
+            <img class="menu-icon" src="assets/menu-icons/inspect.png" alt="" aria-hidden="true">
+            <span class="menu-square-label">Info</span>
+          </button>
+          <button class="menu-square" type="button" data-menu-open="logic" title="Logic" aria-label="Logic">
+            <img class="menu-icon" src="assets/menu-icons/logic.png" alt="" aria-hidden="true">
+            <span class="menu-square-label">Logic</span>
+          </button>
+          <button class="menu-square" type="button" data-menu-open="world" title="World settings" aria-label="World settings">
+            <img class="menu-icon" src="assets/menu-icons/world.png" alt="" aria-hidden="true">
+            <span class="menu-square-label">World</span>
+          </button>
+          <button class="menu-square" type="button" data-menu-open="scene" title="Scene list" aria-label="Scene list">
+            <img class="menu-icon" src="assets/menu-icons/scene.png" alt="" aria-hidden="true">
+            <span class="menu-square-label">Scene</span>
+          </button>
+          <button class="menu-square" type="button" data-menu-open="sprites" title="Sprites and animations" aria-label="Sprites and animations">
+            <img class="menu-icon" src="assets/menu-icons/sprites.png" alt="" aria-hidden="true">
+            <span class="menu-square-label">Art</span>
+          </button>
+          <button class="menu-square" type="button" data-menu-open="sounds" title="Sounds" aria-label="Sounds">
+            <img class="menu-icon" src="assets/menu-icons/sounds.png" alt="" aria-hidden="true">
+            <span class="menu-square-label">SFX</span>
+          </button>
+        </nav>
+
+        <section class="stage-wrap">
+          <div class="mode-switch floating-mode-switch">
+            <button id="editModeBtn" class="primary">Edit</button>
+            <button id="playModeBtn">Play</button>
+            <button id="stopModeBtn">Stop</button>
+          </div>
+
+          <canvas id="stage" width="1280" height="720" tabindex="0" aria-label="gameCR stage"></canvas>
+          <div id="statusLine" class="status-line">Edit mode. Select a tool and click the world.</div>
+          <div id="mobilePlayControls" class="mobile-play-controls" aria-label="Mobile play controls">
+            <div id="mobileMoveWheel" class="mobile-move-wheel" role="application" aria-label="Movement wheel">
+              <span class="mobile-wheel-cross" aria-hidden="true"></span>
+              <span id="mobileMoveKnob" class="mobile-move-knob" aria-hidden="true"></span>
+            </div>
+            <button id="mobileAttackBtn" class="mobile-attack-button" type="button" aria-label="Attack">ATK</button>
+          </div>
+        </section>
+
+        <section id="menuOverlay" class="menu-overlay" aria-labelledby="menuTitle" aria-modal="true" role="dialog" hidden>
+          <div class="menu-backdrop" aria-hidden="true"></div>
+          <section class="menu-window">
+            <header class="menu-window-header">
+              <div>
+                <p class="eyebrow">gameCR</p>
+                <h1 id="menuTitle">Build</h1>
+              </div>
+              <button id="menuCloseBtn" class="menu-close" type="button" aria-label="Close menu">X</button>
+            </header>
+
+            <div class="menu-panel-stack">
+              <section class="menu-panel" data-menu-panel="build">
+                <section class="panel-section ribbon-section menu-section" data-section="place">
+                  <header class="panel-static-header">
+                    <span>Place</span>
+                    <span class="panel-toggle-meta">tools and editing</span>
+                  </header>
+                  <div class="panel-body">
+                    <div id="toolGrid" class="tool-grid"></div>
+                    <p class="hint">Click to place. Select to drag. Drag a blank part of the stage to pan. Arrow keys also pan the scene. Right-drag to marquee-select multiple things. Drag a selected edge or corner handle to reshape. Delete removes the current selection.</p>
+                  </div>
+                </section>
+              </section>
+
+              <section class="menu-panel" data-menu-panel="actions">
+                <section class="panel-section menu-section" data-section="actions">
+                  <header class="panel-static-header">
+                    <span>Quick Actions</span>
+                    <span class="panel-toggle-meta">selection helpers</span>
+                  </header>
+                  <div class="panel-body">
+                    <div id="stageToolbar" class="stage-toolbar"></div>
+                  </div>
+                </section>
+              </section>
+
+              <section class="menu-panel" data-menu-panel="project">
+                <section class="panel-section menu-section" data-section="project">
+                  <header class="panel-static-header">
+                    <span>Project</span>
+                    <span class="panel-toggle-meta">save, load, and export</span>
+                  </header>
+                  <div class="panel-body project-menu-grid">
+                    <label class="field-label">
+                      Project name
+                      <input id="projectName" class="text-input project-name-input" type="text" autocomplete="off" aria-label="Project name">
+                    </label>
+                    <div class="project-strip">
+                      <button id="saveLocalBtn">Save</button>
+                      <button id="loadLocalBtn">Load</button>
+                      <button id="undoBtn">Undo</button>
+                      <button id="redoBtn">Redo</button>
+                      <button id="exportBtn">Export</button>
+                      <button id="exportPlayableBtn">Playable</button>
+                      <label class="file-button compact-file-button">
+                        Import
+                        <input id="projectImport" type="file" accept="application/json,.json">
+                      </label>
+                    </div>
+                  </div>
+                </section>
+              </section>
+
+              <section class="menu-panel" data-menu-panel="inspect">
+                <section id="selectionSection" class="panel-section menu-section" data-section="selection">
+                  <header class="panel-static-header">
+                    <span>Selected Thing</span>
+                    <span class="panel-toggle-meta">properties and textures</span>
+                  </header>
+                  <div class="panel-body">
+                    <div id="selectionPanel" class="selection-panel"></div>
+                  </div>
+                </section>
+              </section>
+
+              <section class="menu-panel" data-menu-panel="logic">
+                <section class="panel-section menu-section" data-section="logic">
+                  <header class="panel-static-header">
+                    <span>Logic</span>
+                    <span class="panel-toggle-meta">keybind actions</span>
+                  </header>
+                  <div class="panel-body">
+                    <p class="hint">No code. Bind a key to one function a thing can do.</p>
+                    <div id="logicBuilder" class="logic-builder"></div>
+                    <div id="logicList" class="logic-list"></div>
+                  </div>
+                </section>
+              </section>
+
+              <section class="menu-panel" data-menu-panel="world">
+                <section class="panel-section menu-section" data-section="world">
+                  <header class="panel-static-header">
+                    <span>World</span>
+                    <span class="panel-toggle-meta">camera and project settings</span>
+                  </header>
+                  <div class="panel-body">
+                    <div id="worldPanel" class="world-panel"></div>
+                  </div>
+                </section>
+              </section>
+
+              <section class="menu-panel" data-menu-panel="scene">
+                <section class="panel-section dock-section menu-section" data-section="scene">
+                  <header class="panel-static-header">
+                    <span>Scene</span>
+                    <span class="panel-toggle-meta">outliner and quick select</span>
+                  </header>
+                  <div class="panel-body">
+                    <input id="sceneSearchInput" class="text-input" type="text" autocomplete="off" placeholder="Search things">
+                    <div id="sceneList" class="scene-list"></div>
+                  </div>
+                </section>
+              </section>
+
+              <section class="menu-panel" data-menu-panel="sprites">
+                <section class="panel-section dock-section menu-section" data-section="sprites">
+                  <header class="panel-static-header">
+                    <span>Sprites and Animations</span>
+                    <span class="panel-toggle-meta">pixel art and frame sets</span>
+                  </header>
+                  <div class="panel-body">
+                    <div class="pixel-editor">
+                      <div class="pixel-editor-toolbar">
+                        <label class="field-label">
+                          Name
+                          <input id="pixelEditorName" class="text-input" type="text" autocomplete="off" value="Pixel Animation">
+                        </label>
+                        <label class="field-label">
+                          W
+                          <input id="pixelEditorWidth" class="text-input" type="number" min="4" max="64" step="1" value="16">
+                        </label>
+                        <label class="field-label">
+                          H
+                          <input id="pixelEditorHeight" class="text-input" type="number" min="4" max="64" step="1" value="16">
+                        </label>
+                        <label class="field-label">
+                          FPS
+                          <input id="pixelEditorFps" class="text-input" type="number" min="1" max="25" step="1" value="8">
+                        </label>
+                        <label class="field-label pixel-color-field">
+                          Color
+                          <input id="pixelEditorColor" type="color" value="#31b6a4">
+                        </label>
+                      </div>
+
+                      <div class="pixel-editor-main">
+                        <canvas id="pixelEditorCanvas" class="pixel-editor-canvas" width="384" height="384" aria-label="Pixel art editor"></canvas>
+                        <div class="pixel-editor-side">
+                          <div class="button-row pixel-editor-tools">
+                            <button id="pixelEditorDrawBtn" class="primary" type="button">Draw</button>
+                            <button id="pixelEditorEraserBtn" type="button">Erase</button>
+                            <button id="pixelEditorClearFrameBtn" type="button">Clear</button>
+                          </div>
+                          <div class="button-row pixel-editor-tools">
+                            <button id="pixelEditorPrevFrameBtn" type="button">Prev</button>
+                            <button id="pixelEditorNextFrameBtn" type="button">Next</button>
+                            <button id="pixelEditorAddFrameBtn" type="button">Add Page</button>
+                          </div>
+                          <div class="button-row pixel-editor-tools">
+                            <button id="pixelEditorDuplicateFrameBtn" type="button">Duplicate</button>
+                            <button id="pixelEditorDeleteFrameBtn" class="danger" type="button">Delete</button>
+                            <button id="pixelEditorSaveAssetBtn" class="primary" type="button">Save Asset</button>
+                          </div>
+                          <div id="pixelEditorFrameList" class="pixel-frame-list"></div>
+                        </div>
+                      </div>
+                      <p class="hint">Each page becomes one animation frame. Draw or erase pixels, add pages, then save it as a sprite or animation asset.</p>
+                    </div>
+
+                    <label class="file-button wide">
+                      Import sprite or frame set
+                      <input id="assetImport" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
+                    </label>
+                    <div id="assetList" class="asset-list"></div>
+                  </div>
+                </section>
+              </section>
+
+              <section class="menu-panel" data-menu-panel="sounds">
+                <section class="panel-section dock-section menu-section" data-section="sounds">
+                  <header class="panel-static-header">
+                    <span>Sounds</span>
+                    <span class="panel-toggle-meta">audio assets</span>
+                  </header>
+                  <div class="panel-body">
+                    <label class="file-button wide">
+                      Import sound
+                      <input id="soundImport" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm" multiple>
+                    </label>
+                    <div id="soundList" class="asset-list"></div>
+                  </div>
+                </section>
+              </section>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="src/playable-export.js"></script>
+    <script src="src/app.js"></script>
+  </body>
+</html>
