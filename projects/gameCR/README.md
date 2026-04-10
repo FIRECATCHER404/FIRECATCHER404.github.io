@@ -24,7 +24,7 @@ Open `index.html` in a browser. There is no install step.
 - A canvas-first editor layout: the stage fills the screen, with compact square menu launchers across the top.
 - The top menu logos are editable PNG files in `assets/menu-icons/`.
 - Opening any editor menu blurs and locks the canvas until you close the menu with `X` or `Esc`, but the top menu buttons stay clickable so you can switch menus immediately.
-- Built-in guided tutorial that you can open from the Project menu.
+- Built-in guided tutorial that you can open from the Info menu.
 - Mobile play controls: a touch movement wheel and an attack button appear only on touch/mobile screens in play mode.
 - A scene outliner with search, quick select, hide/show, and lock/unlock controls.
 - A stage toolbar with focus, fit-world, copy, paste, duplicate, visibility, lock, and draw-order actions.
@@ -61,7 +61,7 @@ In edit mode:
 - Drag one of the selected things to move the whole selected group together.
 - Use the `Scene` menu to search things, select them from a list, focus the camera on them, or hide/lock them.
 - Project name, save/load, undo/redo, export, playable export, and import live in the `Project` menu.
-- `Project -> Tutorial` reopens the walkthrough if you want a refresher.
+- `Info -> Tutorial` reopens the walkthrough if you want a refresher.
 - Use the `Actions` menu for `Copy`, `Paste`, `Duplicate`, `Send Back`, `Bring Front`, `Hide`, `Lock`, `Focus`, and `Fit World`.
 - Hold the arrow keys in edit mode to pan the scene in that direction.
 - Press `Delete` to remove the current selection.
