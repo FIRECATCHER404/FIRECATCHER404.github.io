@@ -1169,6 +1169,23 @@ summary:focus-visible {
   color: var(--muted);
 }
 
+.tutorial-section-title {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tutorial-examples {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(68, 218, 197, 0.12);
+  border-radius: 6px;
+  background: rgba(10, 19, 24, 0.72);
+}
+
 .tutorial-copy li + li {
   margin-top: 6px;
 }

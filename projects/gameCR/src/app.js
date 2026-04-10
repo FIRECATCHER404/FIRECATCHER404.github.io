@@ -14,72 +14,160 @@ const TUTORIAL_STEPS = [
     title: "Welcome to gameCR",
     menu: "project",
     body: [
-      "gameCR lets you build a 2D platform game, test it immediately, and export a playable HTML file."
+      "gameCR is a canvas-first 2D game maker. You place objects in the world, assign art and animation, wire actions with keybind logic, test it instantly, and export a playable HTML file."
     ],
     bullets: [
-      "Use the square buttons across the top to switch between the main editor sections.",
-      "Everything important lives in those menus, so the canvas stays visible.",
-      "You can reopen this tutorial any time from the Project menu."
+      "Use the square buttons across the top to switch between Build, Actions, Project, Info, Logic, World, Scene, Art, and SFX.",
+      "Everything important lives in those menus so the game canvas stays visible while you work.",
+      "The Tutorial button in Project reopens this guide whenever you want a refresher."
+    ],
+    examples: [
+      "Typical loop: open Build, place platforms and a player, open Info to tweak them, open Logic to bind controls, then press Play.",
+      "If you forget where something lives, use the menu shown on each step with the Open Menu button."
     ]
   },
   {
-    title: "Build and Place",
+    title: "Build the Level",
     menu: "build",
     body: [
-      "Start in Build. Pick a tool, then close the menu and click the world to place it."
+      "Open Build to choose what you want to place in the level. After you click a tool, close the menu and click the world to drop that thing onto the map."
     ],
     bullets: [
-      "Use Player, Platform, Mob, Trap, Lava, Door, Portal, Trigger, Checkpoint, and Goal to shape the level.",
-      "After placing something, it switches back to Select so you can move on quickly.",
-      "Drag empty space to pan the scene."
+      "The main pieces are Player, Platform, Sprite, Mob, Trap, Lava, Door, Portal, Trigger, Checkpoint, Goal, and Erase.",
+      "After placing something, the editor switches back to Select so you can move, resize, or place the next object without getting stuck in place mode.",
+      "Drag empty space to pan the scene. On desktop, arrow keys also pan while editing."
+    ],
+    examples: [
+      "Basic platformer start: place one Player, a wide Platform as the ground, a Goal near the end, and a few higher Platforms to jump across.",
+      "Hazard setup: place Lava under gaps and a Mob on a platform so the player has to jump or fight."
     ]
   },
   {
-    title: "Select and Edit",
+    title: "Select, Move, and Resize",
     menu: "inspect",
     body: [
-      "Select a thing in the world, then open Info to change its size, textures, animations, and behavior."
+      "Select a thing in the canvas to edit it. Info is where you change size, textures, platform maps, animations, behavior, and most per-object settings."
     ],
     bullets: [
-      "Platforms can be reshaped by dragging their edges and corners.",
-      "Action animations let you assign separate idle, walk, jump, land, hurt, and attack visuals.",
-      "Global textures in World act as defaults when an object does not have its own art."
+      "Drag a selected thing to move it. Drag the edge or corner handles on a platform to reshape it directly instead of stacking tiles side-by-side.",
+      "Right-drag selects multiple objects so you can move or delete a group together.",
+      "If you prefer list-based selection, the Scene menu lets you find, focus, hide, and lock objects."
+    ],
+    examples: [
+      "To make a floating ledge, place one Platform, select it, then drag its right edge until it is the width you want.",
+      "To move an enemy section together, right-drag across a mob, trap, and checkpoint, then drag any selected object to move the whole set."
     ]
   },
   {
-    title: "Logic and Reactions",
-    menu: "logic",
+    title: "Textures and Visual Setup",
+    menu: "inspect",
     body: [
-      "Logic is keybind-driven. You do not write code. You bind a key to a function a selected thing can do."
+      "Each object can use built-in visuals, a local texture, or a project-wide default texture. Platforms are special because they support a full 9-slice tile map."
     ],
     bullets: [
-      "Use movement, jump, dash, shoot, door, portal, spawn, hide/show, and sound actions.",
-      "Triggers can fire actions when the player touches them.",
-      "Portals can be always active or activated by logic and triggers."
+      "A normal object like Player, Mob, Door, or Portal can use a sprite or animation asset directly.",
+      "Platforms can use a middle texture plus top, bottom, left, right, and corner pieces so they stretch cleanly.",
+      "World -> Global textures lets you assign defaults so every platform or portal does not need to be textured by hand."
+    ],
+    examples: [
+      "If every platform in your game should use the same grass tiles, set that in World -> Global textures once instead of editing every platform.",
+      "If one special platform should look different, select only that platform in Info and assign a local texture override."
     ]
   },
   {
-    title: "Art and Animation",
+    title: "Art, Frames, and Animation",
     menu: "sprites",
     body: [
-      "The Art menu now includes a built-in pixel editor and the normal asset importer."
+      "The Art menu includes both importing and a built-in pixel editor. The pixel editor is for drawing sprites inside the site, and each page becomes one frame of an animation."
     ],
     bullets: [
-      "Each page in the pixel editor becomes one frame of an animation.",
-      "Set the FPS, save the asset, then assign it anywhere you would use an imported sprite.",
-      "You can still import external PNG, GIF, WEBP, and JPG files if you prefer."
+      "Use Draw and Erase to edit pixels. Change W and H to choose the sprite resolution, and FPS to control how fast the saved animation plays.",
+      "Add Page creates a new frame. Duplicate copies the current frame so you can make small motion changes between frames.",
+      "Save Asset turns the pages into a normal sprite or animation that can be assigned anywhere in the game."
+    ],
+    examples: [
+      "Idle animation example: make three pages where the player blinks or bobs slightly, then save at 6 to 8 FPS.",
+      "Walk animation example: duplicate a standing frame several times and move the feet and arms a little on each page."
     ]
   },
   {
-    title: "Test and Export",
-    menu: "project",
+    title: "Assign Action Animations",
+    menu: "inspect",
     body: [
-      "Switch to Play at the top right to test the current game instantly."
+      "Objects can use one texture for everything, or separate animations for specific states. This is especially useful for the player, mobs, doors, and other active objects."
     ],
     bullets: [
-      "Save keeps a browser copy, Export saves JSON, and Playable exports a standalone HTML game.",
-      "On mobile, play mode shows a movement wheel and attack button automatically.",
-      "If you want to publish it, the whole folder can be hosted as a static site."
+      "Action slots include idle, walking, start jumping, currently jumping, land, falling, attacking, hurt, active, inactive, open, and closed.",
+      "Jumping is split into start jumping, currently jumping, and land so the player can lift off cleanly before the in-air loop starts.",
+      "Animation speed lives on the asset itself, so one saved animation can be reused in multiple places."
+    ],
+    examples: [
+      "Player example: assign one asset to Idle, another to Walking, another to Start jumping, another to Currently jumping, and another to Land.",
+      "Door example: assign a closed animation to Closed and a different one to Open so the door visibly changes state."
+    ]
+  },
+  {
+    title: "Logic and Keybinds",
+    menu: "logic",
+    body: [
+      "Logic is event-driven and key-based. You do not write code. Instead, you choose a key, choose when it should trigger, and choose an action for the selected object."
+    ],
+    bullets: [
+      "Events include key down, key press, and key up, so you can choose whether an action repeats or only fires once.",
+      "Actions include move, jump, dash, shoot, activate, spawn, resize, hide, show, open door, close door, activate portal, and more.",
+      "The selected object is usually the target of the logic entry, so select the right thing before you add a keybind."
+    ],
+    examples: [
+      "Default player controls: ArrowLeft or A -> Move left, ArrowRight or D -> Move right, Space -> Jump, F -> Shoot.",
+      "Trap toggle example: bind a switch object to Toggle active so a key can turn a hazard on and off."
+    ]
+  },
+  {
+    title: "Triggers, Portals, Doors, and Power-Ups",
+    menu: "logic",
+    body: [
+      "Interactive levels come from combining object types. A trigger can activate another thing, a portal can teleport the player, a door can block routes, and power-ups can change the player temporarily."
+    ],
+    bullets: [
+      "Place two portals and they auto-link when the second one is placed if the first is still waiting for a pair.",
+      "Portals can be always active or activatable, so a trigger or keybind can turn them on later.",
+      "Power-ups support built-in effects like speed, shield, low gravity, heal, and double jump, plus custom function hooks."
+    ],
+    examples: [
+      "Puzzle example: a trigger near the start activates a portal near the end, opening a secret shortcut only after the player reaches the switch.",
+      "Progression example: a door blocks the exit until the player touches a checkpoint trigger or collects a power-up."
+    ]
+  },
+  {
+    title: "World Settings and Project Defaults",
+    menu: "world",
+    body: [
+      "World controls the overall project instead of a single object. This is where you set the camera bounds, gravity, grid behavior, import pixel limit, messages, and default textures."
+    ],
+    bullets: [
+      "Game flow settings let you customize intro text, HUD labels, win title, lose title, respawn behavior, and other runtime messages.",
+      "Global textures let you assign one default look to each object type.",
+      "Imported sprite pixel limit controls how aggressively imported art is reduced to the 8-bit look."
+    ],
+    examples: [
+      "If your game is supposed to feel floaty, lower gravity in World instead of editing every jump-related object.",
+      "If you want a stronger retro look, lower the imported sprite pixel limit so outside art becomes chunkier."
+    ]
+  },
+  {
+    title: "Playtest, Mobile, and Export",
+    menu: "project",
+    body: [
+      "Use Play at the top right to test the game immediately without leaving the editor. When you are happy with it, save the project and export a standalone build."
+    ],
+    bullets: [
+      "Save stores the project in the current browser. Export saves JSON. Playable exports a single HTML file with no editor UI.",
+      "On touch devices, play mode automatically shows a movement wheel and attack button.",
+      "The exported HTML uses the same assets, logic, and mobile controls as the editor preview."
+    ],
+    examples: [
+      "Quick test loop: move a platform, press Play, try the jump, go back to Edit, then tweak the platform again.",
+      "Sharing example: export a playable HTML file and upload it to a static host or GitHub Pages so other people can play it without seeing the editor."
     ]
   }
 ];
@@ -1022,11 +1110,18 @@ function syncTutorialOverlay() {
     return;
   }
   const step = TUTORIAL_STEPS[tutorialState.step];
+  const examples = Array.isArray(step.examples) ? step.examples : [];
   els.tutorialTitle.textContent = step.title;
   els.tutorialStepLabel.textContent = `Step ${tutorialState.step + 1} of ${TUTORIAL_STEPS.length}`;
   els.tutorialBody.innerHTML = `
     ${step.body.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("")}
     <ul>${step.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    ${examples.length > 0 ? `
+      <div class="tutorial-examples">
+        <p class="tutorial-section-title">Examples</p>
+        <ul>${examples.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </div>
+    ` : ""}
   `;
   els.tutorialPrevBtn.disabled = tutorialState.step <= 0;
   els.tutorialNextBtn.textContent = tutorialState.step >= TUTORIAL_STEPS.length - 1 ? "Finish" : "Next";
