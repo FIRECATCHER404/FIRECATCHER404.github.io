@@ -1177,6 +1177,7 @@ summary:focus-visible {
   letter-spacing: 0.08em;
 }
 
+.tutorial-detail-section,
 .tutorial-examples {
   display: grid;
   gap: 8px;

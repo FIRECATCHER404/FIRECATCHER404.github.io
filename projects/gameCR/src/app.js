@@ -72,6 +72,35 @@ const TUTORIAL_STEPS = [
     examples: [
       "If every platform in your game should use the same grass tiles, set that in World -> Global textures once instead of editing every platform.",
       "If one special platform should look different, select only that platform in Info and assign a local texture override."
+    ],
+    sections: [
+      {
+        title: "How to texture a normal object",
+        items: [
+          "Open Art and either import an image or draw one in the built-in pixel editor, then save it as an asset.",
+          "Select the object you want to change, such as a player, mob, portal, door, trap, or decorative sprite.",
+          "Open Info and choose the asset in the object's sprite or animation field.",
+          "If you want the object to ignore project-wide defaults, keep its local texture set directly on that object."
+        ]
+      },
+      {
+        title: "How to texture a platform",
+        items: [
+          "Select a platform and open Info.",
+          "Use the platform texture map controls to assign the middle, top, bottom, left, right, and corner pieces.",
+          "If you imported a tile sheet, choose the sheet, set its columns and rows, click the tile slot you want to change, then click a cell in the atlas preview.",
+          "Stretch the platform after that. The assigned parts repeat or cap the edges so it still looks correct when resized."
+        ]
+      },
+      {
+        title: "How project-wide textures work",
+        items: [
+          "Open World and find Global textures.",
+          "Pick an object type such as platform, portal, trap, or player.",
+          "Assign the default texture or platform atlas there.",
+          "Any object of that type that does not have its own local override will use the global texture automatically."
+        ]
+      }
     ]
   },
   {
@@ -88,6 +117,35 @@ const TUTORIAL_STEPS = [
     examples: [
       "Idle animation example: make three pages where the player blinks or bobs slightly, then save at 6 to 8 FPS.",
       "Walk animation example: duplicate a standing frame several times and move the feet and arms a little on each page."
+    ],
+    sections: [
+      {
+        title: "How to draw art inside gameCR",
+        items: [
+          "Open Art.",
+          "Enter the asset name, width, height, and FPS at the top of the pixel editor.",
+          "Pick a color, use Draw to place pixels, and use Erase to remove them.",
+          "Click Save Asset when the current frame set is ready."
+        ]
+      },
+      {
+        title: "How to make an animation",
+        items: [
+          "Use Add Page to create a new frame.",
+          "Use Duplicate when the next frame should only change a little from the current one.",
+          "Repeat for as many frames as you need, then set the FPS to control playback speed.",
+          "When you save, all pages are stored as one animation asset."
+        ]
+      },
+      {
+        title: "How to import outside art",
+        items: [
+          "Use Import sprite or frame set in the same Art menu.",
+          "Select one file for a single-frame sprite or several files for a multi-frame animation.",
+          "Imported art is pixel-limited and color-quantized automatically so it matches the retro look.",
+          "After import, the new asset appears in the asset list and can be used immediately."
+        ]
+      }
     ]
   },
   {
@@ -104,6 +162,26 @@ const TUTORIAL_STEPS = [
     examples: [
       "Player example: assign one asset to Idle, another to Walking, another to Start jumping, another to Currently jumping, and another to Land.",
       "Door example: assign a closed animation to Closed and a different one to Open so the door visibly changes state."
+    ],
+    sections: [
+      {
+        title: "How to assign state-based animations",
+        items: [
+          "Select the object in the canvas.",
+          "Open Info and find the Action animations area.",
+          "Pick a saved asset for each slot you want to override.",
+          "Leave a slot empty if you want the object to fall back to its default texture."
+        ]
+      },
+      {
+        title: "Player-specific jump flow",
+        items: [
+          "If Start jumping is assigned, that animation plays before lift-off.",
+          "After that finishes, the Currently jumping animation takes over while the player is in the air.",
+          "When the player lands, the Land animation plays.",
+          "This gives the jump more weight than a single in-air frame."
+        ]
+      }
     ]
   },
   {
@@ -120,6 +198,25 @@ const TUTORIAL_STEPS = [
     examples: [
       "Default player controls: ArrowLeft or A -> Move left, ArrowRight or D -> Move right, Space -> Jump, F -> Shoot.",
       "Trap toggle example: bind a switch object to Toggle active so a key can turn a hazard on and off."
+    ],
+    sections: [
+      {
+        title: "How to add a keybind",
+        items: [
+          "Select the object that should react to the key.",
+          "Open Logic.",
+          "Choose the key, choose whether it should trigger on down, press, or up, then choose the action.",
+          "Add the entry and test it in Play mode."
+        ]
+      },
+      {
+        title: "When to use down, press, and up",
+        items: [
+          "Use down for repeated movement while the key is held.",
+          "Use press for one-time actions like jump, dash, or shoot.",
+          "Use up when something should happen when the player releases the key."
+        ]
+      }
     ]
   },
   {
@@ -152,6 +249,35 @@ const TUTORIAL_STEPS = [
     examples: [
       "If your game is supposed to feel floaty, lower gravity in World instead of editing every jump-related object.",
       "If you want a stronger retro look, lower the imported sprite pixel limit so outside art becomes chunkier."
+    ],
+    sections: [
+      {
+        title: "How to change world settings",
+        items: [
+          "Open World.",
+          "Change gravity, world size, grid, snapping, and import pixel limit there.",
+          "These settings affect the whole project, not just the selected object.",
+          "If something feels globally off, such as jumps being too heavy or imported art being too sharp, World is the first place to check."
+        ]
+      },
+      {
+        title: "How to change game flow text",
+        items: [
+          "Stay in World and look for the game flow or runtime text settings.",
+          "Edit intro messages, HUD labels, win text, lose text, and checkpoint or respawn messages.",
+          "Those strings are what the player sees during play mode and in the exported build.",
+          "You can use this to turn the same level into a different experience without changing the map itself."
+        ]
+      },
+      {
+        title: "How to use global defaults",
+        items: [
+          "Global textures are also in World.",
+          "Assign a default texture for each type so new objects already match the style of the game.",
+          "Local overrides still win, so one special object can still look different.",
+          "This is the fastest way to keep a large project visually consistent."
+        ]
+      }
     ]
   },
   {
@@ -168,6 +294,26 @@ const TUTORIAL_STEPS = [
     examples: [
       "Quick test loop: move a platform, press Play, try the jump, go back to Edit, then tweak the platform again.",
       "Sharing example: export a playable HTML file and upload it to a static host or GitHub Pages so other people can play it without seeing the editor."
+    ],
+    sections: [
+      {
+        title: "How to test quickly",
+        items: [
+          "Leave the level exactly where it is in Edit mode.",
+          "Press Play in the top-right controls.",
+          "Try the current controls, hazards, doors, portals, and messages.",
+          "Press Edit again, make the adjustment, and test once more."
+        ]
+      },
+      {
+        title: "How export works",
+        items: [
+          "Save keeps a copy in the browser you are using right now.",
+          "Export writes the full project as JSON so you can back it up or import it later.",
+          "Playable generates a single HTML file that contains the game and no editor UI.",
+          "That playable file can be uploaded to a static host or shared directly."
+        ]
+      }
     ]
   }
 ];
@@ -1111,11 +1257,18 @@ function syncTutorialOverlay() {
   }
   const step = TUTORIAL_STEPS[tutorialState.step];
   const examples = Array.isArray(step.examples) ? step.examples : [];
+  const sections = Array.isArray(step.sections) ? step.sections : [];
   els.tutorialTitle.textContent = step.title;
   els.tutorialStepLabel.textContent = `Step ${tutorialState.step + 1} of ${TUTORIAL_STEPS.length}`;
   els.tutorialBody.innerHTML = `
     ${step.body.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("")}
     <ul>${step.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    ${sections.map((section) => `
+      <div class="tutorial-detail-section">
+        <p class="tutorial-section-title">${escapeHtml(section.title)}</p>
+        <ul>${section.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </div>
+    `).join("")}
     ${examples.length > 0 ? `
       <div class="tutorial-examples">
         <p class="tutorial-section-title">Examples</p>
