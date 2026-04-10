@@ -9,8 +9,6 @@ const RESIZE_HANDLE_SIZE = 10;
 const EDIT_PAN_SPEED = 960;
 const PAN_DRAG_THRESHOLD = 6;
 const PANEL_STATE_KEY = "gameCR-panel-state-v1";
-const TUTORIAL_SEEN_KEY = "gameCR-tutorial-seen-v1";
-
 const TUTORIAL_STEPS = [
   {
     title: "Welcome to gameCR",
@@ -689,8 +687,8 @@ function init() {
   });
   els.menuCloseBtn.addEventListener("click", closeMenu);
   els.menuBackdrop.addEventListener("click", closeMenu);
-  els.tutorialCloseBtn.addEventListener("click", () => closeTutorial(true));
-  els.tutorialBackdrop.addEventListener("click", () => closeTutorial(true));
+  els.tutorialCloseBtn.addEventListener("click", closeTutorial);
+  els.tutorialBackdrop.addEventListener("click", closeTutorial);
   els.tutorialPrevBtn.addEventListener("click", tutorialPrev);
   els.tutorialNextBtn.addEventListener("click", tutorialNext);
   els.tutorialOpenMenuBtn.addEventListener("click", tutorialOpenMenu);
@@ -710,9 +708,6 @@ function init() {
 
   renderAllPanels();
   resizeCanvas();
-  if (!hasSeenTutorial()) {
-    openTutorial(0);
-  }
   requestAnimationFrame(loop);
 }
 
@@ -999,22 +994,6 @@ function syncMenuOverlay() {
   }
 }
 
-function hasSeenTutorial() {
-  try {
-    return localStorage.getItem(TUTORIAL_SEEN_KEY) === "1";
-  } catch (error) {
-    return false;
-  }
-}
-
-function markTutorialSeen() {
-  try {
-    localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
-  } catch (error) {
-    void error;
-  }
-}
-
 function openTutorial(step = 0) {
   tutorialState.open = true;
   tutorialState.step = clamp(step, 0, TUTORIAL_STEPS.length - 1);
@@ -1023,17 +1002,11 @@ function openTutorial(step = 0) {
   syncTutorialOverlay();
 }
 
-function closeTutorial(markSeen = false) {
+function closeTutorial() {
   if (!tutorialState.open) {
-    if (markSeen) {
-      markTutorialSeen();
-    }
     return;
   }
   tutorialState.open = false;
-  if (markSeen) {
-    markTutorialSeen();
-  }
   syncTutorialOverlay();
   els.canvas.focus();
 }
@@ -1085,7 +1058,7 @@ function tutorialPrev() {
 
 function tutorialNext() {
   if (tutorialState.step >= TUTORIAL_STEPS.length - 1) {
-    closeTutorial(true);
+    closeTutorial();
     setStatus("Tutorial finished. Reopen it any time from Project.");
     return;
   }
@@ -1098,7 +1071,7 @@ function tutorialOpenMenu() {
   if (!step.menu) {
     return;
   }
-  closeTutorial(true);
+  closeTutorial();
   openMenu(step.menu);
 }
 
@@ -3330,7 +3303,7 @@ function onWheel(event) {
 
 function onKeyDown(event) {
   if (event.key === "Escape" && tutorialState.open) {
-    closeTutorial(true);
+    closeTutorial();
     event.preventDefault();
     return;
   }
