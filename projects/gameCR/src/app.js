@@ -9,6 +9,82 @@ const RESIZE_HANDLE_SIZE = 10;
 const EDIT_PAN_SPEED = 960;
 const PAN_DRAG_THRESHOLD = 6;
 const PANEL_STATE_KEY = "gameCR-panel-state-v1";
+const TUTORIAL_SEEN_KEY = "gameCR-tutorial-seen-v1";
+
+const TUTORIAL_STEPS = [
+  {
+    title: "Welcome to gameCR",
+    menu: "project",
+    body: [
+      "gameCR lets you build a 2D platform game, test it immediately, and export a playable HTML file."
+    ],
+    bullets: [
+      "Use the square buttons across the top to switch between the main editor sections.",
+      "Everything important lives in those menus, so the canvas stays visible.",
+      "You can reopen this tutorial any time from the Project menu."
+    ]
+  },
+  {
+    title: "Build and Place",
+    menu: "build",
+    body: [
+      "Start in Build. Pick a tool, then close the menu and click the world to place it."
+    ],
+    bullets: [
+      "Use Player, Platform, Mob, Trap, Lava, Door, Portal, Trigger, Checkpoint, and Goal to shape the level.",
+      "After placing something, it switches back to Select so you can move on quickly.",
+      "Drag empty space to pan the scene."
+    ]
+  },
+  {
+    title: "Select and Edit",
+    menu: "inspect",
+    body: [
+      "Select a thing in the world, then open Info to change its size, textures, animations, and behavior."
+    ],
+    bullets: [
+      "Platforms can be reshaped by dragging their edges and corners.",
+      "Action animations let you assign separate idle, walk, jump, land, hurt, and attack visuals.",
+      "Global textures in World act as defaults when an object does not have its own art."
+    ]
+  },
+  {
+    title: "Logic and Reactions",
+    menu: "logic",
+    body: [
+      "Logic is keybind-driven. You do not write code. You bind a key to a function a selected thing can do."
+    ],
+    bullets: [
+      "Use movement, jump, dash, shoot, door, portal, spawn, hide/show, and sound actions.",
+      "Triggers can fire actions when the player touches them.",
+      "Portals can be always active or activated by logic and triggers."
+    ]
+  },
+  {
+    title: "Art and Animation",
+    menu: "sprites",
+    body: [
+      "The Art menu now includes a built-in pixel editor and the normal asset importer."
+    ],
+    bullets: [
+      "Each page in the pixel editor becomes one frame of an animation.",
+      "Set the FPS, save the asset, then assign it anywhere you would use an imported sprite.",
+      "You can still import external PNG, GIF, WEBP, and JPG files if you prefer."
+    ]
+  },
+  {
+    title: "Test and Export",
+    menu: "project",
+    body: [
+      "Switch to Play at the top right to test the current game instantly."
+    ],
+    bullets: [
+      "Save keeps a browser copy, Export saves JSON, and Playable exports a standalone HTML game.",
+      "On mobile, play mode shows a movement wheel and attack button automatically.",
+      "If you want to publish it, the whole folder can be hosted as a static site."
+    ]
+  }
+];
 
 const TOOLS = [
   ["select", "Select"],
@@ -185,6 +261,10 @@ const pixelEditor = {
   tool: "draw",
   pointerId: null,
   drawing: false
+};
+const tutorialState = {
+  open: false,
+  step: 0
 };
 
 function uid(prefix) {
@@ -534,6 +614,15 @@ function init() {
   els.menuCloseBtn = document.getElementById("menuCloseBtn");
   els.menuButtons = Array.from(document.querySelectorAll("[data-menu-open]"));
   els.menuPanels = Array.from(document.querySelectorAll("[data-menu-panel]"));
+  els.tutorialOverlay = document.getElementById("tutorialOverlay");
+  els.tutorialBackdrop = document.querySelector(".tutorial-backdrop");
+  els.tutorialTitle = document.getElementById("tutorialTitle");
+  els.tutorialStepLabel = document.getElementById("tutorialStepLabel");
+  els.tutorialBody = document.getElementById("tutorialBody");
+  els.tutorialCloseBtn = document.getElementById("tutorialCloseBtn");
+  els.tutorialPrevBtn = document.getElementById("tutorialPrevBtn");
+  els.tutorialNextBtn = document.getElementById("tutorialNextBtn");
+  els.tutorialOpenMenuBtn = document.getElementById("tutorialOpenMenuBtn");
   els.mobilePlayControls = document.getElementById("mobilePlayControls");
   els.mobileMoveWheel = document.getElementById("mobileMoveWheel");
   els.mobileMoveKnob = document.getElementById("mobileMoveKnob");
@@ -580,6 +669,7 @@ function init() {
   document.getElementById("redoBtn").addEventListener("click", redo);
   document.getElementById("exportBtn").addEventListener("click", exportProject);
   document.getElementById("exportPlayableBtn").addEventListener("click", exportPlayableHtml);
+  document.getElementById("openTutorialBtn").addEventListener("click", () => openTutorial(0));
   document.getElementById("projectImport").addEventListener("change", importProject);
   document.getElementById("assetImport").addEventListener("change", importAssets);
   document.getElementById("soundImport").addEventListener("change", importSounds);
@@ -599,6 +689,11 @@ function init() {
   });
   els.menuCloseBtn.addEventListener("click", closeMenu);
   els.menuBackdrop.addEventListener("click", closeMenu);
+  els.tutorialCloseBtn.addEventListener("click", () => closeTutorial(true));
+  els.tutorialBackdrop.addEventListener("click", () => closeTutorial(true));
+  els.tutorialPrevBtn.addEventListener("click", tutorialPrev);
+  els.tutorialNextBtn.addEventListener("click", tutorialNext);
+  els.tutorialOpenMenuBtn.addEventListener("click", tutorialOpenMenu);
   initMobilePlayControls();
   initPixelEditor();
 
@@ -615,6 +710,9 @@ function init() {
 
   renderAllPanels();
   resizeCanvas();
+  if (!hasSeenTutorial()) {
+    openTutorial(0);
+  }
   requestAnimationFrame(loop);
 }
 
@@ -774,6 +872,7 @@ function renderAllPanels() {
   rebuildAudioCache();
   syncDockTabs();
   syncMenuOverlay();
+  syncTutorialOverlay();
   renderToolGrid();
   renderStageToolbar();
   renderSceneList();
@@ -898,6 +997,109 @@ function syncMenuOverlay() {
       panel.classList.toggle("active", panel.dataset.menuPanel === activeMenu);
     });
   }
+}
+
+function hasSeenTutorial() {
+  try {
+    return localStorage.getItem(TUTORIAL_SEEN_KEY) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
+function markTutorialSeen() {
+  try {
+    localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
+  } catch (error) {
+    void error;
+  }
+}
+
+function openTutorial(step = 0) {
+  tutorialState.open = true;
+  tutorialState.step = clamp(step, 0, TUTORIAL_STEPS.length - 1);
+  closeMenu();
+  clearTransientInputs();
+  syncTutorialOverlay();
+}
+
+function closeTutorial(markSeen = false) {
+  if (!tutorialState.open) {
+    if (markSeen) {
+      markTutorialSeen();
+    }
+    return;
+  }
+  tutorialState.open = false;
+  if (markSeen) {
+    markTutorialSeen();
+  }
+  syncTutorialOverlay();
+  els.canvas.focus();
+}
+
+function syncTutorialOverlay() {
+  if (els.appShell) {
+    els.appShell.classList.toggle("tutorial-open", tutorialState.open);
+  }
+  if (els.tutorialOverlay) {
+    els.tutorialOverlay.hidden = !tutorialState.open;
+  }
+  if (!tutorialState.open) {
+    return;
+  }
+  const step = TUTORIAL_STEPS[tutorialState.step];
+  els.tutorialTitle.textContent = step.title;
+  els.tutorialStepLabel.textContent = `Step ${tutorialState.step + 1} of ${TUTORIAL_STEPS.length}`;
+  els.tutorialBody.innerHTML = `
+    ${step.body.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("")}
+    <ul>${step.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+  `;
+  els.tutorialPrevBtn.disabled = tutorialState.step <= 0;
+  els.tutorialNextBtn.textContent = tutorialState.step >= TUTORIAL_STEPS.length - 1 ? "Finish" : "Next";
+  const hasMenu = Boolean(step.menu);
+  els.tutorialOpenMenuBtn.hidden = !hasMenu;
+  if (hasMenu) {
+    els.tutorialOpenMenuBtn.textContent = `Open ${menuTitleForTutorialStep(step.menu)}`;
+  }
+}
+
+function menuTitleForTutorialStep(menu) {
+  return {
+    build: "Build",
+    actions: "Actions",
+    project: "Project",
+    inspect: "Info",
+    logic: "Logic",
+    world: "World",
+    scene: "Scene",
+    sprites: "Art",
+    sounds: "SFX"
+  }[menu] || "Menu";
+}
+
+function tutorialPrev() {
+  tutorialState.step = clamp(tutorialState.step - 1, 0, TUTORIAL_STEPS.length - 1);
+  syncTutorialOverlay();
+}
+
+function tutorialNext() {
+  if (tutorialState.step >= TUTORIAL_STEPS.length - 1) {
+    closeTutorial(true);
+    setStatus("Tutorial finished. Reopen it any time from Project.");
+    return;
+  }
+  tutorialState.step += 1;
+  syncTutorialOverlay();
+}
+
+function tutorialOpenMenu() {
+  const step = TUTORIAL_STEPS[tutorialState.step];
+  if (!step.menu) {
+    return;
+  }
+  closeTutorial(true);
+  openMenu(step.menu);
 }
 
 function initMobilePlayControls() {
@@ -3127,6 +3329,21 @@ function onWheel(event) {
 }
 
 function onKeyDown(event) {
+  if (event.key === "Escape" && tutorialState.open) {
+    closeTutorial(true);
+    event.preventDefault();
+    return;
+  }
+  if (tutorialState.open) {
+    if (event.key === "ArrowRight" || event.key === "Enter") {
+      tutorialNext();
+      event.preventDefault();
+    } else if (event.key === "ArrowLeft") {
+      tutorialPrev();
+      event.preventDefault();
+    }
+    return;
+  }
   if (event.key === "Escape" && activeMenu) {
     closeMenu();
     event.preventDefault();
@@ -3187,6 +3404,9 @@ function onKeyDown(event) {
 }
 
 function onKeyUp(event) {
+  if (tutorialState.open) {
+    return;
+  }
   if (activeMenu) {
     return;
   }

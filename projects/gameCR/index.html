@@ -121,6 +121,7 @@
                       <button id="redoBtn">Redo</button>
                       <button id="exportBtn">Export</button>
                       <button id="exportPlayableBtn">Playable</button>
+                      <button id="openTutorialBtn" type="button">Tutorial</button>
                       <label class="file-button compact-file-button">
                         Import
                         <input id="projectImport" type="file" accept="application/json,.json">
@@ -261,6 +262,31 @@
                 </section>
               </section>
             </div>
+          </section>
+        </section>
+        <section id="tutorialOverlay" class="tutorial-overlay" aria-labelledby="tutorialTitle" aria-modal="true" role="dialog" hidden>
+          <div class="tutorial-backdrop" aria-hidden="true"></div>
+          <section class="tutorial-window">
+            <header class="tutorial-header">
+              <div>
+                <p class="eyebrow">gameCR Tutorial</p>
+                <h1 id="tutorialTitle">Welcome</h1>
+              </div>
+              <button id="tutorialCloseBtn" class="menu-close" type="button" aria-label="Close tutorial">X</button>
+            </header>
+
+            <div class="tutorial-body">
+              <p id="tutorialStepLabel" class="tutorial-step-label">Step 1 of 1</p>
+              <div id="tutorialBody" class="tutorial-copy"></div>
+            </div>
+
+            <footer class="tutorial-footer">
+              <button id="tutorialOpenMenuBtn" type="button">Open Menu</button>
+              <div class="tutorial-nav">
+                <button id="tutorialPrevBtn" type="button">Back</button>
+                <button id="tutorialNextBtn" class="primary" type="button">Next</button>
+              </div>
+            </footer>
           </section>
         </section>
       </main>

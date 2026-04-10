@@ -666,6 +666,15 @@ summary:focus-visible {
   user-select: none;
 }
 
+.app-shell.tutorial-open .stage-wrap,
+.app-shell.tutorial-open .menu-overlay,
+.app-shell.tutorial-open .menu-launcher,
+.app-shell.tutorial-open .floating-mode-switch {
+  filter: blur(4px) saturate(0.72);
+  pointer-events: none;
+  user-select: none;
+}
+
 .menu-launcher {
   position: absolute;
   z-index: 40;
@@ -1078,6 +1087,100 @@ summary:focus-visible {
 
 .menu-panel.active {
   display: block;
+}
+
+.tutorial-overlay {
+  position: absolute;
+  z-index: 60;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.tutorial-overlay[hidden] {
+  display: none;
+}
+
+.tutorial-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 7, 10, 0.5);
+}
+
+.tutorial-window {
+  position: relative;
+  z-index: 1;
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(82vh, 760px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(19, 29, 35, 0.97);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.5);
+}
+
+.tutorial-header,
+.tutorial-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #101a20;
+}
+
+.tutorial-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.tutorial-body {
+  overflow: auto;
+  padding: 16px 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.tutorial-step-label {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tutorial-copy {
+  display: grid;
+  gap: 12px;
+  color: var(--text);
+}
+
+.tutorial-copy p,
+.tutorial-copy ul {
+  margin: 0;
+}
+
+.tutorial-copy ul {
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.tutorial-copy li + li {
+  margin-top: 6px;
+}
+
+.tutorial-footer {
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.tutorial-nav {
+  display: flex;
+  gap: 8px;
 }
 
 .menu-panel .dock-section {
@@ -1622,6 +1725,30 @@ summary:focus-visible {
   .menu-overlay {
     padding: 122px 8px 8px;
     align-items: start;
+  }
+
+  .tutorial-overlay {
+    padding: 10px;
+    align-items: start;
+  }
+
+  .tutorial-window {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+  }
+
+  .tutorial-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tutorial-nav {
+    width: 100%;
+  }
+
+  .tutorial-nav button,
+  .tutorial-footer > button {
+    flex: 1 1 auto;
   }
 
   .menu-window {
