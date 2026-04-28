@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SelfTube</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f7f2;
+      --panel: #ffffff;
+      --panel-soft: #efeee6;
+      --text: #171714;
+      --muted: #65645f;
+      --line: #d7d4c8;
+      --accent: #116b5f;
+      --accent-strong: #0b4e45;
+      --danger: #ad3029;
+      --shadow: 0 12px 28px rgba(28, 26, 18, 0.12);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.54), rgba(255,255,255,0)),
+        radial-gradient(circle at top left, rgba(17,107,95,0.11), transparent 30rem),
+        var(--bg);
+      color: var(--text);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app-shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 24px 0 48px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 0 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border: 1px solid #151513;
+      border-radius: 8px;
+      background: #f04e37;
+      box-shadow: 4px 4px 0 #171714;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(1.5rem, 4vw, 2.35rem);
+      letter-spacing: 0;
+      line-height: 1;
+    }
+
+    .repo-pill {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      min-height: 28px;
+      padding: 4px 8px;
+      margin-top: 7px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.64);
+      color: var(--muted);
+      font-size: 0.85rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .icon-button,
+    .text-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      border: 1px solid #171714;
+      border-radius: 7px;
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      box-shadow: 2px 2px 0 #171714;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    }
+
+    .icon-button {
+      width: 40px;
+      padding: 0;
+    }
+
+    .text-button {
+      gap: 8px;
+      padding: 0 12px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .icon-button:hover,
+    .text-button:hover {
+      background: var(--panel-soft);
+      transform: translate(-1px, -1px);
+      box-shadow: 3px 3px 0 #171714;
+    }
+
+    .icon-button:active,
+    .text-button:active {
+      transform: translate(1px, 1px);
+      box-shadow: 1px 1px 0 #171714;
+    }
+
+    .icon {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+      flex: 0 0 auto;
+    }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      margin: 4px 0 22px;
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-wrap .icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 44px;
+      padding: 0 14px 0 42px;
+      border: 1px solid #171714;
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+      outline: none;
+      box-shadow: 3px 3px 0 #171714;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 3px 3px 0 var(--accent);
+    }
+
+    .status {
+      min-height: 26px;
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .video-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+      border: 1px solid #171714;
+      border-radius: 8px;
+      background: var(--panel);
+      color: inherit;
+      overflow: hidden;
+      text-decoration: none;
+      box-shadow: var(--shadow);
+      transition: transform 0.14s ease, box-shadow 0.14s ease;
+    }
+
+    .video-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 18px 34px rgba(28, 26, 18, 0.16);
+    }
+
+    .poster {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #151513;
+      overflow: hidden;
+    }
+
+    .poster video,
+    .poster img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      background: #151513;
+    }
+
+    .poster-fallback {
+      display: grid;
+      width: 100%;
+      height: 100%;
+      place-items: center;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .card-body {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 10px;
+      padding: 13px 14px 14px;
+    }
+
+    .card-title {
+      display: -webkit-box;
+      min-height: 2.7em;
+      margin: 0;
+      overflow: hidden;
+      font-size: 1.05rem;
+      line-height: 1.35;
+      letter-spacing: 0;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .card-description {
+      display: -webkit-box;
+      min-height: 2.8em;
+      margin: 0;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.4;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: auto;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 7px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-soft);
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .empty-state {
+      display: grid;
+      min-height: 280px;
+      place-items: center;
+      border: 1px dashed #8c897e;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.42);
+      color: var(--muted);
+      text-align: center;
+      padding: 24px;
+    }
+
+    .watch-view {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .player-panel {
+      min-width: 0;
+    }
+
+    .player {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      display: block;
+      border: 1px solid #171714;
+      border-radius: 8px;
+      background: #000;
+      box-shadow: var(--shadow);
+    }
+
+    .watch-details {
+      min-width: 0;
+      border: 1px solid #171714;
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .watch-details h2 {
+      margin: 0 0 10px;
+      font-size: 1.35rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .watch-details p {
+      color: var(--muted);
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-list {
+      display: grid;
+      gap: 8px;
+      margin: 16px 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .detail-list div {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 7px;
+    }
+
+    .detail-list strong {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .config-warning {
+      border: 1px solid #171714;
+      border-left: 8px solid var(--danger);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .config-warning h2 {
+      margin: 0 0 8px;
+      font-size: 1.2rem;
+    }
+
+    .config-warning code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: var(--panel-soft);
+    }
+
+    @media (max-width: 760px) {
+      .app-shell {
+        width: min(100% - 20px, 1180px);
+        padding-top: 12px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .toolbar {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .search-row {
+        grid-template-columns: 1fr;
+      }
+
+      .watch-view {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">ST</div>
+        <div>
+          <h1>SelfTube</h1>
+          <div id="repoLabel" class="repo-pill">Loading repository</div>
+        </div>
+      </div>
+      <nav class="toolbar" aria-label="Page controls">
+        <button id="backButton" class="icon-button" type="button" title="Back to videos" hidden aria-label="Back to videos">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.42-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <button id="refreshButton" class="icon-button" type="button" title="Refresh videos" aria-label="Refresh videos">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.45 5.08h-2.13A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h8V3l-3.35 3.35z"/></svg>
+        </button>
+      </nav>
+    </header>
+
+    <section id="libraryControls" class="search-row">
+      <label class="search-wrap">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.44 4.45-1.42 1.41-4.44-4.44A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/></svg>
+        <input id="searchInput" class="search-input" type="search" placeholder="Search videos" autocomplete="off">
+      </label>
+      <button id="clearSearchButton" class="text-button" type="button">Clear</button>
+    </section>
+
+    <div id="status" class="status" role="status"></div>
+    <section id="content"></section>
+  </main>
+
+  <script>
+    /*
+      Change these two values before publishing.
+      The uploader creates release tags like: selftube/v1/my-video-id/public
+      Hidden videos are unlisted only. Anyone who can read the public GitHub
+      releases or knows the direct URL can still access them.
+    */
+    const SELFTUBE_CONFIG = {
+      owner: "FIRECATCHER404",
+      repo: "videos",
+      tagPrefix: "selftube/v1/",
+      githubApiBase: "https://api.github.com"
+    };
+
+    const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv", "ogg"]);
+    const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+
+    const state = {
+      allVideos: [],
+      visibleVideos: [],
+      activeVideo: null,
+      loading: false
+    };
+
+    const elements = {
+      repoLabel: document.getElementById("repoLabel"),
+      status: document.getElementById("status"),
+      content: document.getElementById("content"),
+      searchInput: document.getElementById("searchInput"),
+      clearSearchButton: document.getElementById("clearSearchButton"),
+      refreshButton: document.getElementById("refreshButton"),
+      backButton: document.getElementById("backButton"),
+      libraryControls: document.getElementById("libraryControls")
+    };
+
+    function isConfigured() {
+      return Boolean(
+        SELFTUBE_CONFIG.owner &&
+        SELFTUBE_CONFIG.repo &&
+        !SELFTUBE_CONFIG.owner.includes("YOUR_") &&
+        !SELFTUBE_CONFIG.repo.includes("YOUR_")
+      );
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes) || bytes <= 0) return "Unknown size";
+      const units = ["B", "KB", "MB", "GB"];
+      let size = bytes;
+      let unitIndex = 0;
+      while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex += 1;
+      }
+      const digits = size >= 10 || unitIndex === 0 ? 0 : 1;
+      return `${size.toFixed(digits)} ${units[unitIndex]}`;
+    }
+
+    function formatDate(value) {
+      if (!value) return "Unknown date";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "Unknown date";
+      return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    function extensionFromName(name) {
+      const match = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
+      return match ? match[1] : "";
+    }
+
+    function parseSelfTubeTag(tagName) {
+      if (!tagName || !tagName.startsWith(SELFTUBE_CONFIG.tagPrefix)) return null;
+      const rest = tagName.slice(SELFTUBE_CONFIG.tagPrefix.length);
+      const parts = rest.split("/");
+      if (parts.length !== 2) return null;
+      const id = parts[0].trim();
+      const visibility = parts[1].trim().toLowerCase();
+      if (!id || !["public", "hidden"].includes(visibility)) return null;
+      return {
+        id,
+        hidden: visibility === "hidden"
+      };
+    }
+
+    function parseEmbeddedMetadata(body) {
+      if (!body) return {};
+      const match = body.match(/<!--\s*selftube:([\s\S]*?)\s*-->/i);
+      if (!match) return {};
+      try {
+        const parsed = JSON.parse(match[1]);
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function visibleDescription(body) {
+      return String(body || "")
+        .replace(/<!--\s*selftube:[\s\S]*?\s*-->/i, "")
+        .trim();
+    }
+
+    function pickAssets(assets) {
+      const allAssets = Array.isArray(assets) ? assets : [];
+      const videos = allAssets.filter((asset) => {
+        const ext = extensionFromName(asset.name);
+        const type = String(asset.content_type || "").toLowerCase();
+        return VIDEO_EXTENSIONS.has(ext) || type.startsWith("video/");
+      });
+      const thumbnails = allAssets.filter((asset) => IMAGE_EXTENSIONS.has(extensionFromName(asset.name)));
+      return {
+        video: videos[0] || null,
+        thumbnail: thumbnails[0] || null
+      };
+    }
+
+    function releaseToVideo(release) {
+      const tagData = parseSelfTubeTag(release.tag_name);
+      if (!tagData) return null;
+      const metadata = parseEmbeddedMetadata(release.body);
+      const assets = pickAssets(release.assets);
+      if (!assets.video) return null;
+
+      const description = metadata.description || visibleDescription(release.body);
+      const title = metadata.title || release.name || tagData.id;
+
+      return {
+        id: metadata.id || tagData.id,
+        hidden: typeof metadata.hidden === "boolean" ? metadata.hidden : tagData.hidden,
+        title,
+        description,
+        releaseUrl: release.html_url,
+        createdAt: release.published_at || release.created_at,
+        updatedAt: release.updated_at,
+        videoUrl: assets.video.browser_download_url,
+        videoName: assets.video.name,
+        videoSize: assets.video.size,
+        thumbnailUrl: assets.thumbnail ? assets.thumbnail.browser_download_url : "",
+        tagName: release.tag_name
+      };
+    }
+
+    async function githubFetch(url) {
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/vnd.github+json"
+        }
+      });
+
+      if (!response.ok) {
+        let message = `GitHub returned ${response.status}`;
+        try {
+          const data = await response.json();
+          if (data && data.message) message += `: ${data.message}`;
+        } catch {
+          message += `: ${response.statusText}`;
+        }
+        throw new Error(message);
+      }
+
+      return response.json();
+    }
+
+    async function fetchAllReleases() {
+      const releases = [];
+      for (let page = 1; page <= 20; page += 1) {
+        const url = `${SELFTUBE_CONFIG.githubApiBase}/repos/${encodeURIComponent(SELFTUBE_CONFIG.owner)}/${encodeURIComponent(SELFTUBE_CONFIG.repo)}/releases?per_page=100&page=${page}`;
+        const batch = await githubFetch(url);
+        releases.push(...batch);
+        if (batch.length < 100) break;
+      }
+      return releases;
+    }
+
+    function setStatus(message, isError = false) {
+      elements.status.textContent = message || "";
+      elements.status.classList.toggle("error", Boolean(isError));
+    }
+
+    function setLibraryMode(isLibrary) {
+      elements.libraryControls.hidden = !isLibrary;
+      elements.backButton.hidden = isLibrary;
+    }
+
+    function videoLink(id) {
+      const url = new URL(window.location.href);
+      url.search = "";
+      url.searchParams.set("video", id);
+      return url.pathname + url.search;
+    }
+
+    function renderConfiguredWarning() {
+      elements.repoLabel.textContent = "Repository not configured";
+      elements.content.innerHTML = `
+        <section class="config-warning">
+          <h2>Set your GitHub repository</h2>
+          <p>Edit <code>SELFTUBE_CONFIG</code> near the top of this file's script and set <code>owner</code> and <code>repo</code>.</p>
+          <p>This page reads public GitHub Releases tagged with <code>${escapeHtml(SELFTUBE_CONFIG.tagPrefix)}&lt;video-id&gt;/public</code> or <code>${escapeHtml(SELFTUBE_CONFIG.tagPrefix)}&lt;video-id&gt;/hidden</code>.</p>
+        </section>
+      `;
+    }
+
+    function renderLibrary() {
+      setLibraryMode(true);
+      const query = elements.searchInput.value.trim().toLowerCase();
+      state.visibleVideos = state.allVideos
+        .filter((video) => !video.hidden)
+        .filter((video) => {
+          if (!query) return true;
+          return [video.id, video.title, video.description, video.videoName]
+            .join(" ")
+            .toLowerCase()
+            .includes(query);
+        })
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      if (!state.visibleVideos.length) {
+        const message = query ? "No matching public videos." : "No public videos found.";
+        elements.content.innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
+        return;
+      }
+
+      elements.content.innerHTML = `
+        <section class="video-grid" aria-label="Videos">
+          ${state.visibleVideos.map(renderVideoCard).join("")}
+        </section>
+      `;
+    }
+
+    function renderVideoCard(video) {
+      const poster = video.thumbnailUrl
+        ? `<img src="${escapeHtml(video.thumbnailUrl)}" alt="">`
+        : `<video src="${escapeHtml(video.videoUrl)}#t=0.1" preload="metadata" muted playsinline></video>`;
+
+      return `
+        <a class="video-card" href="${escapeHtml(videoLink(video.id))}" data-video-id="${escapeHtml(video.id)}">
+          <div class="poster">
+            ${poster || `<div class="poster-fallback">Video</div>`}
+          </div>
+          <div class="card-body">
+            <h2 class="card-title">${escapeHtml(video.title)}</h2>
+            <p class="card-description">${escapeHtml(video.description || "No description.")}</p>
+            <div class="meta-row">
+              <span>${escapeHtml(formatDate(video.createdAt))}</span>
+              <span class="badge">${escapeHtml(formatBytes(video.videoSize))}</span>
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    function renderWatch(video) {
+      setLibraryMode(false);
+      elements.content.innerHTML = `
+        <section class="watch-view">
+          <div class="player-panel">
+            <video class="player" src="${escapeHtml(video.videoUrl)}" controls autoplay playsinline poster="${escapeHtml(video.thumbnailUrl)}"></video>
+          </div>
+          <aside class="watch-details">
+            <h2>${escapeHtml(video.title)}</h2>
+            ${video.hidden ? `<span class="badge">Hidden</span>` : `<span class="badge">Public</span>`}
+            <p>${escapeHtml(video.description || "No description.")}</p>
+            <div class="detail-list">
+              <div><strong>ID</strong><span>${escapeHtml(video.id)}</span></div>
+              <div><strong>Uploaded</strong><span>${escapeHtml(formatDate(video.createdAt))}</span></div>
+              <div><strong>File</strong><span>${escapeHtml(video.videoName)}</span></div>
+              <div><strong>Size</strong><span>${escapeHtml(formatBytes(video.videoSize))}</span></div>
+            </div>
+            <div class="actions">
+              <a class="text-button" href="${escapeHtml(video.videoUrl)}" download>Download</a>
+              <a class="text-button" href="${escapeHtml(video.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
+            </div>
+          </aside>
+        </section>
+      `;
+    }
+
+    function renderNotFound(videoId) {
+      setLibraryMode(false);
+      elements.content.innerHTML = `
+        <div class="empty-state">
+          Video "${escapeHtml(videoId)}" was not found in this repository.
+        </div>
+      `;
+    }
+
+    async function loadVideos() {
+      if (!isConfigured()) {
+        setStatus("");
+        renderConfiguredWarning();
+        return;
+      }
+
+      state.loading = true;
+      setStatus("Loading videos from GitHub Releases...");
+      elements.repoLabel.textContent = `${SELFTUBE_CONFIG.owner}/${SELFTUBE_CONFIG.repo}`;
+
+      try {
+        const releases = await fetchAllReleases();
+        state.allVideos = releases
+          .map(releaseToVideo)
+          .filter(Boolean);
+        state.loading = false;
+        route();
+        const publicCount = state.allVideos.filter((video) => !video.hidden).length;
+        const hiddenCount = state.allVideos.length - publicCount;
+        setStatus(`${publicCount} public video${publicCount === 1 ? "" : "s"} loaded. ${hiddenCount} hidden.`);
+      } catch (error) {
+        state.loading = false;
+        state.allVideos = [];
+        elements.content.innerHTML = `<div class="empty-state">Could not load videos.</div>`;
+        setStatus(error.message, true);
+      }
+    }
+
+    function route() {
+      const params = new URLSearchParams(window.location.search);
+      const videoId = params.get("video");
+      if (!videoId) {
+        renderLibrary();
+        return;
+      }
+
+      const video = state.allVideos.find((item) => item.id === videoId);
+      if (video) {
+        renderWatch(video);
+      } else {
+        renderNotFound(videoId);
+      }
+    }
+
+    elements.searchInput.addEventListener("input", renderLibrary);
+    elements.clearSearchButton.addEventListener("click", () => {
+      elements.searchInput.value = "";
+      renderLibrary();
+      elements.searchInput.focus();
+    });
+    elements.refreshButton.addEventListener("click", loadVideos);
+    elements.backButton.addEventListener("click", () => {
+      history.pushState({}, "", window.location.pathname);
+      route();
+    });
+    window.addEventListener("popstate", route);
+
+    document.addEventListener("click", (event) => {
+      const link = event.target.closest("a[data-video-id]");
+      if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      history.pushState({}, "", link.getAttribute("href"));
+      route();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    loadVideos();
+  </script>
+</body>
+</html>
