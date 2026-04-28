@@ -499,6 +499,22 @@
       max-width: 100%;
     }
 
+    .comments-fallback {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .comments-fallback p {
+      margin: 0;
+    }
+
     .config-warning {
       border: 1px solid var(--ink);
       border-left: 8px solid var(--danger);
@@ -682,6 +698,13 @@
 
     function shareCardUrl(id) {
       return new URL(`watch/${encodeURIComponent(id)}/`, SELFTUBE_CONFIG.siteBaseUrl).href;
+    }
+
+    function commentsIssueUrl(id) {
+      const params = new URLSearchParams({
+        q: `repo:${SELFTUBE_CONFIG.commentsRepo} video:${id} in:title`
+      });
+      return `https://github.com/${SELFTUBE_CONFIG.commentsRepo}/issues?${params.toString()}`;
     }
 
     async function copyText(value) {
@@ -994,6 +1017,10 @@
             <video class="player" src="${escapeHtml(video.videoUrl)}" controls autoplay playsinline poster="${escapeHtml(video.thumbnailUrl)}"></video>
             <section class="comments-panel" aria-label="Comments">
               <h3>Comments</h3>
+              <div class="comments-fallback">
+                <p>Embedded comments need the utterances GitHub App installed on ${escapeHtml(SELFTUBE_CONFIG.commentsRepo)}.</p>
+                <a class="text-button" href="${escapeHtml(commentsIssueUrl(video.id))}" target="_blank" rel="noopener">GitHub Comments</a>
+              </div>
               <div id="comments"></div>
             </section>
           </div>
