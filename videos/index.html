@@ -530,19 +530,6 @@
         .replaceAll("'", "&#039;");
     }
 
-    function formatBytes(bytes) {
-      if (!Number.isFinite(bytes) || bytes <= 0) return "Unknown size";
-      const units = ["B", "KB", "MB", "GB"];
-      let size = bytes;
-      let unitIndex = 0;
-      while (size >= 1024 && unitIndex < units.length - 1) {
-        size /= 1024;
-        unitIndex += 1;
-      }
-      const digits = size >= 10 || unitIndex === 0 ? 0 : 1;
-      return `${size.toFixed(digits)} ${units[unitIndex]}`;
-    }
-
     function formatDate(value) {
       if (!value) return "Unknown date";
       const date = new Date(value);
@@ -728,8 +715,7 @@
             <h2 class="card-title">${escapeHtml(video.title)}</h2>
             <p class="card-description">${escapeHtml(video.description || "No description.")}</p>
             <div class="meta-row">
-              <span>${escapeHtml(formatDate(video.createdAt))}</span>
-              <span class="badge">${escapeHtml(formatBytes(video.videoSize))}</span>
+              <span>Uploaded ${escapeHtml(formatDate(video.createdAt))}</span>
             </div>
           </div>
         </a>
@@ -745,13 +731,9 @@
           </div>
           <aside class="watch-details">
             <h2>${escapeHtml(video.title)}</h2>
-            ${video.hidden ? `<span class="badge">Hidden</span>` : `<span class="badge">Public</span>`}
             <p>${escapeHtml(video.description || "No description.")}</p>
             <div class="detail-list">
-              <div><strong>ID</strong><span>${escapeHtml(video.id)}</span></div>
               <div><strong>Uploaded</strong><span>${escapeHtml(formatDate(video.createdAt))}</span></div>
-              <div><strong>File</strong><span>${escapeHtml(video.videoName)}</span></div>
-              <div><strong>Size</strong><span>${escapeHtml(formatBytes(video.videoSize))}</span></div>
             </div>
             <div class="actions">
               <a class="text-button" href="${escapeHtml(video.videoUrl)}" download>Download</a>
