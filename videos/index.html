@@ -684,6 +684,39 @@
       return new URL(`watch/${encodeURIComponent(id)}/`, SELFTUBE_CONFIG.siteBaseUrl).href;
     }
 
+    async function copyText(value) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+        return;
+      }
+
+      const textArea = document.createElement("textarea");
+      textArea.value = value;
+      textArea.setAttribute("readonly", "");
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      document.body.append(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      textArea.remove();
+    }
+
+    async function copyShareUrl(button) {
+      const url = button.dataset.copyUrl;
+      if (!url) return;
+      const originalText = button.textContent;
+      try {
+        await copyText(url);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Copy failed";
+      } finally {
+        window.setTimeout(() => {
+          button.textContent = originalText;
+        }, 1400);
+      }
+    }
+
     function applyLibraryMeta() {
       removeDynamicVideoMeta();
       document.title = "Videos";
@@ -971,7 +1004,7 @@
               <div><strong>Uploaded</strong><span>${escapeHtml(formatDate(video.createdAt))}</span></div>
             </div>
             <div class="actions">
-              <a class="text-button" href="${escapeHtml(shareCardUrl(video.id))}">Share Card</a>
+              <button class="text-button" type="button" data-copy-url="${escapeHtml(shareCardUrl(video.id))}">Share Card</button>
               <a class="text-button" href="${escapeHtml(video.videoUrl)}" download>Download</a>
               <a class="text-button" href="${escapeHtml(video.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
             </div>
@@ -1055,6 +1088,12 @@
     window.addEventListener("popstate", route);
 
     document.addEventListener("click", (event) => {
+      const copyButton = event.target.closest("button[data-copy-url]");
+      if (copyButton) {
+        copyShareUrl(copyButton);
+        return;
+      }
+
       const link = event.target.closest("a[data-video-id]");
       if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
