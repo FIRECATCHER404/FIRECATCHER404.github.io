@@ -428,6 +428,56 @@
       box-shadow: var(--shadow);
     }
 
+    .player-controls {
+      display: grid;
+      grid-template-columns: auto auto minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+      border: 1px solid var(--ink);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 10px;
+      box-shadow: var(--shadow);
+    }
+
+    .time-display {
+      min-width: 46px;
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+    }
+
+    .timeline-wrap {
+      position: relative;
+      min-width: 0;
+    }
+
+    .segment-markers {
+      position: absolute;
+      inset: 4px 8px auto 8px;
+      height: 8px;
+      pointer-events: none;
+    }
+
+    .segment-marker {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      opacity: 0.9;
+    }
+
+    .timeline {
+      width: 100%;
+      margin: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
     .watch-details {
       min-width: 0;
       border: 1px solid var(--ink);
@@ -821,6 +871,23 @@
       return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
     }
 
+    function formatTime(seconds) {
+      const safeSeconds = Math.max(0, Number(seconds) || 0);
+      const whole = Math.floor(safeSeconds);
+      const hours = Math.floor(whole / 3600);
+      const minutes = Math.floor((whole % 3600) / 60);
+      const secs = whole % 60;
+      if (hours) {
+        return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+      }
+      return `${minutes}:${String(secs).padStart(2, "0")}`;
+    }
+
+    function asNumber(value, fallback = 0) {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : fallback;
+    }
+
     function extensionFromName(name) {
       const match = String(name || "").toLowerCase().match(/\.([a-z0-9]+)$/);
       return match ? match[1] : "";
@@ -830,13 +897,24 @@
       if (!tagName || !tagName.startsWith(SELFTUBE_CONFIG.tagPrefix)) return null;
       const rest = tagName.slice(SELFTUBE_CONFIG.tagPrefix.length);
       const parts = rest.split("/");
-      if (parts.length !== 2) return null;
+      if (![2, 3].includes(parts.length)) return null;
       const id = parts[0].trim();
       const visibility = parts[1].trim().toLowerCase();
       if (!id || !["public", "hidden"].includes(visibility)) return null;
+      let segmentIndex = 1;
+      let segmentCount = 1;
+      if (parts.length === 3) {
+        const match = parts[2].match(/^part-(\d+)-of-(\d+)$/);
+        if (!match) return null;
+        segmentIndex = Number(match[1]);
+        segmentCount = Number(match[2]);
+        if (!segmentIndex || !segmentCount || segmentIndex > segmentCount) return null;
+      }
       return {
         id,
-        hidden: visibility === "hidden"
+        hidden: visibility === "hidden",
+        segmentIndex,
+        segmentCount
       };
     }
 
@@ -872,7 +950,7 @@
       };
     }
 
-    function releaseToVideo(release) {
+    function releaseToVideoPart(release) {
       const tagData = parseSelfTubeTag(release.tag_name);
       if (!tagData) return null;
       const metadata = parseEmbeddedMetadata(release.body);
@@ -894,8 +972,37 @@
         videoName: assets.video.name,
         videoSize: assets.video.size,
         thumbnailUrl: assets.thumbnail ? assets.thumbnail.browser_download_url : "",
-        tagName: release.tag_name
+        tagName: release.tag_name,
+        segmentIndex: asNumber(metadata.segmentIndex, tagData.segmentIndex),
+        segmentCount: asNumber(metadata.segmentCount, tagData.segmentCount),
+        segmentStart: asNumber(metadata.segmentStart, (tagData.segmentIndex - 1) * 1200),
+        segmentDuration: asNumber(metadata.segmentDuration, 0),
+        originalDuration: asNumber(metadata.originalDuration, 0)
       };
+    }
+
+    function groupVideoParts(parts) {
+      const groups = new Map();
+      for (const part of parts) {
+        if (!groups.has(part.id)) groups.set(part.id, []);
+        groups.get(part.id).push(part);
+      }
+
+      return [...groups.values()].map((segments) => {
+        segments.sort((a, b) => a.segmentIndex - b.segmentIndex);
+        const first = segments[0];
+        const totalDuration = first.originalDuration || segments.reduce((sum, segment) => sum + (segment.segmentDuration || 0), 0);
+        return {
+          ...first,
+          hidden: first.hidden,
+          segmentCount: Math.max(first.segmentCount || 1, segments.length),
+          totalDuration,
+          segments: segments.map((segment, index) => ({
+            ...segment,
+            offset: segment.segmentStart || segments.slice(0, index).reduce((sum, item) => sum + (item.segmentDuration || 0), 0)
+          }))
+        };
+      });
     }
 
     async function githubFetch(url) {
@@ -1007,6 +1114,123 @@
       `;
     }
 
+    function renderSegmentMarkers(video) {
+      if (!video.totalDuration || video.segmentCount <= 1) return "";
+      return video.segments.slice(1).map((segment) => {
+        const left = Math.max(0, Math.min(100, (segment.offset / video.totalDuration) * 100));
+        return `<span class="segment-marker" style="left:${left}%"></span>`;
+      }).join("");
+    }
+
+    function setupMergedPlayer(video) {
+      const media = document.getElementById("videoPlayer");
+      const preloader = document.getElementById("preloadPlayer");
+      const playButton = document.getElementById("playerPlayButton");
+      const timeline = document.getElementById("playerTimeline");
+      const currentLabel = document.getElementById("playerCurrentTime");
+      const durationLabel = document.getElementById("playerDuration");
+      if (!media || !playButton || !timeline || !currentLabel || !durationLabel) return;
+
+      const segments = video.segments && video.segments.length ? video.segments : [video];
+      let currentIndex = 0;
+      let totalDuration = video.totalDuration || segments.reduce((sum, segment) => sum + (segment.segmentDuration || 0), 0);
+
+      function syncDuration() {
+        if (!totalDuration && Number.isFinite(media.duration) && media.duration > 0) {
+          segments[currentIndex].segmentDuration = media.duration;
+          totalDuration = segments.reduce((sum, segment) => sum + (segment.segmentDuration || 0), 0);
+        }
+        timeline.max = String(totalDuration || 1);
+        durationLabel.textContent = formatTime(totalDuration || media.duration || 0);
+      }
+
+      function segmentForTime(time) {
+        let index = 0;
+        for (let i = 0; i < segments.length; i += 1) {
+          const segment = segments[i];
+          const nextSegment = segments[i + 1];
+          if (!nextSegment || time < nextSegment.offset) {
+            index = i;
+            break;
+          }
+        }
+        return index;
+      }
+
+      function globalTime() {
+        return (segments[currentIndex].offset || 0) + (media.currentTime || 0);
+      }
+
+      function updateDisplay() {
+        const time = globalTime();
+        currentLabel.textContent = formatTime(time);
+        timeline.value = String(Math.min(time, totalDuration || time));
+        playButton.textContent = media.paused ? "Play" : "Pause";
+      }
+
+      function updatePreloader() {
+        if (!preloader) return;
+        const next = segments[currentIndex + 1];
+        if (!next || preloader.getAttribute("src") === next.videoUrl) return;
+        preloader.src = next.videoUrl;
+        preloader.load();
+      }
+
+      function loadSegment(index, localTime = 0, shouldPlay = false) {
+        currentIndex = Math.max(0, Math.min(index, segments.length - 1));
+        const segment = segments[currentIndex];
+        if (media.getAttribute("src") !== segment.videoUrl) {
+          media.src = segment.videoUrl;
+          media.load();
+        }
+
+        const seekWhenReady = () => {
+          const duration = Number.isFinite(media.duration) ? media.duration : segment.segmentDuration || localTime;
+          media.currentTime = Math.max(0, Math.min(localTime, duration || localTime));
+          syncDuration();
+          updateDisplay();
+          updatePreloader();
+          if (shouldPlay) media.play().catch(() => {});
+        };
+
+        if (media.readyState >= 1) {
+          seekWhenReady();
+        } else {
+          media.addEventListener("loadedmetadata", seekWhenReady, { once: true });
+        }
+      }
+
+      function seekGlobal(time) {
+        const targetTime = Math.max(0, Math.min(time, totalDuration || time));
+        const targetIndex = segmentForTime(targetTime);
+        const localTime = targetTime - (segments[targetIndex].offset || 0);
+        const shouldPlay = !media.paused;
+        loadSegment(targetIndex, localTime, shouldPlay);
+      }
+
+      playButton.addEventListener("click", () => {
+        if (media.paused) {
+          media.play().catch(() => {});
+        } else {
+          media.pause();
+        }
+      });
+      timeline.addEventListener("input", () => seekGlobal(Number(timeline.value)));
+      media.addEventListener("loadedmetadata", syncDuration);
+      media.addEventListener("timeupdate", updateDisplay);
+      media.addEventListener("play", updateDisplay);
+      media.addEventListener("pause", updateDisplay);
+      media.addEventListener("ended", () => {
+        if (currentIndex < segments.length - 1) {
+          loadSegment(currentIndex + 1, 0, true);
+        } else {
+          updateDisplay();
+        }
+      });
+
+      loadSegment(0, 0, true);
+    }
+
     function renderWatch(video) {
       setLibraryMode(false);
       state.activeVideo = video;
@@ -1014,7 +1238,17 @@
       elements.content.innerHTML = `
         <section class="watch-view">
           <div class="player-panel">
-            <video class="player" src="${escapeHtml(video.videoUrl)}" controls autoplay playsinline poster="${escapeHtml(video.thumbnailUrl)}"></video>
+            <video id="videoPlayer" class="player" playsinline poster="${escapeHtml(video.thumbnailUrl)}"></video>
+            <video id="preloadPlayer" preload="auto" hidden></video>
+            <div class="player-controls">
+              <button id="playerPlayButton" class="text-button" type="button">Play</button>
+              <span id="playerCurrentTime" class="time-display">0:00</span>
+              <div class="timeline-wrap">
+                <div class="segment-markers">${renderSegmentMarkers(video)}</div>
+                <input id="playerTimeline" class="timeline" type="range" min="0" max="${escapeHtml(video.totalDuration || 1)}" step="0.033" value="0" aria-label="Video timeline">
+              </div>
+              <span id="playerDuration" class="time-display">${escapeHtml(formatTime(video.totalDuration || 0))}</span>
+            </div>
             <section class="comments-panel" aria-label="Comments">
               <h3>Comments</h3>
               <div class="comments-fallback">
@@ -1038,6 +1272,7 @@
           </aside>
         </section>
       `;
+      setupMergedPlayer(video);
       renderComments(video);
     }
 
@@ -1064,9 +1299,9 @@
 
       try {
         const releases = await fetchAllReleases();
-        state.allVideos = releases
-          .map(releaseToVideo)
-          .filter(Boolean);
+        state.allVideos = groupVideoParts(releases
+          .map(releaseToVideoPart)
+          .filter(Boolean));
         state.loading = false;
         route();
         const publicCount = state.allVideos.filter((video) => !video.hidden).length;
