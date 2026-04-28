@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Videos</title>
+  <desc id="desc">FIRECATCHER404 videos preview image.</desc>
+  <rect width="1200" height="630" fill="#f7f7f2"/>
+  <path d="M0 0h1200v630H0z" fill="#f7f7f2"/>
+  <circle cx="985" cy="88" r="210" fill="#dcefe8"/>
+  <circle cx="160" cy="540" r="190" fill="#f5d1c8"/>
+  <g transform="translate(130 126)">
+    <rect x="26" y="34" width="332" height="278" rx="38" fill="#171714"/>
+    <rect x="0" y="0" width="332" height="278" rx="38" fill="#f04e37" stroke="#171714" stroke-width="16"/>
+    <path d="M137 86v106l92-53-92-53z" fill="#fff"/>
+    <path d="M58 70h70M58 218h162" fill="none" stroke="#171714" stroke-width="16" stroke-linecap="round"/>
+  </g>
+  <g fill="#171714" font-family="Inter, Segoe UI, Arial, sans-serif">
+    <text x="540" y="265" font-size="104" font-weight="800">Videos</text>
+    <text x="544" y="340" font-size="40" font-weight="500" fill="#4f514a">FIRECATCHER404</text>
+    <text x="544" y="406" font-size="32" font-weight="500" fill="#65645f">GitHub-hosted video library</text>
+  </g>
+</svg>
