@@ -680,6 +680,10 @@
       return url.href;
     }
 
+    function shareCardUrl(id) {
+      return new URL(`watch/${encodeURIComponent(id)}/`, SELFTUBE_CONFIG.siteBaseUrl).href;
+    }
+
     function applyLibraryMeta() {
       removeDynamicVideoMeta();
       document.title = "Videos";
@@ -967,6 +971,7 @@
               <div><strong>Uploaded</strong><span>${escapeHtml(formatDate(video.createdAt))}</span></div>
             </div>
             <div class="actions">
+              <a class="text-button" href="${escapeHtml(shareCardUrl(video.id))}">Share Card</a>
               <a class="text-button" href="${escapeHtml(video.videoUrl)}" download>Download</a>
               <a class="text-button" href="${escapeHtml(video.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
             </div>
