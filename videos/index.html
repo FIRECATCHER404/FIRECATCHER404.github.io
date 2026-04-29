@@ -246,6 +246,28 @@
       margin: 4px 0 22px;
     }
 
+    .library-controls {
+      display: grid;
+      gap: 12px;
+      margin: 4px 0 22px;
+    }
+
+    .library-controls .search-row {
+      margin: 0;
+    }
+
+    .section-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .section-tab[aria-selected="true"] {
+      background: var(--accent);
+      color: var(--logo-play);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+
     .search-wrap {
       position: relative;
     }
@@ -287,14 +309,16 @@
       color: var(--danger);
     }
 
-    .video-grid {
+    .video-grid,
+    .post-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
       gap: 16px;
       align-items: stretch;
     }
 
-    .video-card {
+    .video-card,
+    .post-card {
       display: flex;
       flex-direction: column;
       min-height: 100%;
@@ -308,9 +332,23 @@
       transition: transform 0.14s ease, box-shadow 0.14s ease;
     }
 
-    .video-card:hover {
+    .video-card:hover,
+    .post-card:hover {
       transform: translateY(-3px);
       box-shadow: 0 18px 34px rgba(28, 26, 18, 0.16);
+    }
+
+    .short-card .poster {
+      aspect-ratio: 9 / 16;
+    }
+
+    .post-card {
+      min-height: 220px;
+      padding: 16px;
+    }
+
+    .post-card .card-body {
+      padding: 0;
     }
 
     .poster {
@@ -471,6 +509,11 @@
       opacity: 0.9;
     }
 
+    .chapter-marker {
+      background: var(--danger);
+      opacity: 0.8;
+    }
+
     .timeline {
       width: 100%;
       margin: 0;
@@ -530,7 +573,9 @@
       margin-top: 14px;
     }
 
-    .comments-panel {
+    .chapters-panel,
+    .comments-panel,
+    .post-panel {
       margin-top: 18px;
       border: 1px solid var(--ink);
       border-radius: 8px;
@@ -539,10 +584,31 @@
       box-shadow: var(--shadow);
     }
 
-    .comments-panel h3 {
+    .chapters-panel h3,
+    .comments-panel h3,
+    .post-panel h2 {
       margin: 0 0 12px;
       font-size: 1rem;
       letter-spacing: 0;
+    }
+
+    .chapter-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .chapter-button {
+      justify-content: space-between;
+      width: 100%;
+      min-height: 34px;
+      box-shadow: none;
+    }
+
+    .post-body {
+      color: var(--text);
+      line-height: 1.55;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
 
     .comments-panel .utterances {
@@ -640,12 +706,20 @@
       </nav>
     </header>
 
-    <section id="libraryControls" class="search-row">
-      <label class="search-wrap">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.44 4.45-1.42 1.41-4.44-4.44A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/></svg>
-        <input id="searchInput" class="search-input" type="search" placeholder="Search videos" autocomplete="off">
-      </label>
-      <button id="clearSearchButton" class="text-button" type="button">Clear</button>
+    <section id="libraryControls" class="library-controls">
+      <nav class="section-tabs" aria-label="Content sections">
+        <button class="text-button section-tab" type="button" data-section="videos" aria-selected="true">Videos</button>
+        <button class="text-button section-tab" type="button" data-section="shorts" aria-selected="false">Shorts</button>
+        <button class="text-button section-tab" type="button" data-section="playlists" aria-selected="false">Playlists</button>
+        <button class="text-button section-tab" type="button" data-section="posts" aria-selected="false">Posts</button>
+      </nav>
+      <div class="search-row">
+        <label class="search-wrap">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.44 4.45-1.42 1.41-4.44-4.44A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/></svg>
+          <input id="searchInput" class="search-input" type="search" placeholder="Search videos" autocomplete="off">
+        </label>
+        <button id="clearSearchButton" class="text-button" type="button">Clear</button>
+      </div>
     </section>
 
     <div id="status" class="status" role="status"></div>
@@ -674,12 +748,20 @@
 
     const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv", "ogg"]);
     const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+    const CAPTION_EXTENSIONS = new Set(["vtt"]);
+    const SECTION_TYPES = {
+      videos: "video",
+      shorts: "short",
+      playlists: "playlist",
+      posts: "post"
+    };
     const THEME_STORAGE_KEY = "videos-theme";
 
     const state = {
-      allVideos: [],
-      visibleVideos: [],
-      activeVideo: null,
+      allItems: [],
+      visibleItems: [],
+      activeItem: null,
+      activeSection: "videos",
       loading: false
     };
 
@@ -692,7 +774,8 @@
       refreshButton: document.getElementById("refreshButton"),
       themeButton: document.getElementById("themeButton"),
       backButton: document.getElementById("backButton"),
-      libraryControls: document.getElementById("libraryControls")
+      libraryControls: document.getElementById("libraryControls"),
+      sectionTabs: [...document.querySelectorAll(".section-tab")]
     };
 
     function isConfigured() {
@@ -746,13 +829,26 @@
       return url.href;
     }
 
+    function absoluteItemUrl(item) {
+      const url = new URL(SELFTUBE_CONFIG.siteBaseUrl, window.location.href);
+      url.search = "";
+      url.searchParams.set(queryKeyForType(item.type), item.id);
+      return url.href;
+    }
+
     function shareCardUrl(id) {
       return new URL(`watch/${encodeURIComponent(id)}/`, SELFTUBE_CONFIG.siteBaseUrl).href;
     }
 
-    function commentsIssueUrl(id) {
+    function issueTerm(item) {
+      const type = item.type === "post" || item.type === "playlist" ? item.type : "video";
+      return `${type}:${item.id}`;
+    }
+
+    function commentsIssueUrl(itemOrId) {
+      const term = typeof itemOrId === "string" ? `video:${itemOrId}` : issueTerm(itemOrId);
       const params = new URLSearchParams({
-        q: `repo:${SELFTUBE_CONFIG.commentsRepo} video:${id} in:title`
+        q: `repo:${SELFTUBE_CONFIG.commentsRepo} ${term} in:title`
       });
       return `https://github.com/${SELFTUBE_CONFIG.commentsRepo}/issues?${params.toString()}`;
     }
@@ -804,23 +900,23 @@
       setMetaContent("twitterImage", SELFTUBE_CONFIG.defaultPreviewImage);
     }
 
-    function applyVideoMeta(video) {
-      const title = `${video.title} - Videos`;
-      const description = video.description || `Watch ${video.title} from FIRECATCHER404.`;
-      const image = video.thumbnailUrl || SELFTUBE_CONFIG.defaultPreviewImage;
+    function applyItemMeta(item) {
+      const title = `${item.title} - Videos`;
+      const description = item.description || `Open ${item.title} from FIRECATCHER404.`;
+      const image = item.thumbnailUrl || SELFTUBE_CONFIG.defaultPreviewImage;
       removeDynamicVideoMeta();
       document.title = title;
       setMetaContent("metaDescription", description);
       setMetaContent("ogTitle", title);
       setMetaContent("ogDescription", description);
-      setMetaContent("ogType", "video.other");
-      setMetaContent("ogUrl", absoluteVideoUrl(video.id));
+      setMetaContent("ogType", item.videoUrl ? "video.other" : "article");
+      setMetaContent("ogUrl", absoluteItemUrl(item));
       setMetaContent("ogImage", image);
       setMetaContent("twitterTitle", title);
       setMetaContent("twitterDescription", description);
       setMetaContent("twitterImage", image);
-      addDynamicVideoMeta("og:video", video.videoUrl);
-      addDynamicVideoMeta("og:video:secure_url", video.videoUrl);
+      addDynamicVideoMeta("og:video", item.videoUrl);
+      addDynamicVideoMeta("og:video:secure_url", item.videoUrl);
     }
 
     function applyTheme(theme, persist = false) {
@@ -848,7 +944,7 @@
       iframe.contentWindow.postMessage({ type: "set-theme", theme: utterancesTheme() }, "https://utteranc.es");
     }
 
-    function renderComments(video) {
+    function renderComments(item) {
       const comments = document.getElementById("comments");
       if (!comments) return;
       comments.innerHTML = "";
@@ -858,7 +954,7 @@
       script.async = true;
       script.crossOrigin = "anonymous";
       script.setAttribute("repo", SELFTUBE_CONFIG.commentsRepo);
-      script.setAttribute("issue-term", `video:${video.id}`);
+      script.setAttribute("issue-term", issueTerm(item));
       script.setAttribute("label", "comments");
       script.setAttribute("theme", utterancesTheme());
       comments.append(script);
@@ -944,34 +1040,71 @@
         return VIDEO_EXTENSIONS.has(ext) || type.startsWith("video/");
       });
       const thumbnails = allAssets.filter((asset) => IMAGE_EXTENSIONS.has(extensionFromName(asset.name)));
+      const captions = allAssets.filter((asset) => CAPTION_EXTENSIONS.has(extensionFromName(asset.name)));
       return {
         video: videos[0] || null,
-        thumbnail: thumbnails[0] || null
+        thumbnail: thumbnails[0] || null,
+        captions
       };
     }
 
-    function releaseToVideoPart(release) {
+    function normalizeChapters(chapters) {
+      if (!Array.isArray(chapters)) return [];
+      return chapters
+        .map((chapter) => ({
+          start: asNumber(chapter.start, -1),
+          title: String(chapter.title || "").trim()
+        }))
+        .filter((chapter) => chapter.start >= 0 && chapter.title)
+        .sort((a, b) => a.start - b.start);
+    }
+
+    function normalizePlaylistItems(items) {
+      if (!Array.isArray(items)) return [];
+      return items.map((item) => String(item).trim()).filter(Boolean);
+    }
+
+    function captionsForAssets(metadata, assets) {
+      const metadataCaptions = Array.isArray(metadata.captions) ? metadata.captions : [];
+      return assets.captions.map((asset, index) => {
+        const match = metadataCaptions.find((caption) => caption.assetName === asset.name) || metadataCaptions[index] || {};
+        return {
+          url: asset.browser_download_url,
+          label: String(match.label || asset.name || "Captions"),
+          lang: String(match.lang || "en")
+        };
+      });
+    }
+
+    function releaseToContentPart(release) {
       const tagData = parseSelfTubeTag(release.tag_name);
       if (!tagData) return null;
       const metadata = parseEmbeddedMetadata(release.body);
       const assets = pickAssets(release.assets);
-      if (!assets.video) return null;
 
       const description = metadata.description || visibleDescription(release.body);
       const title = metadata.title || release.name || tagData.id;
+      const type = String(metadata.type || (assets.video ? "video" : "post")).toLowerCase();
+      if (!["video", "short", "playlist", "post"].includes(type)) return null;
+      if ((type === "video" || type === "short") && !assets.video) return null;
 
       return {
         id: metadata.id || tagData.id,
+        type,
         hidden: typeof metadata.hidden === "boolean" ? metadata.hidden : tagData.hidden,
         title,
         description,
         releaseUrl: release.html_url,
         createdAt: release.published_at || release.created_at,
         updatedAt: release.updated_at,
-        videoUrl: assets.video.browser_download_url,
-        videoName: assets.video.name,
-        videoSize: assets.video.size,
+        scheduledAt: metadata.scheduledAt || "",
+        videoUrl: assets.video ? assets.video.browser_download_url : "",
+        videoName: assets.video ? assets.video.name : "",
+        videoSize: assets.video ? assets.video.size : 0,
         thumbnailUrl: assets.thumbnail ? assets.thumbnail.browser_download_url : "",
+        captions: captionsForAssets(metadata, assets),
+        chapters: normalizeChapters(metadata.chapters),
+        playlistItems: normalizePlaylistItems(metadata.items || metadata.playlistItems),
         tagName: release.tag_name,
         segmentIndex: asNumber(metadata.segmentIndex, tagData.segmentIndex),
         segmentCount: asNumber(metadata.segmentCount, tagData.segmentCount),
@@ -981,7 +1114,7 @@
       };
     }
 
-    function groupVideoParts(parts) {
+    function groupContentParts(parts) {
       const groups = new Map();
       for (const part of parts) {
         if (!groups.has(part.id)) groups.set(part.id, []);
@@ -1047,11 +1180,44 @@
       elements.backButton.hidden = isLibrary;
     }
 
-    function videoLink(id) {
+    function sectionForType(type) {
+      if (type === "short") return "shorts";
+      if (type === "playlist") return "playlists";
+      if (type === "post") return "posts";
+      return "videos";
+    }
+
+    function queryKeyForType(type) {
+      if (type === "post") return "post";
+      if (type === "playlist") return "playlist";
+      if (type === "short") return "short";
+      return "video";
+    }
+
+    function itemLink(item) {
       const url = new URL(window.location.href);
       url.search = "";
-      url.searchParams.set("video", id);
+      url.searchParams.set(queryKeyForType(item.type), item.id);
       return url.pathname + url.search;
+    }
+
+    function isFutureDate(value) {
+      if (!value) return false;
+      const date = new Date(value);
+      return !Number.isNaN(date.getTime()) && date.getTime() > Date.now();
+    }
+
+    function isVisibleItem(item) {
+      return !item.hidden && !isFutureDate(item.scheduledAt);
+    }
+
+    function setActiveSection(section) {
+      state.activeSection = SECTION_TYPES[section] ? section : "videos";
+      elements.sectionTabs.forEach((button) => {
+        button.setAttribute("aria-selected", button.dataset.section === state.activeSection ? "true" : "false");
+      });
+      const label = state.activeSection[0].toUpperCase() + state.activeSection.slice(1);
+      elements.searchInput.placeholder = `Search ${label.toLowerCase()}`;
     }
 
     function renderConfiguredWarning() {
@@ -1069,45 +1235,69 @@
       setLibraryMode(true);
       applyLibraryMeta();
       const query = elements.searchInput.value.trim().toLowerCase();
-      state.visibleVideos = state.allVideos
-        .filter((video) => !video.hidden)
-        .filter((video) => {
+      const sectionType = SECTION_TYPES[state.activeSection] || "video";
+      state.visibleItems = state.allItems
+        .filter((item) => item.type === sectionType)
+        .filter(isVisibleItem)
+        .filter((item) => {
           if (!query) return true;
-          return [video.id, video.title, video.description, video.videoName]
+          return [item.id, item.title, item.description, item.videoName, ...(item.playlistItems || [])]
             .join(" ")
             .toLowerCase()
             .includes(query);
         })
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
-      if (!state.visibleVideos.length) {
-        const message = query ? "No matching public videos." : "No public videos found.";
+      if (!state.visibleItems.length) {
+        const message = query ? `No matching ${state.activeSection}.` : `No public ${state.activeSection} found.`;
         elements.content.innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
         return;
       }
 
+      const gridClass = sectionType === "post" ? "post-grid" : "video-grid";
       elements.content.innerHTML = `
-        <section class="video-grid" aria-label="Videos">
-          ${state.visibleVideos.map(renderVideoCard).join("")}
+        <section class="${gridClass}" aria-label="${escapeHtml(state.activeSection)}">
+          ${state.visibleItems.map(renderContentCard).join("")}
         </section>
       `;
     }
 
-    function renderVideoCard(video) {
-      const poster = video.thumbnailUrl
-        ? `<img src="${escapeHtml(video.thumbnailUrl)}" alt="">`
-        : `<video src="${escapeHtml(video.videoUrl)}#t=0.1" preload="metadata" muted playsinline></video>`;
+    function renderContentCard(item) {
+      if (item.type === "post") return renderPostCard(item);
+      const poster = item.thumbnailUrl
+        ? `<img src="${escapeHtml(item.thumbnailUrl)}" alt="">`
+        : item.videoUrl
+          ? `<video src="${escapeHtml(item.videoUrl)}#t=0.1" preload="metadata" muted playsinline></video>`
+          : `<div class="poster-fallback">Playlist</div>`;
+      const cardClass = `video-card ${item.type === "short" ? "short-card" : ""}`;
+      const meta = item.type === "playlist" ? `${item.playlistItems.length} item${item.playlistItems.length === 1 ? "" : "s"}` : `Uploaded ${formatDate(item.createdAt)}`;
 
       return `
-        <a class="video-card" href="${escapeHtml(videoLink(video.id))}" data-video-id="${escapeHtml(video.id)}">
+        <a class="${cardClass}" href="${escapeHtml(itemLink(item))}" data-content-id="${escapeHtml(item.id)}">
           <div class="poster">
             ${poster || `<div class="poster-fallback">Video</div>`}
           </div>
           <div class="card-body">
-            <h2 class="card-title">${escapeHtml(video.title)}</h2>
-            <p class="card-description">${escapeHtml(video.description || "No description.")}</p>
+            <h2 class="card-title">${escapeHtml(item.title)}</h2>
+            <p class="card-description">${escapeHtml(item.description || "No description.")}</p>
             <div class="meta-row">
-              <span>Uploaded ${escapeHtml(formatDate(video.createdAt))}</span>
+              <span>${escapeHtml(meta)}</span>
+              <span class="badge">${escapeHtml(item.type)}</span>
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    function renderPostCard(item) {
+      return `
+        <a class="post-card" href="${escapeHtml(itemLink(item))}" data-content-id="${escapeHtml(item.id)}">
+          <div class="card-body">
+            <h2 class="card-title">${escapeHtml(item.title)}</h2>
+            <p class="card-description">${escapeHtml(item.description || "No post body.")}</p>
+            <div class="meta-row">
+              <span>Posted ${escapeHtml(formatDate(item.createdAt))}</span>
+              <span class="badge">post</span>
             </div>
           </div>
         </a>
@@ -1115,11 +1305,39 @@
     }
 
     function renderSegmentMarkers(video) {
-      if (!video.totalDuration || video.segmentCount <= 1) return "";
-      return video.segments.slice(1).map((segment) => {
+      if (!video.totalDuration) return "";
+      const segmentMarkers = video.segmentCount <= 1 ? [] : video.segments.slice(1).map((segment) => {
         const left = Math.max(0, Math.min(100, (segment.offset / video.totalDuration) * 100));
         return `<span class="segment-marker" style="left:${left}%"></span>`;
-      }).join("");
+      });
+      const chapterMarkers = (video.chapters || []).slice(1).map((chapter) => {
+        const left = Math.max(0, Math.min(100, (chapter.start / video.totalDuration) * 100));
+        return `<span class="segment-marker chapter-marker" style="left:${left}%"></span>`;
+      });
+      return [...segmentMarkers, ...chapterMarkers].join("");
+    }
+
+    function renderTracks(video) {
+      return (video.captions || []).map((caption, index) => `
+        <track kind="captions" src="${escapeHtml(caption.url)}" srclang="${escapeHtml(caption.lang)}" label="${escapeHtml(caption.label)}"${index === 0 ? " default" : ""}>
+      `).join("");
+    }
+
+    function renderChapters(video) {
+      if (!video.chapters || !video.chapters.length) return "";
+      return `
+        <section class="chapters-panel" aria-label="Chapters">
+          <h3>Chapters</h3>
+          <div class="chapter-list">
+            ${video.chapters.map((chapter) => `
+              <button class="text-button chapter-button" type="button" data-seek="${escapeHtml(chapter.start)}">
+                <span>${escapeHtml(chapter.title)}</span>
+                <span>${escapeHtml(formatTime(chapter.start))}</span>
+              </button>
+            `).join("")}
+          </div>
+        </section>
+      `;
     }
 
     function setupMergedPlayer(video) {
@@ -1208,6 +1426,8 @@
         loadSegment(targetIndex, localTime, shouldPlay);
       }
 
+      window.selftubeSeekActiveVideo = seekGlobal;
+
       playButton.addEventListener("click", () => {
         if (media.paused) {
           media.play().catch(() => {});
@@ -1231,14 +1451,50 @@
       loadSegment(0, 0, false);
     }
 
+    function setupChapterButtons() {
+      document.querySelectorAll("[data-seek]").forEach((button) => {
+        button.addEventListener("click", () => {
+          if (typeof window.selftubeSeekActiveVideo === "function") {
+            window.selftubeSeekActiveVideo(Number(button.dataset.seek));
+          }
+        });
+      });
+    }
+
+    async function fetchIssueForItem(item) {
+      const query = new URLSearchParams({
+        q: `repo:${SELFTUBE_CONFIG.commentsRepo} ${issueTerm(item)} in:title`,
+        per_page: "1"
+      });
+      const url = `${SELFTUBE_CONFIG.githubApiBase}/search/issues?${query.toString()}`;
+      const result = await githubFetch(url);
+      return result && Array.isArray(result.items) && result.items.length ? result.items[0] : null;
+    }
+
+    async function updateLikeButton(item) {
+      const likeButton = document.getElementById("likeButton");
+      if (!likeButton) return;
+      try {
+        const issue = await fetchIssueForItem(item);
+        const count = issue && issue.reactions ? Number(issue.reactions["+1"] || 0) : 0;
+        likeButton.textContent = `Like ${count}`;
+        likeButton.href = issue && issue.html_url ? issue.html_url : commentsIssueUrl(item);
+      } catch {
+        likeButton.textContent = "Like";
+        likeButton.href = commentsIssueUrl(item);
+      }
+    }
+
     function renderWatch(video) {
       setLibraryMode(false);
-      state.activeVideo = video;
-      applyVideoMeta(video);
+      state.activeItem = video;
+      applyItemMeta(video);
       elements.content.innerHTML = `
         <section class="watch-view">
           <div class="player-panel">
-            <video id="videoPlayer" class="player" playsinline poster="${escapeHtml(video.thumbnailUrl)}"></video>
+            <video id="videoPlayer" class="player" playsinline poster="${escapeHtml(video.thumbnailUrl)}">
+              ${renderTracks(video)}
+            </video>
             <video id="preloadPlayer" preload="auto" hidden></video>
             <div class="player-controls">
               <button id="playerPlayButton" class="text-button" type="button">Play</button>
@@ -1249,11 +1505,12 @@
               </div>
               <span id="playerDuration" class="time-display">${escapeHtml(formatTime(video.totalDuration || 0))}</span>
             </div>
+            ${renderChapters(video)}
             <section class="comments-panel" aria-label="Comments">
               <h3>Comments</h3>
               <div class="comments-fallback">
                 <p>Embedded comments need the utterances GitHub App installed on ${escapeHtml(SELFTUBE_CONFIG.commentsRepo)}.</p>
-                <a class="text-button" href="${escapeHtml(commentsIssueUrl(video.id))}" target="_blank" rel="noopener">GitHub Comments</a>
+                <a class="text-button" href="${escapeHtml(commentsIssueUrl(video))}" target="_blank" rel="noopener">GitHub Comments</a>
               </div>
               <div id="comments"></div>
             </section>
@@ -1263,8 +1520,10 @@
             <p>${escapeHtml(video.description || "No description.")}</p>
             <div class="detail-list">
               <div><strong>Uploaded</strong><span>${escapeHtml(formatDate(video.createdAt))}</span></div>
+              <div><strong>Section</strong><span>${escapeHtml(sectionForType(video.type))}</span></div>
             </div>
             <div class="actions">
+              <a id="likeButton" class="text-button" href="${escapeHtml(commentsIssueUrl(video))}" target="_blank" rel="noopener">Like</a>
               <button class="text-button" type="button" data-copy-url="${escapeHtml(shareCardUrl(video.id))}">Share Card</button>
               <a class="text-button" href="${escapeHtml(video.videoUrl)}" download>Download</a>
               <a class="text-button" href="${escapeHtml(video.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
@@ -1273,7 +1532,74 @@
         </section>
       `;
       setupMergedPlayer(video);
+      setupChapterButtons();
       renderComments(video);
+      updateLikeButton(video);
+    }
+
+    function renderPost(item) {
+      setLibraryMode(false);
+      state.activeItem = item;
+      applyItemMeta(item);
+      elements.content.innerHTML = `
+        <article class="post-panel">
+          <h2>${escapeHtml(item.title)}</h2>
+          <div class="post-body">${escapeHtml(item.description || "No post body.")}</div>
+          <div class="detail-list">
+            <div><strong>Posted</strong><span>${escapeHtml(formatDate(item.createdAt))}</span></div>
+          </div>
+          <div class="actions">
+            <a id="likeButton" class="text-button" href="${escapeHtml(commentsIssueUrl(item))}" target="_blank" rel="noopener">Like</a>
+            <a class="text-button" href="${escapeHtml(item.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
+          </div>
+        </article>
+        <section class="comments-panel" aria-label="Comments">
+          <h3>Comments</h3>
+          <div class="comments-fallback">
+            <p>Embedded comments need the utterances GitHub App installed on ${escapeHtml(SELFTUBE_CONFIG.commentsRepo)}.</p>
+            <a class="text-button" href="${escapeHtml(commentsIssueUrl(item))}" target="_blank" rel="noopener">GitHub Comments</a>
+          </div>
+          <div id="comments"></div>
+        </section>
+      `;
+      renderComments(item);
+      updateLikeButton(item);
+    }
+
+    function renderPlaylist(item) {
+      setLibraryMode(false);
+      state.activeItem = item;
+      applyItemMeta(item);
+      const playlistVideos = item.playlistItems
+        .map((id) => state.allItems.find((candidate) => candidate.id === id && (candidate.type === "video" || candidate.type === "short") && isVisibleItem(candidate)))
+        .filter(Boolean);
+      elements.content.innerHTML = `
+        <section class="post-panel">
+          <h2>${escapeHtml(item.title)}</h2>
+          <div class="post-body">${escapeHtml(item.description || "No description.")}</div>
+          <div class="detail-list">
+            <div><strong>Items</strong><span>${escapeHtml(String(item.playlistItems.length))}</span></div>
+            <div><strong>Created</strong><span>${escapeHtml(formatDate(item.createdAt))}</span></div>
+          </div>
+          <div class="actions">
+            <a id="likeButton" class="text-button" href="${escapeHtml(commentsIssueUrl(item))}" target="_blank" rel="noopener">Like</a>
+            <a class="text-button" href="${escapeHtml(item.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
+          </div>
+        </section>
+        <section class="video-grid" aria-label="Playlist videos">
+          ${playlistVideos.length ? playlistVideos.map(renderContentCard).join("") : `<div class="empty-state">No matching public videos in this playlist.</div>`}
+        </section>
+        <section class="comments-panel" aria-label="Comments">
+          <h3>Comments</h3>
+          <div class="comments-fallback">
+            <p>Embedded comments need the utterances GitHub App installed on ${escapeHtml(SELFTUBE_CONFIG.commentsRepo)}.</p>
+            <a class="text-button" href="${escapeHtml(commentsIssueUrl(item))}" target="_blank" rel="noopener">GitHub Comments</a>
+          </div>
+          <div id="comments"></div>
+        </section>
+      `;
+      renderComments(item);
+      updateLikeButton(item);
     }
 
     function renderNotFound(videoId) {
@@ -1299,17 +1625,17 @@
 
       try {
         const releases = await fetchAllReleases();
-        state.allVideos = groupVideoParts(releases
-          .map(releaseToVideoPart)
+        state.allItems = groupContentParts(releases
+          .map(releaseToContentPart)
           .filter(Boolean));
         state.loading = false;
         route();
-        const publicCount = state.allVideos.filter((video) => !video.hidden).length;
-        const hiddenCount = state.allVideos.length - publicCount;
-        setStatus(`${publicCount} public video${publicCount === 1 ? "" : "s"} loaded. ${hiddenCount} hidden.`);
+        const publicCount = state.allItems.filter(isVisibleItem).length;
+        const hiddenCount = state.allItems.length - publicCount;
+        setStatus(`${publicCount} public item${publicCount === 1 ? "" : "s"} loaded. ${hiddenCount} hidden or scheduled.`);
       } catch (error) {
         state.loading = false;
-        state.allVideos = [];
+        state.allItems = [];
         elements.content.innerHTML = `<div class="empty-state">Could not load videos.</div>`;
         setStatus(error.message, true);
       }
@@ -1317,17 +1643,26 @@
 
     function route() {
       const params = new URLSearchParams(window.location.search);
-      const videoId = params.get("video");
-      if (!videoId) {
+      const section = params.get("section");
+      if (section) setActiveSection(section);
+      const videoId = params.get("video") || params.get("short");
+      const postId = params.get("post");
+      const playlistId = params.get("playlist");
+      const targetId = videoId || postId || playlistId;
+      if (!targetId) {
         renderLibrary();
         return;
       }
 
-      const video = state.allVideos.find((item) => item.id === videoId);
-      if (video) {
-        renderWatch(video);
+      const item = state.allItems.find((candidate) => candidate.id === targetId && isVisibleItem(candidate));
+      if (item && (item.type === "video" || item.type === "short")) {
+        renderWatch(item);
+      } else if (item && item.type === "post") {
+        renderPost(item);
+      } else if (item && item.type === "playlist") {
+        renderPlaylist(item);
       } else {
-        renderNotFound(videoId);
+        renderNotFound(targetId);
       }
     }
 
@@ -1338,6 +1673,16 @@
       elements.searchInput.value = "";
       renderLibrary();
       elements.searchInput.focus();
+    });
+    elements.sectionTabs.forEach((button) => {
+      button.addEventListener("click", () => {
+        setActiveSection(button.dataset.section);
+        const url = new URL(window.location.href);
+        url.search = "";
+        url.searchParams.set("section", state.activeSection);
+        history.pushState({}, "", url.pathname + url.search);
+        renderLibrary();
+      });
     });
     elements.refreshButton.addEventListener("click", loadVideos);
     elements.themeButton.addEventListener("click", () => {
@@ -1356,7 +1701,7 @@
         return;
       }
 
-      const link = event.target.closest("a[data-video-id]");
+      const link = event.target.closest("a[data-content-id]");
       if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
       history.pushState({}, "", link.getAttribute("href"));
