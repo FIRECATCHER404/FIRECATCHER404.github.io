@@ -1174,6 +1174,11 @@
       });
     }
 
+    function pagesMediaUrlForPart(id, segmentIndex, segmentCount) {
+      const suffix = segmentCount > 1 ? `-part-${String(segmentIndex).padStart(3, "0")}` : "";
+      return new URL(`media/${encodeURIComponent(`${id}${suffix}.mp4`)}`, SELFTUBE_CONFIG.siteBaseUrl).href;
+    }
+
     function releaseToContentPart(release) {
       const tagData = parseSelfTubeTag(release.tag_name);
       if (!tagData) return null;
@@ -1185,6 +1190,14 @@
       const type = String(metadata.type || (assets.video ? "video" : "post")).toLowerCase();
       if (!["video", "short", "playlist", "post"].includes(type)) return null;
       if ((type === "video" || type === "short") && !assets.video) return null;
+      const segmentIndex = asNumber(metadata.segmentIndex, tagData.segmentIndex);
+      const segmentCount = asNumber(metadata.segmentCount, tagData.segmentCount);
+      const releaseVideoUrl = assets.video ? assets.video.browser_download_url : "";
+      const pagesVideoUrl = releaseVideoUrl ? pagesMediaUrlForPart(metadata.id || tagData.id, segmentIndex, segmentCount) : "";
+      const legacyPagesVideoUrl = releaseVideoUrl && segmentCount > 1 && segmentIndex === 1
+        ? pagesMediaUrlForPart(metadata.id || tagData.id, 1, 1)
+        : "";
+      const videoSources = [...new Set([pagesVideoUrl, legacyPagesVideoUrl, releaseVideoUrl].filter(Boolean))];
 
       return {
         id: metadata.id || tagData.id,
@@ -1196,7 +1209,9 @@
         createdAt: release.published_at || release.created_at,
         updatedAt: release.updated_at,
         scheduledAt: metadata.scheduledAt || "",
-        videoUrl: assets.video ? assets.video.browser_download_url : "",
+        videoUrl: videoSources[0] || "",
+        videoSources,
+        fallbackVideoUrl: releaseVideoUrl,
         videoName: assets.video ? assets.video.name : "",
         videoSize: assets.video ? assets.video.size : 0,
         thumbnailUrl: assets.thumbnail ? assets.thumbnail.browser_download_url : "",
@@ -1204,8 +1219,8 @@
         chapters: normalizeChapters(metadata.chapters),
         playlistItems: normalizePlaylistItems(metadata.items || metadata.playlistItems),
         tagName: release.tag_name,
-        segmentIndex: asNumber(metadata.segmentIndex, tagData.segmentIndex),
-        segmentCount: asNumber(metadata.segmentCount, tagData.segmentCount),
+        segmentIndex,
+        segmentCount,
         segmentStart: asNumber(metadata.segmentStart, (tagData.segmentIndex - 1) * 1200),
         segmentDuration: asNumber(metadata.segmentDuration, 0),
         originalDuration: asNumber(metadata.originalDuration, 0)
@@ -1404,15 +1419,11 @@
 
     function renderSegmentMarkers(video) {
       if (!video.totalDuration) return "";
-      const segmentMarkers = video.segmentCount <= 1 ? [] : video.segments.slice(1).map((segment) => {
-        const left = Math.max(0, Math.min(100, (segment.offset / video.totalDuration) * 100));
-        return `<span class="segment-marker" style="left:${left}%"></span>`;
-      });
       const chapterMarkers = (video.chapters || []).slice(1).map((chapter) => {
         const left = Math.max(0, Math.min(100, (chapter.start / video.totalDuration) * 100));
         return `<span class="segment-marker chapter-marker" style="left:${left}%"></span>`;
       });
-      return [...segmentMarkers, ...chapterMarkers].join("");
+      return chapterMarkers.join("");
     }
 
     function renderTracks(video) {
@@ -1450,6 +1461,8 @@
       const segments = video.segments && video.segments.length ? video.segments : [video];
       let currentIndex = 0;
       let totalDuration = video.totalDuration || segments.reduce((sum, segment) => sum + (segment.segmentDuration || 0), 0);
+      let pendingLocalTime = 0;
+      let pendingShouldPlay = false;
 
       function syncDuration() {
         if (!totalDuration && Number.isFinite(media.duration) && media.duration > 0) {
@@ -1494,6 +1507,8 @@
 
       function loadSegment(index, localTime = 0, shouldPlay = false) {
         currentIndex = Math.max(0, Math.min(index, segments.length - 1));
+        pendingLocalTime = localTime;
+        pendingShouldPlay = shouldPlay;
         const segment = segments[currentIndex];
         if (media.getAttribute("src") !== segment.videoUrl) {
           media.src = segment.videoUrl;
@@ -1538,6 +1553,19 @@
       media.addEventListener("timeupdate", updateDisplay);
       media.addEventListener("play", updateDisplay);
       media.addEventListener("pause", updateDisplay);
+      media.addEventListener("error", () => {
+        const segment = segments[currentIndex];
+        if (!segment) return;
+        const sources = segment.videoSources && segment.videoSources.length
+          ? segment.videoSources
+          : [segment.videoUrl, segment.fallbackVideoUrl].filter(Boolean);
+        const currentSource = media.getAttribute("src");
+        const currentSourceIndex = sources.indexOf(currentSource);
+        const nextSource = sources[currentSourceIndex + 1];
+        if (!nextSource) return;
+        media.src = nextSource;
+        media.load();
+      });
       media.addEventListener("ended", () => {
         if (currentIndex < segments.length - 1) {
           loadSegment(currentIndex + 1, 0, true);
@@ -1701,9 +1729,7 @@
           .filter(Boolean));
         state.loading = false;
         route();
-        const publicCount = state.allItems.filter(isVisibleItem).length;
-        const hiddenCount = state.allItems.length - publicCount;
-        setStatus(`${publicCount} public item${publicCount === 1 ? "" : "s"} loaded. ${hiddenCount} hidden or scheduled.`);
+        setStatus("");
       } catch (error) {
         state.loading = false;
         state.allItems = [];
