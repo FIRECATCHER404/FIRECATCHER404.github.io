@@ -1566,8 +1566,7 @@
       elements.sectionTabs.forEach((button) => {
         button.setAttribute("aria-selected", button.dataset.section === state.activeSection ? "true" : "false");
       });
-      const label = state.activeSection[0].toUpperCase() + state.activeSection.slice(1);
-      elements.searchInput.placeholder = `Search ${label.toLowerCase()}`;
+      elements.searchInput.placeholder = "Search everything";
     }
 
     function renderConfiguredWarning() {
@@ -1658,27 +1657,34 @@
       applyLibraryMeta();
       const query = elements.searchInput.value.trim().toLowerCase();
       const sectionType = SECTION_TYPES[state.activeSection] || "video";
+      const searchableText = (item) => [
+        item.id,
+        item.title,
+        item.description,
+        item.videoName,
+        item.type,
+        sectionForType(item.type),
+        ...(item.playlistItems || [])
+      ].join(" ").toLowerCase();
       state.visibleItems = state.allItems
-        .filter((item) => item.type === sectionType)
         .filter(isVisibleItem)
+        .filter((item) => query || item.type === sectionType)
         .filter((item) => {
           if (!query) return true;
-          return [item.id, item.title, item.description, item.videoName, ...(item.playlistItems || [])]
-            .join(" ")
-            .toLowerCase()
-            .includes(query);
+          return searchableText(item).includes(query);
         })
         .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
       if (!state.visibleItems.length) {
-        const message = query ? `No matching ${state.activeSection}.` : `No public ${state.activeSection} found.`;
+        const message = query ? "No matching items." : `No public ${state.activeSection} found.`;
         elements.content.innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
         return;
       }
 
-      const gridClass = sectionType === "post" ? "post-grid" : "video-grid";
+      const gridClass = !query && sectionType === "post" ? "post-grid" : "video-grid";
+      const label = query ? "Search results" : state.activeSection;
       elements.content.innerHTML = `
-        <section class="${gridClass}" aria-label="${escapeHtml(state.activeSection)}">
+        <section class="${gridClass}" aria-label="${escapeHtml(label)}">
           ${state.visibleItems.map(renderContentCard).join("")}
         </section>
       `;
