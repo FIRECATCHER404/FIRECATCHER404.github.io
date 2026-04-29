@@ -268,6 +268,11 @@
       box-shadow: 3px 3px 0 var(--ink);
     }
 
+    .like-button[aria-pressed="true"] {
+      background: var(--accent);
+      color: var(--logo-play);
+    }
+
     .search-wrap {
       position: relative;
     }
@@ -756,6 +761,8 @@
       posts: "post"
     };
     const THEME_STORAGE_KEY = "videos-theme";
+    const LIKE_COUNTS_STORAGE_KEY = "videos-local-like-counts-v1";
+    const LIKED_COOKIE_NAME = "videos_liked_items";
 
     const state = {
       allItems: [],
@@ -884,6 +891,97 @@
           button.textContent = originalText;
         }, 1400);
       }
+    }
+
+    function readCookie(name) {
+      const prefix = `${name}=`;
+      return document.cookie
+        .split(";")
+        .map((item) => item.trim())
+        .find((item) => item.startsWith(prefix))
+        ?.slice(prefix.length) || "";
+    }
+
+    function writeCookie(name, value) {
+      document.cookie = `${name}=${value}; max-age=31536000; path=/; SameSite=Lax`;
+    }
+
+    function likeKey(item) {
+      return `${item.type || "video"}:${item.id}`;
+    }
+
+    function readLikedKeys() {
+      try {
+        const raw = readCookie(LIKED_COOKIE_NAME);
+        const parsed = raw ? JSON.parse(decodeURIComponent(raw)) : [];
+        return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+      } catch {
+        return new Set();
+      }
+    }
+
+    function writeLikedKeys(keys) {
+      writeCookie(LIKED_COOKIE_NAME, encodeURIComponent(JSON.stringify([...keys])));
+    }
+
+    function readLikeCounts() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(LIKE_COUNTS_STORAGE_KEY) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function writeLikeCounts(counts) {
+      try {
+        localStorage.setItem(LIKE_COUNTS_STORAGE_KEY, JSON.stringify(counts));
+      } catch {
+        // The button still changes visually even if storage is unavailable.
+      }
+    }
+
+    function localLikeState(item) {
+      const key = likeKey(item);
+      const likedKeys = readLikedKeys();
+      const liked = likedKeys.has(key);
+      const counts = readLikeCounts();
+      const savedCount = Math.max(0, Number(counts[key]) || 0);
+      return { key, liked, count: liked ? Math.max(1, savedCount) : savedCount };
+    }
+
+    function likeButtonText(liked, count) {
+      return `${liked ? "Liked" : "Like"} ${count}`;
+    }
+
+    function renderLikeButton(item) {
+      const state = localLikeState(item);
+      return `<button id="likeButton" class="text-button like-button" type="button" data-like-key="${escapeHtml(state.key)}" aria-pressed="${state.liked ? "true" : "false"}">${escapeHtml(likeButtonText(state.liked, state.count))}</button>`;
+    }
+
+    function setupLocalLikeButtons() {
+      document.querySelectorAll("[data-like-key]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const key = button.dataset.likeKey;
+          if (!key) return;
+          const likedKeys = readLikedKeys();
+          const counts = readLikeCounts();
+          const wasLiked = likedKeys.has(key);
+          let count = Math.max(0, Number(counts[key]) || 0);
+          if (wasLiked) {
+            likedKeys.delete(key);
+            count = Math.max(0, count - 1);
+          } else {
+            likedKeys.add(key);
+            count += 1;
+          }
+          counts[key] = count;
+          writeLikedKeys(likedKeys);
+          writeLikeCounts(counts);
+          button.setAttribute("aria-pressed", wasLiked ? "false" : "true");
+          button.textContent = likeButtonText(!wasLiked, count);
+        });
+      });
     }
 
     function applyLibraryMeta() {
@@ -1461,30 +1559,6 @@
       });
     }
 
-    async function fetchIssueForItem(item) {
-      const query = new URLSearchParams({
-        q: `repo:${SELFTUBE_CONFIG.commentsRepo} ${issueTerm(item)} in:title`,
-        per_page: "1"
-      });
-      const url = `${SELFTUBE_CONFIG.githubApiBase}/search/issues?${query.toString()}`;
-      const result = await githubFetch(url);
-      return result && Array.isArray(result.items) && result.items.length ? result.items[0] : null;
-    }
-
-    async function updateLikeButton(item) {
-      const likeButton = document.getElementById("likeButton");
-      if (!likeButton) return;
-      try {
-        const issue = await fetchIssueForItem(item);
-        const count = issue && issue.reactions ? Number(issue.reactions["+1"] || 0) : 0;
-        likeButton.textContent = `Like ${count}`;
-        likeButton.href = issue && issue.html_url ? issue.html_url : commentsIssueUrl(item);
-      } catch {
-        likeButton.textContent = "Like";
-        likeButton.href = commentsIssueUrl(item);
-      }
-    }
-
     function renderWatch(video) {
       setLibraryMode(false);
       state.activeItem = video;
@@ -1523,7 +1597,7 @@
               <div><strong>Section</strong><span>${escapeHtml(sectionForType(video.type))}</span></div>
             </div>
             <div class="actions">
-              <a id="likeButton" class="text-button" href="${escapeHtml(commentsIssueUrl(video))}" target="_blank" rel="noopener">Like</a>
+              ${renderLikeButton(video)}
               <button class="text-button" type="button" data-copy-url="${escapeHtml(shareCardUrl(video.id))}">Share Card</button>
               <a class="text-button" href="${escapeHtml(video.videoUrl)}" download>Download</a>
               <a class="text-button" href="${escapeHtml(video.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
@@ -1533,8 +1607,8 @@
       `;
       setupMergedPlayer(video);
       setupChapterButtons();
+      setupLocalLikeButtons();
       renderComments(video);
-      updateLikeButton(video);
     }
 
     function renderPost(item) {
@@ -1549,7 +1623,7 @@
             <div><strong>Posted</strong><span>${escapeHtml(formatDate(item.createdAt))}</span></div>
           </div>
           <div class="actions">
-            <a id="likeButton" class="text-button" href="${escapeHtml(commentsIssueUrl(item))}" target="_blank" rel="noopener">Like</a>
+            ${renderLikeButton(item)}
             <a class="text-button" href="${escapeHtml(item.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
           </div>
         </article>
@@ -1562,8 +1636,8 @@
           <div id="comments"></div>
         </section>
       `;
+      setupLocalLikeButtons();
       renderComments(item);
-      updateLikeButton(item);
     }
 
     function renderPlaylist(item) {
@@ -1582,7 +1656,7 @@
             <div><strong>Created</strong><span>${escapeHtml(formatDate(item.createdAt))}</span></div>
           </div>
           <div class="actions">
-            <a id="likeButton" class="text-button" href="${escapeHtml(commentsIssueUrl(item))}" target="_blank" rel="noopener">Like</a>
+            ${renderLikeButton(item)}
             <a class="text-button" href="${escapeHtml(item.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
           </div>
         </section>
@@ -1598,8 +1672,8 @@
           <div id="comments"></div>
         </section>
       `;
+      setupLocalLikeButtons();
       renderComments(item);
-      updateLikeButton(item);
     }
 
     function renderNotFound(videoId) {
