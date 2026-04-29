@@ -23,8 +23,9 @@
     (() => {
       try {
         const storedTheme = localStorage.getItem("videos-theme");
+        const validThemes = new Set(["light", "dark", "midnight"]);
         const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        document.documentElement.dataset.theme = storedTheme || (prefersDark ? "dark" : "light");
+        document.documentElement.dataset.theme = validThemes.has(storedTheme) ? storedTheme : (prefersDark ? "dark" : "light");
       } catch {
         document.documentElement.dataset.theme = "light";
       }
@@ -42,6 +43,7 @@
       --line: #d7d4c8;
       --accent: #116b5f;
       --accent-strong: #0b4e45;
+      --accent-text: #ffffff;
       --danger: #ad3029;
       --logo-bg: #f04e37;
       --logo-play: #ffffff;
@@ -57,25 +59,50 @@
 
     html[data-theme="dark"] {
       color-scheme: dark;
-      --bg: #11130f;
-      --panel: #1c201b;
-      --panel-soft: #262b24;
-      --text: #f4f1e8;
-      --ink: #f4f1e8;
-      --muted: #b2aea3;
-      --line: #4d5148;
-      --accent: #6ed6c2;
-      --accent-strong: #9ee5d8;
+      --bg: #151715;
+      --panel: #20231f;
+      --panel-soft: #2a3029;
+      --text: #edf4ea;
+      --ink: #edf4ea;
+      --muted: #aeb9aa;
+      --line: #414a3f;
+      --accent: #21c96b;
+      --accent-strong: #60e995;
+      --accent-text: #05140b;
       --danger: #ff8177;
-      --logo-bg: #35a0d1;
-      --logo-play: #10130f;
-      --poster-bg: #080907;
-      --empty-line: #686d61;
-      --page-glow: rgba(110,214,194,0.13);
-      --page-sheen: rgba(255,255,255,0.05);
+      --logo-bg: #21c96b;
+      --logo-play: #05140b;
+      --poster-bg: #080a08;
+      --empty-line: #5a6658;
+      --page-glow: rgba(33,201,107,0.13);
+      --page-sheen: rgba(255,255,255,0.04);
       --soft-fill: rgba(255,255,255,0.08);
       --empty-fill: rgba(255,255,255,0.05);
       --shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
+    }
+
+    html[data-theme="midnight"] {
+      color-scheme: dark;
+      --bg: #000000;
+      --panel: #060b0d;
+      --panel-soft: #0b171b;
+      --text: #e8fdff;
+      --ink: #b7faff;
+      --muted: #8bbcc1;
+      --line: #17464d;
+      --accent: #00eaff;
+      --accent-strong: #73f6ff;
+      --accent-text: #001013;
+      --danger: #ff5d8f;
+      --logo-bg: #00eaff;
+      --logo-play: #001013;
+      --poster-bg: #010303;
+      --empty-line: #1b5c66;
+      --page-glow: rgba(0,234,255,0.16);
+      --page-sheen: rgba(0,234,255,0.045);
+      --soft-fill: rgba(0,234,255,0.07);
+      --empty-fill: rgba(0,234,255,0.045);
+      --shadow: 0 16px 34px rgba(0, 234, 255, 0.10);
     }
 
     * {
@@ -227,9 +254,16 @@
       box-shadow: 1px 1px 0 var(--ink);
     }
 
-    html[data-theme="dark"] .theme-sun,
-    html:not([data-theme="dark"]) .theme-moon {
+    .theme-sun,
+    .theme-moon,
+    .theme-midnight {
       display: none;
+    }
+
+    html[data-theme="light"] .theme-sun,
+    html[data-theme="dark"] .theme-moon,
+    html[data-theme="midnight"] .theme-midnight {
+      display: block;
     }
 
     .icon {
@@ -264,13 +298,13 @@
 
     .section-tab[aria-selected="true"] {
       background: var(--accent);
-      color: var(--logo-play);
+      color: var(--accent-text);
       box-shadow: 3px 3px 0 var(--ink);
     }
 
     .like-button[aria-pressed="true"] {
       background: var(--accent);
-      color: var(--logo-play);
+      color: var(--accent-text);
     }
 
     .search-wrap {
@@ -312,6 +346,87 @@
 
     .status.error {
       color: var(--danger);
+    }
+
+    .home-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .home-card {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+      min-height: 260px;
+      border: 1px solid var(--ink);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .home-section-button {
+      width: 100%;
+      min-height: 44px;
+      background: var(--accent);
+      color: var(--accent-text);
+      font-weight: 750;
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+
+    .home-section-button:hover {
+      background: var(--accent-strong);
+    }
+
+    .home-latest {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .home-latest-poster {
+      aspect-ratio: 16 / 9;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--poster-bg);
+      overflow: hidden;
+    }
+
+    .home-latest-poster img,
+    .home-latest-poster video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      background: var(--poster-bg);
+    }
+
+    .home-card[data-section="shorts"] .home-latest-poster {
+      aspect-ratio: 9 / 16;
+      max-height: 260px;
+      width: min(100%, 150px);
+      justify-self: center;
+    }
+
+    .home-latest-title {
+      margin: 0;
+      overflow-wrap: anywhere;
+      font-size: 1rem;
+      line-height: 1.3;
+      letter-spacing: 0;
+    }
+
+    .home-latest-meta,
+    .home-empty {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.4;
     }
 
     .video-grid,
@@ -676,8 +791,18 @@
         grid-template-columns: 1fr;
       }
 
+      .home-grid {
+        grid-template-columns: 1fr;
+      }
+
       .watch-view {
         grid-template-columns: 1fr;
+      }
+    }
+
+    @media (min-width: 761px) and (max-width: 1040px) {
+      .home-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
   </style>
@@ -685,7 +810,7 @@
 <body>
   <main class="app-shell">
     <header class="topbar">
-      <a class="brand" href="./" aria-label="Videos home">
+      <a class="brand" href="./" data-home-link aria-label="Videos home">
         <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
           <rect class="logo-shadow" x="11" y="13" width="44" height="40" rx="8"></rect>
           <rect class="logo-body" x="7" y="9" width="44" height="40" rx="8"></rect>
@@ -698,26 +823,21 @@
         </div>
       </a>
       <nav class="toolbar" aria-label="Page controls">
-        <button id="backButton" class="icon-button" type="button" title="Back to videos" hidden aria-label="Back to videos">
+        <button id="backButton" class="icon-button" type="button" title="Back to home" hidden aria-label="Back to home">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.42-1.41L7.83 13H20v-2z"/></svg>
         </button>
         <button id="refreshButton" class="icon-button" type="button" title="Refresh videos" aria-label="Refresh videos">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.45 5.08h-2.13A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h8V3l-3.35 3.35z"/></svg>
         </button>
-        <button id="themeButton" class="icon-button" type="button" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <button id="themeButton" class="icon-button" type="button" title="Switch theme" aria-label="Switch theme">
           <svg class="icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.8 1.42-1.42zM1 13h3v-2H1v2zm10-12h2v3h-2V1zm8.04 2.46l1.41 1.41-1.79 1.8-1.42-1.42 1.8-1.79zM17.24 19.16l1.8 1.79 1.41-1.41-1.79-1.8-1.42 1.42zM20 11v2h3v-2h-3zM11 20h2v3h-2v-3zm-7.45-.46l1.41 1.41 1.8-1.79-1.42-1.42-1.79 1.8zM12 6a6 6 0 1 0 0 12A6 6 0 0 0 12 6zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/></svg>
           <svg class="icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 15.49A8.03 8.03 0 0 1 8.51 3.4 8.56 8.56 0 1 0 20.6 15.49z"/></svg>
+          <svg class="icon theme-midnight" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l1.55 5.11L19 5.5l-3.88 4.07L20 12l-4.88 2.43L19 18.5l-5.45-1.61L12 22l-1.55-5.11L5 18.5l3.88-4.07L4 12l4.88-2.43L5 5.5l5.45 1.61L12 2z"/></svg>
         </button>
       </nav>
     </header>
 
-    <section id="libraryControls" class="library-controls">
-      <nav class="section-tabs" aria-label="Content sections">
-        <button class="text-button section-tab" type="button" data-section="videos" aria-selected="true">Videos</button>
-        <button class="text-button section-tab" type="button" data-section="shorts" aria-selected="false">Shorts</button>
-        <button class="text-button section-tab" type="button" data-section="playlists" aria-selected="false">Playlists</button>
-        <button class="text-button section-tab" type="button" data-section="posts" aria-selected="false">Posts</button>
-      </nav>
+    <section id="libraryControls" class="library-controls" hidden>
       <div class="search-row">
         <label class="search-wrap">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3a6.5 6.5 0 0 1 5.17 10.44l4.44 4.45-1.42 1.41-4.44-4.44A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/></svg>
@@ -759,6 +879,24 @@
       shorts: "short",
       playlists: "playlist",
       posts: "post"
+    };
+    const SECTION_LABELS = {
+      videos: "Videos",
+      shorts: "Shorts",
+      playlists: "Playlists",
+      posts: "Posts"
+    };
+    const SECTION_ORDER = ["videos", "shorts", "playlists", "posts"];
+    const THEME_SEQUENCE = ["light", "dark", "midnight"];
+    const THEME_LABELS = {
+      light: "light",
+      dark: "dark",
+      midnight: "midnight"
+    };
+    const THEME_COLORS = {
+      light: "#f7f7f2",
+      dark: "#151715",
+      midnight: "#000000"
     };
     const THEME_STORAGE_KEY = "videos-theme";
     const LIKE_COUNTS_STORAGE_KEY = "videos-local-like-counts-v1";
@@ -804,11 +942,12 @@
     }
 
     function currentTheme() {
-      return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+      const theme = document.documentElement.dataset.theme;
+      return THEME_SEQUENCE.includes(theme) ? theme : "light";
     }
 
     function utterancesTheme() {
-      return currentTheme() === "dark" ? "github-dark" : "github-light";
+      return currentTheme() === "light" ? "github-light" : "github-dark";
     }
 
     function setMetaContent(id, value) {
@@ -1018,13 +1157,15 @@
     }
 
     function applyTheme(theme, persist = false) {
-      const normalizedTheme = theme === "dark" ? "dark" : "light";
+      const normalizedTheme = THEME_SEQUENCE.includes(theme) ? theme : "light";
       document.documentElement.dataset.theme = normalizedTheme;
-      setMetaContent("themeColor", normalizedTheme === "dark" ? "#11130f" : "#f7f7f2");
+      setMetaContent("themeColor", THEME_COLORS[normalizedTheme]);
       if (elements.themeButton) {
-        const nextTheme = normalizedTheme === "dark" ? "light" : "dark";
-        elements.themeButton.setAttribute("title", `Switch to ${nextTheme} mode`);
-        elements.themeButton.setAttribute("aria-label", `Switch to ${nextTheme} mode`);
+        const currentIndex = THEME_SEQUENCE.indexOf(normalizedTheme);
+        const nextTheme = THEME_SEQUENCE[(currentIndex + 1) % THEME_SEQUENCE.length];
+        const nextLabel = THEME_LABELS[nextTheme];
+        elements.themeButton.setAttribute("title", `Switch to ${nextLabel} mode`);
+        elements.themeButton.setAttribute("aria-label", `Switch to ${nextLabel} mode`);
       }
       if (persist) {
         try {
@@ -1288,9 +1429,15 @@
       elements.status.classList.toggle("error", Boolean(isError));
     }
 
-    function setLibraryMode(isLibrary) {
-      elements.libraryControls.hidden = !isLibrary;
-      elements.backButton.hidden = isLibrary;
+    function setPageMode(mode) {
+      const isHome = mode === "home";
+      const isSection = mode === "section";
+      elements.libraryControls.hidden = !isSection;
+      elements.backButton.hidden = isHome;
+      if (elements.backButton) {
+        elements.backButton.setAttribute("title", "Back to home");
+        elements.backButton.setAttribute("aria-label", "Back to home");
+      }
     }
 
     function sectionForType(type) {
@@ -1334,6 +1481,7 @@
     }
 
     function renderConfiguredWarning() {
+      setPageMode("home");
       elements.repoLabel.textContent = "Repository not configured";
       elements.content.innerHTML = `
         <section class="config-warning">
@@ -1344,8 +1492,79 @@
       `;
     }
 
+    function sectionUrl(section) {
+      const url = new URL(window.location.href);
+      url.search = "";
+      url.searchParams.set("section", section);
+      return url.pathname + url.search;
+    }
+
+    function newestVisibleItemForSection(section) {
+      const sectionType = SECTION_TYPES[section] || "video";
+      return state.allItems
+        .filter((item) => item.type === sectionType)
+        .filter(isVisibleItem)
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0] || null;
+    }
+
+    function postedVerb(item) {
+      if (item.type === "post") return "Posted";
+      if (item.type === "playlist") return "Created";
+      return "Uploaded";
+    }
+
+    function renderHomePoster(item, section) {
+      if (item.thumbnailUrl) {
+        return `<img src="${escapeHtml(item.thumbnailUrl)}" alt="">`;
+      }
+      if (item.videoUrl) {
+        return `<video src="${escapeHtml(item.videoUrl)}#t=0.1" preload="metadata" muted playsinline></video>`;
+      }
+      return `<div class="poster-fallback">${escapeHtml(SECTION_LABELS[section] || "Item")}</div>`;
+    }
+
+    function renderHomeLatest(section, item) {
+      if (!item) {
+        return `<p class="home-empty">No public ${escapeHtml(SECTION_LABELS[section].toLowerCase())} yet.</p>`;
+      }
+      return `
+        <a class="home-latest" href="${escapeHtml(itemLink(item))}" data-content-id="${escapeHtml(item.id)}">
+          <div class="home-latest-poster">
+            ${renderHomePoster(item, section)}
+          </div>
+          <div>
+            <h2 class="home-latest-title">${escapeHtml(item.title)}</h2>
+            <p class="home-latest-meta">${escapeHtml(postedVerb(item))} ${escapeHtml(formatDate(item.createdAt))}</p>
+          </div>
+        </a>
+      `;
+    }
+
+    function renderHome() {
+      setPageMode("home");
+      applyLibraryMeta();
+      state.activeItem = null;
+      state.visibleItems = [];
+      elements.searchInput.value = "";
+      elements.content.innerHTML = `
+        <section class="home-grid" aria-label="Videos home">
+          ${SECTION_ORDER.map((section) => {
+            const latest = newestVisibleItemForSection(section);
+            return `
+              <article class="home-card" data-section="${escapeHtml(section)}">
+                <a class="text-button home-section-button" href="${escapeHtml(sectionUrl(section))}" data-section-link="${escapeHtml(section)}">
+                  ${escapeHtml(SECTION_LABELS[section])}
+                </a>
+                ${renderHomeLatest(section, latest)}
+              </article>
+            `;
+          }).join("")}
+        </section>
+      `;
+    }
+
     function renderLibrary() {
-      setLibraryMode(true);
+      setPageMode("section");
       applyLibraryMeta();
       const query = elements.searchInput.value.trim().toLowerCase();
       const sectionType = SECTION_TYPES[state.activeSection] || "video";
@@ -1648,7 +1867,7 @@
     }
 
     function renderWatch(video) {
-      setLibraryMode(false);
+      setPageMode("detail");
       state.activeItem = video;
       applyItemMeta(video);
       elements.content.innerHTML = `
@@ -1699,7 +1918,7 @@
     }
 
     function renderPost(item) {
-      setLibraryMode(false);
+      setPageMode("detail");
       state.activeItem = item;
       applyItemMeta(item);
       elements.content.innerHTML = `
@@ -1727,7 +1946,7 @@
     }
 
     function renderPlaylist(item) {
-      setLibraryMode(false);
+      setPageMode("detail");
       state.activeItem = item;
       applyItemMeta(item);
       const playlistVideos = item.playlistItems
@@ -1762,7 +1981,7 @@
     }
 
     function renderNotFound(videoId) {
-      setLibraryMode(false);
+      setPageMode("detail");
       applyLibraryMeta();
       elements.content.innerHTML = `
         <div class="empty-state">
@@ -1801,13 +2020,17 @@
     function route() {
       const params = new URLSearchParams(window.location.search);
       const section = params.get("section");
-      if (section) setActiveSection(section);
       const videoId = params.get("video") || params.get("short");
       const postId = params.get("post");
       const playlistId = params.get("playlist");
       const targetId = videoId || postId || playlistId;
       if (!targetId) {
-        renderLibrary();
+        if (section) {
+          setActiveSection(section);
+          renderLibrary();
+        } else {
+          renderHome();
+        }
         return;
       }
 
@@ -1843,7 +2066,8 @@
     });
     elements.refreshButton.addEventListener("click", loadVideos);
     elements.themeButton.addEventListener("click", () => {
-      applyTheme(currentTheme() === "dark" ? "light" : "dark", true);
+      const currentIndex = THEME_SEQUENCE.indexOf(currentTheme());
+      applyTheme(THEME_SEQUENCE[(currentIndex + 1) % THEME_SEQUENCE.length], true);
     });
     elements.backButton.addEventListener("click", () => {
       history.pushState({}, "", window.location.pathname);
@@ -1852,6 +2076,26 @@
     window.addEventListener("popstate", route);
 
     document.addEventListener("click", (event) => {
+      const homeLink = event.target.closest("a[data-home-link]");
+      if (homeLink && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        history.pushState({}, "", new URL(homeLink.href).pathname);
+        route();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      const sectionLink = event.target.closest("a[data-section-link]");
+      if (sectionLink && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        elements.searchInput.value = "";
+        setActiveSection(sectionLink.dataset.sectionLink);
+        history.pushState({}, "", sectionLink.getAttribute("href"));
+        route();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
       const copyButton = event.target.closest("button[data-copy-url]");
       if (copyButton) {
         copyShareUrl(copyButton);
