@@ -901,6 +901,9 @@
     const THEME_STORAGE_KEY = "videos-theme";
     const LIKE_COUNTS_STORAGE_KEY = "videos-local-like-counts-v1";
     const LIKED_COOKIE_NAME = "videos_liked_items";
+    const RELEASES_CACHE_VERSION = 1;
+    const RELEASES_CACHE_TTL_MS = 10 * 60 * 1000;
+    const RELEASES_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
     const state = {
       allItems: [],
@@ -1392,6 +1395,68 @@
       });
     }
 
+    function releasesCacheKey() {
+      return [
+        "videos-releases-cache",
+        RELEASES_CACHE_VERSION,
+        SELFTUBE_CONFIG.owner,
+        SELFTUBE_CONFIG.repo,
+        SELFTUBE_CONFIG.tagPrefix
+      ].join(":");
+    }
+
+    function compactAssetForCache(asset) {
+      return {
+        name: asset.name,
+        content_type: asset.content_type,
+        browser_download_url: asset.browser_download_url,
+        size: asset.size
+      };
+    }
+
+    function compactReleaseForCache(release) {
+      return {
+        tag_name: release.tag_name,
+        name: release.name,
+        body: release.body,
+        html_url: release.html_url,
+        created_at: release.created_at,
+        published_at: release.published_at,
+        assets: Array.isArray(release.assets) ? release.assets.map(compactAssetForCache) : []
+      };
+    }
+
+    function readReleasesCache(allowStale = false) {
+      try {
+        const raw = localStorage.getItem(releasesCacheKey());
+        if (!raw) return null;
+        const cached = JSON.parse(raw);
+        if (!cached || cached.version !== RELEASES_CACHE_VERSION || !Array.isArray(cached.releases)) return null;
+        const age = Date.now() - Number(cached.savedAt || 0);
+        if (age < 0 || age > RELEASES_CACHE_MAX_AGE_MS) return null;
+        if (!allowStale && age > RELEASES_CACHE_TTL_MS) return null;
+        return {
+          releases: cached.releases,
+          age,
+          stale: age > RELEASES_CACHE_TTL_MS
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    function writeReleasesCache(releases) {
+      try {
+        localStorage.setItem(releasesCacheKey(), JSON.stringify({
+          version: RELEASES_CACHE_VERSION,
+          savedAt: Date.now(),
+          releases: releases.map(compactReleaseForCache)
+        }));
+      } catch {
+        // If browser storage is full or disabled, the site can still use the network.
+      }
+    }
+
     async function githubFetch(url) {
       const response = await fetch(url, {
         headers: {
@@ -1413,7 +1478,7 @@
       return response.json();
     }
 
-    async function fetchAllReleases() {
+    async function fetchAllReleasesFromGitHub() {
       const releases = [];
       for (let page = 1; page <= 20; page += 1) {
         const url = `${SELFTUBE_CONFIG.githubApiBase}/repos/${encodeURIComponent(SELFTUBE_CONFIG.owner)}/${encodeURIComponent(SELFTUBE_CONFIG.repo)}/releases?per_page=100&page=${page}`;
@@ -1422,6 +1487,31 @@
         if (batch.length < 100) break;
       }
       return releases;
+    }
+
+    async function fetchAllReleases(options = {}) {
+      if (!options.forceRefresh) {
+        const cached = readReleasesCache(false);
+        if (cached) {
+          return { releases: cached.releases, source: "cache" };
+        }
+      }
+
+      try {
+        const releases = await fetchAllReleasesFromGitHub();
+        writeReleasesCache(releases);
+        return { releases, source: "network" };
+      } catch (error) {
+        const cached = readReleasesCache(true);
+        if (cached) {
+          return {
+            releases: cached.releases,
+            source: "stale-cache",
+            error
+          };
+        }
+        throw error;
+      }
     }
 
     function setStatus(message, isError = false) {
@@ -1990,7 +2080,7 @@
       `;
     }
 
-    async function loadVideos() {
+    async function loadVideos(options = {}) {
       if (!isConfigured()) {
         setStatus("");
         renderConfiguredWarning();
@@ -2002,13 +2092,17 @@
       elements.repoLabel.textContent = `${SELFTUBE_CONFIG.owner}/${SELFTUBE_CONFIG.repo}`;
 
       try {
-        const releases = await fetchAllReleases();
-        state.allItems = groupContentParts(releases
+        const result = await fetchAllReleases(options);
+        state.allItems = groupContentParts(result.releases
           .map(releaseToContentPart)
           .filter(Boolean));
         state.loading = false;
         route();
-        setStatus("");
+        if (result.source === "stale-cache") {
+          setStatus(`Showing cached items because GitHub could not load: ${result.error.message}`, true);
+        } else {
+          setStatus("");
+        }
       } catch (error) {
         state.loading = false;
         state.allItems = [];
@@ -2064,7 +2158,7 @@
         renderLibrary();
       });
     });
-    elements.refreshButton.addEventListener("click", loadVideos);
+    elements.refreshButton.addEventListener("click", () => loadVideos({ forceRefresh: true }));
     elements.themeButton.addEventListener("click", () => {
       const currentIndex = THEME_SEQUENCE.indexOf(currentTheme());
       applyTheme(THEME_SEQUENCE[(currentIndex + 1) % THEME_SEQUENCE.length], true);
