@@ -189,23 +189,6 @@
       line-height: 1;
     }
 
-    .repo-pill {
-      display: inline-flex;
-      align-items: center;
-      max-width: 100%;
-      min-height: 28px;
-      padding: 4px 8px;
-      margin-top: 7px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: var(--soft-fill);
-      color: var(--muted);
-      font-size: 0.85rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
     .toolbar {
       display: flex;
       align-items: center;
@@ -819,7 +802,6 @@
         </svg>
         <div>
           <h1>Videos</h1>
-          <div id="repoLabel" class="repo-pill">Loading repository</div>
         </div>
       </a>
       <nav class="toolbar" aria-label="Page controls">
@@ -914,7 +896,6 @@
     };
 
     const elements = {
-      repoLabel: document.getElementById("repoLabel"),
       status: document.getElementById("status"),
       content: document.getElementById("content"),
       searchInput: document.getElementById("searchInput"),
@@ -1571,7 +1552,6 @@
 
     function renderConfiguredWarning() {
       setPageMode("home");
-      elements.repoLabel.textContent = "Repository not configured";
       elements.content.innerHTML = `
         <section class="config-warning">
           <h2>Set your GitHub repository</h2>
@@ -2095,7 +2075,6 @@
 
       state.loading = true;
       setStatus("Loading SelfTube items...");
-      elements.repoLabel.textContent = `${SELFTUBE_CONFIG.owner}/${SELFTUBE_CONFIG.repo}`;
 
       try {
         const result = await fetchAllReleases(options);
