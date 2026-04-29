@@ -1324,7 +1324,7 @@
         <section class="config-warning">
           <h2>Set your GitHub repository</h2>
           <p>Edit <code>SELFTUBE_CONFIG</code> near the top of this file's script and set <code>owner</code> and <code>repo</code>.</p>
-          <p>This page reads public GitHub Releases tagged with <code>${escapeHtml(SELFTUBE_CONFIG.tagPrefix)}&lt;video-id&gt;/public</code> or <code>${escapeHtml(SELFTUBE_CONFIG.tagPrefix)}&lt;video-id&gt;/hidden</code>.</p>
+          <p>This page reads published SelfTube items tagged with <code>${escapeHtml(SELFTUBE_CONFIG.tagPrefix)}&lt;video-id&gt;/public</code> or <code>${escapeHtml(SELFTUBE_CONFIG.tagPrefix)}&lt;video-id&gt;/hidden</code>.</p>
         </section>
       `;
     }
@@ -1600,7 +1600,6 @@
               ${renderLikeButton(video)}
               <button class="text-button" type="button" data-copy-url="${escapeHtml(shareCardUrl(video.id))}">Share Card</button>
               <a class="text-button" href="${escapeHtml(video.videoUrl)}" download>Download</a>
-              <a class="text-button" href="${escapeHtml(video.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
             </div>
           </aside>
         </section>
@@ -1624,7 +1623,6 @@
           </div>
           <div class="actions">
             ${renderLikeButton(item)}
-            <a class="text-button" href="${escapeHtml(item.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
           </div>
         </article>
         <section class="comments-panel" aria-label="Comments">
@@ -1657,7 +1655,6 @@
           </div>
           <div class="actions">
             ${renderLikeButton(item)}
-            <a class="text-button" href="${escapeHtml(item.releaseUrl)}" target="_blank" rel="noopener">GitHub Release</a>
           </div>
         </section>
         <section class="video-grid" aria-label="Playlist videos">
@@ -1694,7 +1691,7 @@
       }
 
       state.loading = true;
-      setStatus("Loading videos from GitHub Releases...");
+      setStatus("Loading SelfTube items...");
       elements.repoLabel.textContent = `${SELFTUBE_CONFIG.owner}/${SELFTUBE_CONFIG.repo}`;
 
       try {
