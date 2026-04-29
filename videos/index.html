@@ -1197,7 +1197,7 @@
       const legacyPagesVideoUrl = releaseVideoUrl && segmentCount > 1 && segmentIndex === 1
         ? pagesMediaUrlForPart(metadata.id || tagData.id, 1, 1)
         : "";
-      const videoSources = [...new Set([pagesVideoUrl, legacyPagesVideoUrl, releaseVideoUrl].filter(Boolean))];
+      const videoSources = [...new Set([pagesVideoUrl, legacyPagesVideoUrl].filter(Boolean))];
 
       return {
         id: metadata.id || tagData.id,
@@ -1211,7 +1211,7 @@
         scheduledAt: metadata.scheduledAt || "",
         videoUrl: videoSources[0] || "",
         videoSources,
-        fallbackVideoUrl: releaseVideoUrl,
+        fallbackVideoUrl: "",
         videoName: assets.video ? assets.video.name : "",
         videoSize: assets.video ? assets.video.size : 0,
         thumbnailUrl: assets.thumbnail ? assets.thumbnail.browser_download_url : "",
