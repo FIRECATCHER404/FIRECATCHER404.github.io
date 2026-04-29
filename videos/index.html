@@ -1463,6 +1463,15 @@
       let totalDuration = video.totalDuration || segments.reduce((sum, segment) => sum + (segment.segmentDuration || 0), 0);
       let pendingLocalTime = 0;
       let pendingShouldPlay = false;
+      let isScrubbingTimeline = false;
+      let lastCommittedSeekTime = null;
+      let lastCommittedSeekAt = 0;
+
+      function clampGlobalTime(time) {
+        const numericTime = Number.isFinite(time) ? time : 0;
+        const upperLimit = totalDuration || numericTime || 0;
+        return Math.max(0, Math.min(numericTime, upperLimit));
+      }
 
       function syncDuration() {
         if (!totalDuration && Number.isFinite(media.duration) && media.duration > 0) {
@@ -1492,8 +1501,10 @@
 
       function updateDisplay() {
         const time = globalTime();
-        currentLabel.textContent = formatTime(time);
-        timeline.value = String(Math.min(time, totalDuration || time));
+        if (!isScrubbingTimeline) {
+          currentLabel.textContent = formatTime(time);
+          timeline.value = String(clampGlobalTime(time));
+        }
         playButton.textContent = media.paused ? "Play" : "Pause";
       }
 
@@ -1532,11 +1543,30 @@
       }
 
       function seekGlobal(time) {
-        const targetTime = Math.max(0, Math.min(time, totalDuration || time));
+        const targetTime = clampGlobalTime(time);
         const targetIndex = segmentForTime(targetTime);
         const localTime = targetTime - (segments[targetIndex].offset || 0);
         const shouldPlay = !media.paused;
         loadSegment(targetIndex, localTime, shouldPlay);
+      }
+
+      function previewTimelineSeek(time) {
+        const targetTime = clampGlobalTime(time);
+        currentLabel.textContent = formatTime(targetTime);
+        timeline.value = String(targetTime);
+      }
+
+      function commitTimelineSeek(time) {
+        const targetTime = clampGlobalTime(time);
+        const now = Date.now();
+        const isDuplicateCommit = lastCommittedSeekTime !== null
+          && Math.abs(targetTime - lastCommittedSeekTime) < 0.02
+          && now - lastCommittedSeekAt < 350;
+        isScrubbingTimeline = false;
+        if (isDuplicateCommit) return;
+        lastCommittedSeekTime = targetTime;
+        lastCommittedSeekAt = now;
+        seekGlobal(targetTime);
       }
 
       window.selftubeSeekActiveVideo = seekGlobal;
@@ -1548,7 +1578,37 @@
           media.pause();
         }
       });
-      timeline.addEventListener("input", () => seekGlobal(Number(timeline.value)));
+      timeline.addEventListener("pointerdown", (event) => {
+        isScrubbingTimeline = true;
+        if (timeline.setPointerCapture) {
+          timeline.setPointerCapture(event.pointerId);
+        }
+      });
+      timeline.addEventListener("input", () => {
+        const targetTime = Number(timeline.value);
+        previewTimelineSeek(targetTime);
+        if (!isScrubbingTimeline) {
+          commitTimelineSeek(targetTime);
+        }
+      });
+      timeline.addEventListener("change", () => {
+        commitTimelineSeek(Number(timeline.value));
+      });
+      timeline.addEventListener("pointerup", (event) => {
+        if (timeline.releasePointerCapture && timeline.hasPointerCapture && timeline.hasPointerCapture(event.pointerId)) {
+          timeline.releasePointerCapture(event.pointerId);
+        }
+        commitTimelineSeek(Number(timeline.value));
+      });
+      timeline.addEventListener("pointercancel", () => {
+        isScrubbingTimeline = false;
+        updateDisplay();
+      });
+      timeline.addEventListener("blur", () => {
+        if (isScrubbingTimeline) {
+          commitTimelineSeek(Number(timeline.value));
+        }
+      });
       media.addEventListener("loadedmetadata", syncDuration);
       media.addEventListener("timeupdate", updateDisplay);
       media.addEventListener("play", updateDisplay);
