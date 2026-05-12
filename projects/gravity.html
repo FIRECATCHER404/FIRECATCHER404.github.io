@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Physics Lab</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: #111;
+      color: white;
+    }
+
+    canvas {
+      display: block;
+      background: #222;
+    }
+
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px;
+      border-radius: 10px;
+    }
+
+    .controls label {
+      display: block;
+      margin: 5px 0 2px;
+    }
+
+    .controls input, .controls select {
+      width: 200px;
+    }
+
+    .back-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #00aaff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      color: white;
+      font-size: 16px;
+    }
+
+    .back-btn:hover {
+      background: #0077cc;
+    }
+  </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div class="controls">
+  <label>Gravity X</label>
+  <input type="range" id="gx" min="-1" max="1" step="0.01" value="0">
+  <label>Gravity Y</label>
+  <input type="range" id="gy" min="-1" max="1" step="0.01" value="0.2">
+  <label>Gravity Strength</label>
+  <input type="range" id="gstrength" min="0" max="2" step="0.01" value="1">
+  <label>Shape</label>
+  <select id="shapeSelect">
+    <option value="circle">Circle</option>
+    <option value="square">Square</option>
+    <option value="triangle">Triangle</option>
+  </select>
+  <label>Color</label>
+  <input type="color" id="colorPicker" value="#00aaff">
+  <button onclick="location.href='index.html'">Main Menu</button>
+</div>
+
+<button class="back-btn" onclick="location.href='index.html'">Back to Menu</button>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let gravityX = 0;
+let gravityY = 0.2;
+let gravityStrength = 1;
+
+const gxSlider = document.getElementById('gx');
+const gySlider = document.getElementById('gy');
+const gstrengthSlider = document.getElementById('gstrength');
+const shapeSelect = document.getElementById('shapeSelect');
+const colorPicker = document.getElementById('colorPicker');
+
+gxSlider.addEventListener('input', () => gravityX = parseFloat(gxSlider.value));
+gySlider.addEventListener('input', () => gravityY = parseFloat(gySlider.value));
+gstrengthSlider.addEventListener('input', () => gravityStrength = parseFloat(gstrengthSlider.value));
+
+function createShape(x, y, shape, color, size, vx = 0, vy = 0) {
+  return { x, y, shape, color, size, vx, vy };
+}
+
+function drawShape(obj) {
+  ctx.save();
+  ctx.translate(obj.x, obj.y);
+  ctx.fillStyle = obj.color;
+  ctx.beginPath();
+  if (obj.shape === 'circle') {
+    ctx.arc(0, 0, obj.size, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (obj.shape === 'square') {
+    ctx.fillRect(-obj.size, -obj.size, obj.size * 2, obj.size * 2);
+  } else if (obj.shape === 'triangle') {
+    ctx.moveTo(0, -obj.size);
+    ctx.lineTo(obj.size, obj.size);
+    ctx.lineTo(-obj.size, obj.size);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function getBoundingCircle(obj) {
+  return {
+    x: obj.x,
+    y: obj.y,
+    r: obj.size * (obj.shape === 'circle' ? 1 : Math.SQRT2)
+  };
+}
+
+function resolveCollisions() {
+  for (let i = 0; i < shapes.length; i++) {
+    for (let j = i + 1; j < shapes.length; j++) {
+      const a = shapes[i];
+      const b = shapes[j];
+      const ca = getBoundingCircle(a);
+      const cb = getBoundingCircle(b);
+      const dx = cb.x - ca.x;
+      const dy = cb.y - ca.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const overlap = ca.r + cb.r - dist;
+      if (overlap > 0) {
+        const nx = dx / dist;
+        const ny = dy / dist;
+
+        a.x -= nx * overlap / 2;
+        a.y -= ny * overlap / 2;
+        b.x += nx * overlap / 2;
+        b.y += ny * overlap / 2;
+
+        const dvx = b.vx - a.vx;
+        const dvy = b.vy - a.vy;
+        const impact = dvx * nx + dvy * ny;
+        if (impact > 0) continue;
+
+        const impulse = (1 + 0.7) * impact / 2;
+        a.vx += impulse * nx;
+        a.vy += impulse * ny;
+        b.vx -= impulse * nx;
+        b.vy -= impulse * ny;
+      }
+    }
+  }
+}
+
+const shapes = [];
+let isDragging = false;
+let dragStart = null;
+let dragEnd = null;
+let dragStartTime = 0;
+const minSize = 5;
+const maxSize = 40;
+const growthRate = 0.03;
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  dragStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  dragEnd = { ...dragStart };
+  dragStartTime = performance.now();
+  isDragging = true;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (isDragging) {
+    const rect = canvas.getBoundingClientRect();
+    dragEnd = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (isDragging) {
+    const dx = (dragEnd.x - dragStart.x) * 0.1;
+    const dy = (dragEnd.y - dragStart.y) * 0.1;
+    const holdTime = performance.now() - dragStartTime;
+    const size = Math.min(maxSize, minSize + holdTime * growthRate);
+    const shape = shapeSelect.value;
+    const color = colorPicker.value;
+    shapes.push(createShape(dragStart.x, dragStart.y, shape, color, size, dx, dy));
+  }
+  isDragging = false;
+});
+
+function loop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  resolveCollisions();
+
+  for (let s of shapes) {
+    s.vx += gravityX * gravityStrength;
+    s.vy += gravityY * gravityStrength;
+
+    s.x += s.vx;
+    s.y += s.vy;
+
+    if (s.x - s.size < 0) {
+      s.x = s.size;
+      s.vx *= -0.7;
+    }
+    if (s.x + s.size > canvas.width) {
+      s.x = canvas.width - s.size;
+      s.vx *= -0.7;
+    }
+    if (s.y - s.size < 0) {
+      s.y = s.size;
+      s.vy *= -0.7;
+    }
+    if (s.y + s.size > canvas.height) {
+      s.y = canvas.height - s.size;
+      s.vy *= -0.7;
+    }
+
+    drawShape(s);
+  }
+
+  if (isDragging && dragStart && dragEnd) {
+    const holdTime = performance.now() - dragStartTime;
+    const size = Math.min(maxSize, minSize + holdTime * growthRate);
+
+    ctx.beginPath();
+    ctx.strokeStyle = 'lime';
+    ctx.lineWidth = 2;
+    ctx.moveTo(dragStart.x, dragStart.y);
+    ctx.lineTo(dragEnd.x, dragEnd.y);
+    ctx.stroke();
+
+    const angle = Math.atan2(dragEnd.y - dragStart.y, dragEnd.x - dragStart.x);
+    const len = 10;
+    ctx.beginPath();
+    ctx.moveTo(dragEnd.x, dragEnd.y);
+    ctx.lineTo(dragEnd.x - len * Math.cos(angle - 0.3), dragEnd.y - len * Math.sin(angle - 0.3));
+    ctx.lineTo(dragEnd.x - len * Math.cos(angle + 0.3), dragEnd.y - len * Math.sin(angle + 0.3));
+    ctx.closePath();
+    ctx.fillStyle = 'lime';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.arc(dragStart.x, dragStart.y, size, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
