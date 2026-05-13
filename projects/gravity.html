@@ -341,9 +341,9 @@ function resizeCanvas() {
 function rotatePhoneVectorToCanvas(x, y) {
   const angle = getScreenAngle();
 
-  if (angle === 90) return { x: -y, y: x };
+  if (angle === 90) return { x: y, y: -x };
   if (angle === 180) return { x: -x, y: -y };
-  if (angle === 270) return { x: y, y: -x };
+  if (angle === 270) return { x: -y, y: x };
 
   return { x, y };
 }
@@ -396,7 +396,7 @@ function updateMotionGravity(event) {
   applyPhoneGravity(
     clampUnit(gravity.x / SENSOR_GRAVITY),
     clampUnit(-gravity.y / SENSOR_GRAVITY),
-    false
+    true
   );
 }
 
