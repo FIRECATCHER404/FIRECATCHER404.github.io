@@ -1065,10 +1065,14 @@ function friendlyError(error) {
   const code = error?.code || "";
   if (code.includes("auth/email-already-in-use")) return "That username is already registered.";
   if (code.includes("auth/invalid-email")) return "Use 3-24 letters, numbers, underscores, dots, or hyphens.";
+  if (code.includes("auth/operation-not-allowed")) return "Firebase Auth email/password sign-up is not enabled for this project.";
+  if (code.includes("auth/admin-restricted-operation")) return "Firebase Auth sign-up is restricted for this project.";
+  if (code.includes("auth/api-key-not-valid")) return "The Firebase API key is not valid for this project.";
   if (code.includes("auth/weak-password")) return "Use a password with at least 6 characters.";
   if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) return "Username or password is not correct.";
   if (code.includes("auth/user-not-found")) return "No account exists for that username.";
-  if (code.includes("permission-denied")) return "Firebase denied that action. Check the database rules.";
+  if (code.includes("auth/too-many-requests")) return "Firebase temporarily blocked sign-in attempts. Wait a bit and try again.";
+  if (code.includes("permission-denied")) return "Firebase denied that action. Deploy the Realtime Database rules from blog/firebase.rules.json.";
   return error?.message || "Something went wrong.";
 }
 
@@ -1189,6 +1193,7 @@ async function register() {
       createdAt: serverTimestamp()
     });
   } catch (error) {
+    console.error("Registration failed:", error);
     setStatus(friendlyError(error), els.authStatus);
   } finally {
     els.registerBtn.disabled = false;
@@ -1208,6 +1213,7 @@ async function login() {
     els.loginBtn.disabled = true;
     await signInWithEmailAndPassword(auth, handleToEmail(handle), password);
   } catch (error) {
+    console.error("Login failed:", error);
     setStatus(friendlyError(error), els.authStatus);
   } finally {
     els.loginBtn.disabled = false;
@@ -1262,7 +1268,9 @@ onAuthStateChanged(auth, async user => {
     startGroupListeners();
     await update(ref(db, `${PATH}/users/${user.uid}`), { lastSeenAt: serverTimestamp() });
   } catch (error) {
+    console.error("Profile load failed:", error);
     setStatus(friendlyError(error));
+    setStatus(friendlyError(error), els.authStatus);
   }
 });
 
