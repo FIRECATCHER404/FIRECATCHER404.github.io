@@ -96,7 +96,7 @@
           "members": {
             "$uid": {
               ".write": "auth != null && (root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid || (auth.uid === $uid && !newData.exists() && data.exists()) || (auth.uid === $uid && data.exists() && newData.exists() && newData.child('role').val() === data.child('role').val()) || (auth.uid === $uid && root.child('secureChat/groups/' + $gid + '/privacy').val() === 'public') || (auth.uid === $uid && newData.child('inviteCode').isString() && root.child('secureChat/invites/' + newData.child('inviteCode').val() + '/groupId').val() === $gid))",
-              ".validate": "!newData.exists() || (newData.hasChildren(['role','handle','displayName','joinedAt']) && (newData.child('role').val() === 'owner' || newData.child('role').val() === 'member') && newData.child('handle').isString() && newData.child('handle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('displayName').isString() && newData.child('displayName').val().matches(/^.{1,40}$/))"
+              ".validate": "!newData.exists() || (newData.hasChildren(['role','handle','displayName','joinedAt']) && (newData.child('role').val() === 'owner' || newData.child('role').val() === 'member') && newData.child('handle').isString() && newData.child('handle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('displayName').isString() && newData.child('displayName').val().matches(/^.{1,40}$/) && (!newData.child('color').exists() || (newData.child('color').isString() && newData.child('color').val().matches(/^#[0-9A-Fa-f]{6}$/))))"
             }
           }
         }
@@ -107,7 +107,7 @@
           ".write": "auth != null && !newData.exists() && root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid",
           "$mid": {
             ".write": "auth != null && ((!data.exists() && root.child('secureChat/groups/' + $gid + '/members/' + auth.uid).exists() && newData.child('senderUid').val() === auth.uid) || (!newData.exists() && root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid))",
-            ".validate": "!newData.exists() || (newData.hasChildren(['senderUid','senderHandle','senderName','text','ts']) && newData.child('senderUid').val() === auth.uid && newData.child('senderHandle').isString() && newData.child('senderHandle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('senderName').isString() && newData.child('senderName').val().matches(/^.{1,40}$/) && newData.child('text').isString() && newData.child('text').val().matches(/^.{1,2000}$/))"
+            ".validate": "!newData.exists() || (newData.hasChildren(['senderUid','senderHandle','senderName','text','ts']) && newData.child('senderUid').val() === auth.uid && newData.child('senderHandle').isString() && newData.child('senderHandle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('senderName').isString() && newData.child('senderName').val().matches(/^.{1,40}$/) && newData.child('text').isString() && newData.child('text').val().matches(/^.{1,2000}$/) && (!newData.child('senderColor').exists() || (newData.child('senderColor').isString() && newData.child('senderColor').val().matches(/^#[0-9A-Fa-f]{6}$/))))"
           }
         }
       }

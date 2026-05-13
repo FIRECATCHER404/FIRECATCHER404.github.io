@@ -1023,6 +1023,7 @@ let messagesUnsub = null;
 let pendingInviteCode = readInviteCodeFromUrl();
 const notificationWatchers = new Map();
 const notificationStart = new Map();
+const userProfileCache = new Map();
 
 applySettings();
 
@@ -1098,6 +1099,26 @@ function initials(name) {
 
 function groupInitial(name) {
   return String(name || "#").trim().slice(0, 1).toUpperCase() || "#";
+}
+
+function profileColor() {
+  return profile?.color || settings.profileColor || DEFAULT_SETTINGS.profileColor;
+}
+
+function avatarColor(uid, snapshotColor = "", fallback = "#64748b") {
+  if (uid === currentUser?.uid) return profileColor();
+  return snapshotColor || currentGroupData?.members?.[uid]?.color || userProfileCache.get(uid)?.color || fallback;
+}
+
+function paintAvatar(avatar, uid, snapshotColor = "") {
+  avatar.style.background = avatarColor(uid, snapshotColor);
+  if (!uid || uid === currentUser?.uid || snapshotColor || userProfileCache.has(uid)) return;
+  get(ref(db, `${PATH}/users/${uid}`)).then(snap => {
+    const data = snap.val();
+    if (!data?.color) return;
+    userProfileCache.set(uid, data);
+    avatar.style.background = data.color;
+  }).catch(() => {});
 }
 
 function randomInviteCode() {
@@ -1293,6 +1314,7 @@ onAuthStateChanged(auth, async user => {
 
   try {
     profile = await ensureProfile(user);
+    userProfileCache.set(user.uid, profile);
     settings = { ...settings, ...(profile.settings || {}), profileColor: profile.color || settings.profileColor };
     applySettings();
     updateProfileChrome();
@@ -1542,7 +1564,7 @@ function renderMembers() {
     avatar.className = "avatar";
     avatar.style.width = "32px";
     avatar.style.height = "32px";
-    avatar.style.background = uid === currentUser.uid ? (profile?.color || settings.profileColor) : "#64748b";
+    paintAvatar(avatar, uid, member.color);
     avatar.textContent = initials(member.displayName || member.handle);
 
     const copy = document.createElement("div");
@@ -1573,6 +1595,7 @@ function memberPayload(role, inviteCode = null) {
     role,
     handle: profile.handle,
     displayName: profile.displayName,
+    color: profileColor(),
     joinedAt: serverTimestamp()
   };
   if (inviteCode) payload.inviteCode = inviteCode;
@@ -1738,6 +1761,7 @@ async function sendMessage(event) {
       senderUid: currentUser.uid,
       senderHandle: profile.handle,
       senderName: profile.displayName,
+      senderColor: profileColor(),
       text,
       mentions: parseMentions(text),
       ts: serverTimestamp()
@@ -1755,12 +1779,13 @@ function appendMessage(msg) {
   row.className = "message-row";
   row.classList.toggle("me", msg.senderUid === currentUser?.uid);
   row.classList.toggle("mentioned", Boolean(msg.mentions && msg.mentions[currentUser?.uid]));
+  row.dataset.senderUid = msg.senderUid || "";
   row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${msg.text || ""}`.toLowerCase();
 
   const avatar = document.createElement("div");
   avatar.className = "avatar";
   avatar.textContent = initials(msg.senderName || msg.senderHandle);
-  avatar.style.background = msg.senderUid === currentUser?.uid ? (profile?.color || settings.profileColor) : "#64748b";
+  paintAvatar(avatar, msg.senderUid, msg.senderColor);
 
   const bubble = document.createElement("div");
   bubble.className = "message-bubble";
@@ -1801,6 +1826,13 @@ function applyMessageSearch() {
   const term = els.messageSearch.value.trim().toLowerCase();
   [...els.messages.querySelectorAll(".message-row")].forEach(row => {
     row.classList.toggle("hidden", Boolean(term && !row.dataset.search.includes(term)));
+  });
+}
+
+function repaintRenderedAvatars() {
+  [...els.messages.querySelectorAll(".message-row")].forEach(row => {
+    const avatar = row.querySelector(".avatar");
+    if (avatar) paintAvatar(avatar, row.dataset.senderUid);
   });
 }
 
@@ -2053,12 +2085,22 @@ async function saveSettings() {
     });
     const updates = {};
     Object.keys(memberships || {}).forEach(groupId => {
-      updates[`${PATH}/groups/${groupId}/members/${currentUser.uid}/displayName`] = displayName;
-      updates[`${PATH}/groups/${groupId}/members/${currentUser.uid}/handle`] = profile.handle;
+      const currentMember = currentGroupId === groupId
+        ? (currentGroupData?.members?.[currentUser.uid] || {})
+        : {};
+      updates[`${PATH}/groups/${groupId}/members/${currentUser.uid}`] = {
+        ...currentMember,
+        role: currentMember.role || memberships[groupId]?.role || "member",
+        handle: profile.handle,
+        displayName,
+        color,
+        joinedAt: currentMember.joinedAt || memberships[groupId]?.joinedAt || serverTimestamp()
+      };
     });
     if (Object.keys(updates).length) await update(ref(db), updates);
     updateProfileChrome();
     renderMembers();
+    repaintRenderedAvatars();
     setStatus("Settings saved.", els.settingsStatusLine);
   } catch (error) {
     setStatus(friendlyError(error), els.settingsStatusLine);
