@@ -154,10 +154,12 @@ let lastMotionGravityTime = 0;
 let phoneGravityDataTimer = 0;
 let phoneGravityCalibration = 0;
 let phoneGravityNeedsCalibration = true;
+let phoneGravityIsLevel = false;
 
 const SENSOR_GRAVITY = 9.80665;
 const PHONE_GRAVITY_ACCELERATION = 0.45;
 const PHONE_GRAVITY_SMOOTHING = 0.35;
+const PHONE_GRAVITY_LEVEL_DEADZONE = 0.18;
 
 const gxSlider = document.getElementById('gx');
 const gySlider = document.getElementById('gy');
@@ -364,7 +366,7 @@ function markPhoneGravityForCalibration() {
 
 function calibratePhoneGravity(rawX, rawY) {
   const magnitude = Math.hypot(rawX, rawY);
-  if (magnitude < 0.15) return false;
+  if (magnitude < PHONE_GRAVITY_LEVEL_DEADZONE) return false;
 
   phoneGravityCalibration = Math.PI / 2 - Math.atan2(rawY, rawX);
   phoneGravityNeedsCalibration = false;
@@ -372,14 +374,26 @@ function calibratePhoneGravity(rawX, rawY) {
 }
 
 function applyPhoneGravity(rawX, rawY) {
+  const rawMagnitude = Math.hypot(rawX, rawY);
+
+  if (rawMagnitude < PHONE_GRAVITY_LEVEL_DEADZONE) {
+    phoneGravityX += (0 - phoneGravityX) * PHONE_GRAVITY_SMOOTHING;
+    phoneGravityY += (0 - phoneGravityY) * PHONE_GRAVITY_SMOOTHING;
+    phoneGravityIsLevel = true;
+    lastPhoneGravityEventTime = performance.now();
+    motionStatus.textContent = 'Level';
+    return;
+  }
+
   if (phoneGravityNeedsCalibration && !calibratePhoneGravity(rawX, rawY)) {
     motionStatus.textContent = 'Waiting';
     return;
   }
 
+  phoneGravityIsLevel = false;
   const rotated = rotateVector(rawX, rawY, phoneGravityCalibration);
   const magnitude = Math.hypot(rotated.x, rotated.y);
-  const deadzone = 0.04;
+  const deadzone = 0.03;
   const limitedMagnitude = magnitude > 1 ? 1 / magnitude : 1;
   const targetX = magnitude < deadzone
     ? 0
@@ -453,6 +467,7 @@ function setPhoneGravityEnabled(enabled) {
   } else {
     phoneGravityX = 0;
     phoneGravityY = gravityY;
+    phoneGravityIsLevel = false;
     lastMotionGravityTime = 0;
     markPhoneGravityForCalibration();
   }
@@ -637,6 +652,14 @@ function loop() {
   for (let s of shapes) {
     s.vx += activeGravityX * gravityStrength;
     s.vy += activeGravityY * gravityStrength;
+
+    if (phoneGravityEnabled && phoneGravityIsLevel) {
+      s.vx *= 0.96;
+      s.vy *= 0.96;
+
+      if (Math.abs(s.vx) < 0.01) s.vx = 0;
+      if (Math.abs(s.vy) < 0.01) s.vy = 0;
+    }
 
     s.x += s.vx;
     s.y += s.vy;
