@@ -108,8 +108,8 @@
   <label>Gravity Strength</label>
   <input type="range" id="gstrength" min="0" max="2" step="0.01" value="1">
   <div class="mobile-motion" id="mobileMotion">
-    <label>Phone Tilt</label>
-    <button type="button" id="motionToggle">Enable Tilt</button>
+    <label>Phone Gravity</label>
+    <button type="button" id="motionToggle">Enable Gravity</button>
     <span class="motion-status" id="motionStatus">Off</span>
   </div>
   <label>Shape</label>
@@ -145,13 +145,17 @@ canvas.height = window.innerHeight;
 let gravityX = 0;
 let gravityY = 0.2;
 let gravityStrength = 1;
-let tiltGravityEnabled = false;
-let tiltGravityX = 0;
-let tiltGravityY = 0.2;
-let tiltListenerAttached = false;
-let lastTiltEventTime = 0;
-let lastOrientationTiltTime = 0;
-let tiltDataTimer = 0;
+let phoneGravityEnabled = false;
+let phoneGravityX = 0;
+let phoneGravityY = 0.2;
+let phoneGravityListenerAttached = false;
+let lastPhoneGravityEventTime = 0;
+let lastMotionGravityTime = 0;
+let phoneGravityDataTimer = 0;
+
+const SENSOR_GRAVITY = 9.80665;
+const PHONE_GRAVITY_ACCELERATION = 0.45;
+const PHONE_GRAVITY_SMOOTHING = 0.35;
 
 const gxSlider = document.getElementById('gx');
 const gySlider = document.getElementById('gy');
@@ -334,12 +338,12 @@ function resizeCanvas() {
   lastScreenAngle = newAngle;
 }
 
-function rotateTiltToScreen(x, y) {
+function rotatePhoneVectorToCanvas(x, y) {
   const angle = getScreenAngle();
 
-  if (angle === 90) return { x: y, y: -x };
+  if (angle === 90) return { x: -y, y: x };
   if (angle === 180) return { x: -x, y: -y };
-  if (angle === 270) return { x: -y, y: x };
+  if (angle === 270) return { x: y, y: -x };
 
   return { x, y };
 }
@@ -348,69 +352,73 @@ function clampUnit(value) {
   return Math.max(-1, Math.min(1, value));
 }
 
-function applyTiltGravity(rawX, rawY) {
-  const rotated = rotateTiltToScreen(rawX, rawY);
-  const deadzone = 0.03;
-  const targetX = Math.abs(rotated.x) < deadzone ? 0 : rotated.x;
-  const targetY = Math.abs(rotated.y) < deadzone ? 0 : rotated.y;
+function applyPhoneGravity(rawX, rawY) {
+  const rotated = rotatePhoneVectorToCanvas(rawX, rawY);
+  const magnitude = Math.hypot(rotated.x, rotated.y);
+  const deadzone = 0.04;
+  const limitedMagnitude = magnitude > 1 ? 1 / magnitude : 1;
+  const targetX = magnitude < deadzone
+    ? 0
+    : rotated.x * limitedMagnitude * PHONE_GRAVITY_ACCELERATION;
+  const targetY = magnitude < deadzone
+    ? 0
+    : rotated.y * limitedMagnitude * PHONE_GRAVITY_ACCELERATION;
 
-  tiltGravityX += (targetX - tiltGravityX) * 0.2;
-  tiltGravityY += (targetY - tiltGravityY) * 0.2;
+  phoneGravityX += (targetX - phoneGravityX) * PHONE_GRAVITY_SMOOTHING;
+  phoneGravityY += (targetY - phoneGravityY) * PHONE_GRAVITY_SMOOTHING;
 
-  gxSlider.value = tiltGravityX.toFixed(2);
-  gySlider.value = tiltGravityY.toFixed(2);
-  lastTiltEventTime = performance.now();
+  lastPhoneGravityEventTime = performance.now();
   motionStatus.textContent = 'Active';
 }
 
-function updateTiltGravity(event) {
-  if (!tiltGravityEnabled || event.beta == null || event.gamma == null) return;
+function updateOrientationGravity(event) {
+  if (!phoneGravityEnabled || event.beta == null || event.gamma == null) return;
+  if (performance.now() - lastMotionGravityTime < 1000) return;
 
   const beta = Math.max(-90, Math.min(90, event.beta));
   const gamma = Math.max(-90, Math.min(90, event.gamma));
-  lastOrientationTiltTime = performance.now();
-  applyTiltGravity(
+  applyPhoneGravity(
     Math.sin(gamma * Math.PI / 180),
     Math.sin(beta * Math.PI / 180)
   );
 }
 
 function updateMotionGravity(event) {
-  if (!tiltGravityEnabled || !event.accelerationIncludingGravity) return;
-  if (performance.now() - lastOrientationTiltTime < 250) return;
+  if (!phoneGravityEnabled || !event.accelerationIncludingGravity) return;
 
   const gravity = event.accelerationIncludingGravity;
   if (gravity.x == null || gravity.y == null) return;
 
-  applyTiltGravity(
-    clampUnit(gravity.x / 9.81),
-    clampUnit(-gravity.y / 9.81)
+  lastMotionGravityTime = performance.now();
+  applyPhoneGravity(
+    clampUnit(gravity.x / SENSOR_GRAVITY),
+    clampUnit(-gravity.y / SENSOR_GRAVITY)
   );
 }
 
-function attachTiltListener() {
-  if (tiltListenerAttached) return;
+function attachPhoneGravityListener() {
+  if (phoneGravityListenerAttached) return;
 
-  window.addEventListener('deviceorientation', updateTiltGravity);
+  window.addEventListener('deviceorientation', updateOrientationGravity);
   window.addEventListener('devicemotion', updateMotionGravity);
-  tiltListenerAttached = true;
+  phoneGravityListenerAttached = true;
 }
 
-function watchForTiltData() {
-  clearTimeout(tiltDataTimer);
-  lastTiltEventTime = 0;
+function watchForPhoneGravityData() {
+  clearTimeout(phoneGravityDataTimer);
+  lastPhoneGravityEventTime = 0;
   motionStatus.textContent = 'Waiting';
-  tiltDataTimer = setTimeout(() => {
-    if (tiltGravityEnabled && lastTiltEventTime === 0) {
+  phoneGravityDataTimer = setTimeout(() => {
+    if (phoneGravityEnabled && lastPhoneGravityEventTime === 0) {
       motionStatus.textContent = 'No data';
     }
   }, 1500);
 }
 
-function setTiltGravityEnabled(enabled) {
-  tiltGravityEnabled = enabled;
+function setPhoneGravityEnabled(enabled) {
+  phoneGravityEnabled = enabled;
   motionToggle.classList.toggle('active', enabled);
-  motionToggle.textContent = enabled ? 'Tilt On' : 'Enable Tilt';
+  motionToggle.textContent = enabled ? 'Gravity On' : 'Enable Gravity';
   motionStatus.textContent = enabled ? 'Active' : 'Off';
   gxSlider.disabled = enabled;
   gySlider.disabled = enabled;
@@ -418,13 +426,17 @@ function setTiltGravityEnabled(enabled) {
   if (!enabled) {
     gxSlider.value = gravityX.toFixed(2);
     gySlider.value = gravityY.toFixed(2);
+  } else {
+    phoneGravityX = 0;
+    phoneGravityY = gravityY;
+    lastMotionGravityTime = 0;
   }
 
   if (enabled) {
-    attachTiltListener();
-    watchForTiltData();
+    attachPhoneGravityListener();
+    watchForPhoneGravityData();
   } else {
-    clearTimeout(tiltDataTimer);
+    clearTimeout(phoneGravityDataTimer);
   }
 }
 
@@ -437,8 +449,8 @@ async function requestSensorPermission(EventClass) {
 }
 
 motionToggle.addEventListener('click', async () => {
-  if (tiltGravityEnabled) {
-    setTiltGravityEnabled(false);
+  if (phoneGravityEnabled) {
+    setPhoneGravityEnabled(false);
     return;
   }
 
@@ -463,7 +475,7 @@ motionToggle.addEventListener('click', async () => {
       return;
     }
 
-    setTiltGravityEnabled(true);
+    setPhoneGravityEnabled(true);
   } catch (error) {
     motionStatus.textContent = 'Blocked';
   }
@@ -576,8 +588,8 @@ function loop() {
 
   resolveCollisions();
 
-  const activeGravityX = tiltGravityEnabled ? tiltGravityX : gravityX;
-  const activeGravityY = tiltGravityEnabled ? tiltGravityY : gravityY;
+  const activeGravityX = phoneGravityEnabled ? phoneGravityX : gravityX;
+  const activeGravityY = phoneGravityEnabled ? phoneGravityY : gravityY;
 
   for (let s of shapes) {
     s.vx += activeGravityX * gravityStrength;
