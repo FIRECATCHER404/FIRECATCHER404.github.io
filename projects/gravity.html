@@ -152,6 +152,8 @@ let phoneGravityListenerAttached = false;
 let lastPhoneGravityEventTime = 0;
 let lastMotionGravityTime = 0;
 let phoneGravityDataTimer = 0;
+let phoneGravityCalibration = 0;
+let phoneGravityNeedsCalibration = true;
 
 const SENSOR_GRAVITY = 9.80665;
 const PHONE_GRAVITY_ACCELERATION = 0.45;
@@ -336,26 +338,46 @@ function resizeCanvas() {
   dragStart = null;
   dragEnd = null;
   lastScreenAngle = newAngle;
-}
 
-function rotatePhoneVectorToCanvas(x, y) {
-  const angle = getScreenAngle();
-
-  if (angle === 90) return { x: y, y: -x };
-  if (angle === 180) return { x: -x, y: -y };
-  if (angle === 270) return { x: -y, y: x };
-
-  return { x, y };
+  if (phoneGravityEnabled) {
+    markPhoneGravityForCalibration();
+  }
 }
 
 function clampUnit(value) {
   return Math.max(-1, Math.min(1, value));
 }
 
-function applyPhoneGravity(rawX, rawY, shouldRotateToCanvas = true) {
-  const rotated = shouldRotateToCanvas
-    ? rotatePhoneVectorToCanvas(rawX, rawY)
-    : { x: rawX, y: rawY };
+function rotateVector(x, y, angle) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+
+  return {
+    x: x * cos - y * sin,
+    y: x * sin + y * cos
+  };
+}
+
+function markPhoneGravityForCalibration() {
+  phoneGravityNeedsCalibration = true;
+}
+
+function calibratePhoneGravity(rawX, rawY) {
+  const magnitude = Math.hypot(rawX, rawY);
+  if (magnitude < 0.15) return false;
+
+  phoneGravityCalibration = Math.PI / 2 - Math.atan2(rawY, rawX);
+  phoneGravityNeedsCalibration = false;
+  return true;
+}
+
+function applyPhoneGravity(rawX, rawY) {
+  if (phoneGravityNeedsCalibration && !calibratePhoneGravity(rawX, rawY)) {
+    motionStatus.textContent = 'Waiting';
+    return;
+  }
+
+  const rotated = rotateVector(rawX, rawY, phoneGravityCalibration);
   const magnitude = Math.hypot(rotated.x, rotated.y);
   const deadzone = 0.04;
   const limitedMagnitude = magnitude > 1 ? 1 / magnitude : 1;
@@ -381,8 +403,7 @@ function updateOrientationGravity(event) {
   const gamma = Math.max(-90, Math.min(90, event.gamma));
   applyPhoneGravity(
     Math.sin(gamma * Math.PI / 180),
-    Math.sin(beta * Math.PI / 180),
-    true
+    Math.sin(beta * Math.PI / 180)
   );
 }
 
@@ -395,8 +416,7 @@ function updateMotionGravity(event) {
   lastMotionGravityTime = performance.now();
   applyPhoneGravity(
     clampUnit(gravity.x / SENSOR_GRAVITY),
-    clampUnit(-gravity.y / SENSOR_GRAVITY),
-    true
+    clampUnit(-gravity.y / SENSOR_GRAVITY)
   );
 }
 
@@ -434,6 +454,7 @@ function setPhoneGravityEnabled(enabled) {
     phoneGravityX = 0;
     phoneGravityY = gravityY;
     lastMotionGravityTime = 0;
+    markPhoneGravityForCalibration();
   }
 
   if (enabled) {
@@ -581,10 +602,28 @@ if (window.PointerEvent) {
   }, { passive: false });
 }
 
-window.addEventListener('resize', resizeCanvas);
-window.addEventListener('orientationchange', () => requestAnimationFrame(resizeCanvas));
+window.addEventListener('resize', () => {
+  if (phoneGravityEnabled) {
+    markPhoneGravityForCalibration();
+  }
+
+  resizeCanvas();
+});
+window.addEventListener('orientationchange', () => {
+  if (phoneGravityEnabled) {
+    markPhoneGravityForCalibration();
+  }
+
+  requestAnimationFrame(resizeCanvas);
+});
 if (screenOrientation && typeof screenOrientation.addEventListener === 'function') {
-  screenOrientation.addEventListener('change', resizeCanvas);
+  screenOrientation.addEventListener('change', () => {
+    if (phoneGravityEnabled) {
+      markPhoneGravityForCalibration();
+    }
+
+    resizeCanvas();
+  });
 }
 
 function loop() {
