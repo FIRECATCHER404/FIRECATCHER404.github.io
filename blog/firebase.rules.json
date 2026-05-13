@@ -31,6 +31,87 @@
       ".read": true,
       ".write": true
     },
+    "secureChat": {
+      ".read": false,
+      ".write": false,
+      "users": {
+        "$uid": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['handle','displayName','color','updatedAt']) && newData.child('handle').isString() && newData.child('handle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('displayName').isString() && newData.child('displayName').val().matches(/^.{1,40}$/) && newData.child('color').isString() && newData.child('color').val().matches(/^#[0-9A-Fa-f]{6}$/)"
+        }
+      },
+      "usernames": {
+        "$handle": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || data.child('uid').val() === auth.uid)",
+          ".validate": "$handle.matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.hasChildren(['uid','handle']) && newData.child('uid').isString() && newData.child('handle').val() === $handle"
+        }
+      },
+      "publicGroups": {
+        ".read": "auth != null",
+        "$gid": {
+          ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || data.child('ownerUid').val() === auth.uid || root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['name','privacy','ownerUid','ownerHandle','createdAt']) && newData.child('privacy').val() === 'public' && newData.child('name').isString() && newData.child('name').val().matches(/^.{1,60}$/)"
+        }
+      },
+      "memberships": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$gid": {
+            ".write": "auth != null && (auth.uid === $uid || root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['name','privacy','role','joinedAt']) && newData.child('name').isString() && newData.child('name').val().matches(/^.{1,60}$/) && (newData.child('privacy').val() === 'public' || newData.child('privacy').val() === 'private'))"
+          }
+        }
+      },
+      "invites": {
+        "$code": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((!data.exists() && root.child('secureChat/groups/' + newData.child('groupId').val() + '/ownerUid').val() === auth.uid) || (data.exists() && root.child('secureChat/groups/' + data.child('groupId').val() + '/ownerUid').val() === auth.uid))",
+          ".validate": "!newData.exists() || ($code.matches(/^[A-Z0-9]{10,16}$/) && newData.hasChildren(['groupId','groupName','createdBy','createdAt']) && newData.child('createdBy').val() === auth.uid)"
+        }
+      },
+      "groups": {
+        "$gid": {
+          ".read": "auth != null && (data.child('privacy').val() === 'public' || data.child('members').child(auth.uid).exists())",
+          ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid && newData.child('members').child(auth.uid).child('role').val() === 'owner') || (data.exists() && data.child('ownerUid').val() === auth.uid))",
+          "name": {
+            ".validate": "newData.isString() && newData.val().matches(/^.{1,60}$/)"
+          },
+          "description": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^.{0,160}$/))"
+          },
+          "privacy": {
+            ".validate": "newData.val() === 'public' || newData.val() === 'private'"
+          },
+          "ownerUid": {
+            ".validate": "newData.val() === auth.uid || newData.val() === data.val()"
+          },
+          "ownerHandle": {
+            ".validate": "newData.isString() && newData.val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/)"
+          },
+          "inviteCode": {
+            ".validate": "!newData.exists() || newData.val() === null || newData.val().matches(/^[A-Z0-9]{10,16}$/)"
+          },
+          "members": {
+            "$uid": {
+              ".write": "auth != null && (root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid || (auth.uid === $uid && !newData.exists() && data.exists()) || (auth.uid === $uid && data.exists() && newData.exists() && newData.child('role').val() === data.child('role').val()) || (auth.uid === $uid && root.child('secureChat/groups/' + $gid + '/privacy').val() === 'public') || (auth.uid === $uid && newData.child('inviteCode').isString() && root.child('secureChat/invites/' + newData.child('inviteCode').val() + '/groupId').val() === $gid))",
+              ".validate": "!newData.exists() || (newData.hasChildren(['role','handle','displayName','joinedAt']) && (newData.child('role').val() === 'owner' || newData.child('role').val() === 'member') && newData.child('handle').isString() && newData.child('handle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('displayName').isString() && newData.child('displayName').val().matches(/^.{1,40}$/))"
+            }
+          }
+        }
+      },
+      "messages": {
+        "$gid": {
+          ".read": "auth != null && (root.child('secureChat/groups/' + $gid + '/privacy').val() === 'public' || root.child('secureChat/groups/' + $gid + '/members/' + auth.uid).exists())",
+          ".write": "auth != null && !newData.exists() && root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid",
+          "$mid": {
+            ".write": "auth != null && ((!data.exists() && root.child('secureChat/groups/' + $gid + '/members/' + auth.uid).exists() && newData.child('senderUid').val() === auth.uid) || (!newData.exists() && root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['senderUid','senderHandle','senderName','text','ts']) && newData.child('senderUid').val() === auth.uid && newData.child('senderHandle').isString() && newData.child('senderHandle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('senderName').isString() && newData.child('senderName').val().matches(/^.{1,40}$/) && newData.child('text').isString() && newData.child('text').val().matches(/^.{1,2000}$/))"
+          }
+        }
+      }
+    },
     "posts": {
       ".read": "(query.orderByChild === 'published' && query.equalTo === true) || (auth != null && auth.token.admin === true)",
       ".indexOn": ["published"],

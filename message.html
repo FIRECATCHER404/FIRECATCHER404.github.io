@@ -2,431 +2,2063 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Messager app</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Messager</title>
 <style>
-  :root{
-    --bg:#f4f6f8; --panel:#fff; --muted:#667; --accent:#0b84ff;
-    --left-width:220px; --left-small:92px; --gap:16px;
-  }
-  [data-theme="dark"]{
-    --bg:#0f1720; --panel:#0b1220; --muted:#9aa; --accent:#4aa3ff;
-  }
-  *{box-sizing:border-box; font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
-  body{margin:0; height:100vh; background:var(--bg); color:var(--muted); display:flex; align-items:stretch;}
-  /* Layout: left small column, separator, main panel */
-  .left-small { width:var(--left-small); background:var(--panel); border-right:1px solid rgba(0,0,0,0.06); display:flex; flex-direction:column; gap:8px; padding:12px; }
-  .sep { width:1px; background:transparent; display:flex; align-items:stretch; }
-  .left { width:var(--left-width); background:var(--panel); border-right:1px solid rgba(0,0,0,0.06); padding:12px; display:flex; flex-direction:column; gap:8px; }
-  .main { flex:1; display:flex; flex-direction:column; gap:8px; }
-  /* Header */
-  header{height:64px; display:flex; align-items:center; justify-content:space-between; padding:8px 16px; background:linear-gradient(0deg, transparent, transparent); border-bottom:1px solid rgba(0,0,0,0.04);}
-  .title {display:flex; align-items:center; gap:12px;}
-  .profileCircle { width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700; }
-  .hamburger{cursor:pointer;padding:8px;border-radius:8px;}
-  .hamburger:hover{transform:scale(1.03);}
-
-  /* Group list */
-  .groups { display:flex; flex-direction:column; gap:6px; overflow:auto; padding-right:6px;}
-  .groupEntry { padding:8px;border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:8px; }
-  .groupEntry:hover{background:rgba(0,0,0,0.02);}
-  .groupEntry.selected{background:rgba(11,132,255,0.08); color:var(--accent)}
-
-  /* Main chat */
-  .chatWindow { padding:16px; flex:1; overflow:auto; display:flex; flex-direction:column; gap:10px; }
-  .message { max-width:65%; padding:10px 12px; border-radius:12px; background:#e9f1ff; color:#063; align-self:flex-start; }
-  .message.me { align-self:flex-end; background:linear-gradient(90deg,var(--accent), #6fb8ff); color:#fff; }
-  .msgMeta{ font-size:12px; color:rgba(0,0,0,0.45); margin-bottom:6px;}
-  .composer { padding:8px; border-top:1px solid rgba(0,0,0,0.06); display:flex; gap:8px; align-items:center; background:var(--panel); }
-  .composer input[type="text"]{flex:1;padding:12px;border-radius:20px;border:1px solid rgba(0,0,0,0.06); outline:none; font-size:15px;}
-  .btn { border:none; background:var(--accent); color:white;padding:10px 12px;border-radius:12px; cursor:pointer;}
-  .btn.secondary{ background:transparent; color:var(--accent); border:1px solid rgba(11,132,255,0.12); }
-
-  /* Controls */
-  .controls { display:flex; gap:8px; align-items:center;}
-  .small { font-size:13px; padding:6px 8px; border-radius:8px; }
-
-  /* Modal */
-  .modalBackdrop { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:50; }
-  .modal { background:var(--panel); padding:20px; border-radius:12px; width:min(520px,94%); color:var(--muted); }
-  label{display:block;margin-top:8px;font-size:13px;color:var(--muted); margin-bottom:6px;}
-  input[type="text"], input[type="password"]{width:100%; padding:10px;border-radius:8px;border:1px solid rgba(0,0,0,0.08); outline:none;}
-  .metaLine{font-size:13px;color:var(--muted); margin-top:8px;}
-
-  /* small screens: stack */
-  @media (max-width:900px){
-    .left { display:none; }
-    .left-small { width:64px; }
+  :root {
+    --bg: #eef2f6;
+    --surface: #ffffff;
+    --surface-2: #f7f9fb;
+    --text: #141a22;
+    --muted: #657084;
+    --line: #d8dee8;
+    --accent: #0b84ff;
+    --accent-soft: rgba(11, 132, 255, 0.12);
+    --danger: #c4362e;
+    --success: #237a4d;
+    --warning: #9a6200;
+    --shadow: 0 12px 30px rgba(20, 26, 34, 0.08);
+    --radius: 8px;
+    --message-size: 15px;
   }
 
-  .messageRow {
+  [data-theme="dark"] {
+    --bg: #10151d;
+    --surface: #171e28;
+    --surface-2: #111821;
+    --text: #edf2f7;
+    --muted: #9aa6b6;
+    --line: #2a3442;
+    --accent-soft: rgba(74, 163, 255, 0.16);
+    --shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+  }
+
+  [data-density="compact"] {
+    --message-size: 14px;
+  }
+
+  [data-text="large"] {
+    --message-size: 17px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    overflow: hidden;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button {
+    border: 0;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: minmax(250px, 320px) minmax(0, 1fr) minmax(230px, 290px);
+    height: 100vh;
+    min-height: 0;
+  }
+
+  .sidebar,
+  .details {
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    min-height: 0;
     display: flex;
-    align-items: flex-end;
-    gap: 8px;
+    flex-direction: column;
   }
-  .messageRow.me {
-    flex-direction: row-reverse;
+
+  .details {
+    border-left: 1px solid var(--line);
+    border-right: 0;
   }
-  .msgPfp {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+
+  .side-head,
+  .details-head {
+    padding: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .brand-row,
+  .user-row,
+  .chat-title-row,
+  .member-row,
+  .group-row,
+  .toolbar,
+  .switch-row,
+  .modal-actions {
     display: flex;
     align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: 700;
-    font-size: 15px;
-    flex-shrink: 0;
   }
 
-  /* visual tweaks */
-  .muted{color:var(--muted); font-size:13px;}
-  .tiny{font-size:12px; color:rgba(0,0,0,0.45);}
-  .inviteBadge{background:#fff1c6;padding:4px 8px;border-radius:999px;font-size:12px;}
-  .groupActions{display:flex; gap:6px; margin-left:auto;}
-  .danger{background:#ffebee;color:#a00}
+  .brand-row {
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .brand {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .icon-btn,
+  .small-btn,
+  .primary-btn,
+  .secondary-btn,
+  .danger-btn {
+    border-radius: var(--radius);
+    cursor: pointer;
+    min-height: 36px;
+    transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+  }
+
+  .icon-btn:active,
+  .small-btn:active,
+  .primary-btn:active,
+  .secondary-btn:active,
+  .danger-btn:active {
+    transform: translateY(1px);
+  }
+
+  .icon-btn {
+    width: 38px;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+  }
+
+  .primary-btn,
+  .secondary-btn,
+  .danger-btn,
+  .small-btn {
+    padding: 0 12px;
+    font-weight: 700;
+  }
+
+  .primary-btn {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .secondary-btn,
+  .small-btn {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+  }
+
+  .danger-btn {
+    background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+    color: var(--danger);
+    border: 1px solid color-mix(in srgb, var(--danger) 36%, var(--line));
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+    transform: none;
+  }
+
+  .quick-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .search-box {
+    margin-top: 12px;
+  }
+
+  .field,
+  .textarea,
+  .select {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--text);
+    outline: 0;
+  }
+
+  .field,
+  .select {
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .textarea {
+    min-height: 88px;
+    max-height: 170px;
+    resize: vertical;
+    padding: 12px;
+  }
+
+  .field:focus,
+  .textarea:focus,
+  .select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .group-list {
+    padding: 10px;
+    overflow: auto;
+    min-height: 0;
+  }
+
+  .group-entry {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--text);
+    background: transparent;
+    text-align: left;
+  }
+
+  [data-density="compact"] .group-entry {
+    padding: 7px 8px;
+  }
+
+  .group-entry:hover,
+  .group-entry.active {
+    background: var(--accent-soft);
+  }
+
+  .group-icon,
+  .avatar {
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: #fff;
+    font-weight: 800;
+    flex: 0 0 auto;
+    background: var(--accent);
+  }
+
+  .group-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .avatar {
+    width: 38px;
+    height: 38px;
+  }
+
+  .group-main {
+    min-width: 0;
+  }
+
+  .group-name,
+  .member-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 750;
+  }
+
+  .group-meta,
+  .member-meta,
+  .muted,
+  .status-line {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .badge-stack {
+    display: grid;
+    gap: 4px;
+    justify-items: end;
+  }
+
+  .badge {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    display: inline-grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--accent);
+  }
+
+  .badge.mention {
+    background: var(--warning);
+  }
+
+  .empty-list,
+  .empty-state {
+    color: var(--muted);
+    padding: 18px;
+    text-align: center;
+  }
+
+  .me-panel {
+    margin-top: auto;
+    padding: 12px 16px 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .user-row {
+    gap: 10px;
+  }
+
+  .user-text {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .user-name {
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chat-header {
+    min-height: 76px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .chat-title-row {
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .chat-heading {
+    min-width: 0;
+  }
+
+  .chat-heading h1 {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-heading p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .toolbar {
+    gap: 8px;
+    justify-content: end;
+  }
+
+  .toolbar .field {
+    width: min(28vw, 240px);
+  }
+
+  .messages {
+    flex: 1;
+    min-height: 0;
+    padding: 18px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  [data-density="compact"] .messages {
+    gap: 6px;
+    padding: 12px;
+  }
+
+  .message-row {
+    display: flex;
+    gap: 9px;
+    align-items: flex-end;
+  }
+
+  .message-row.me {
+    flex-direction: row-reverse;
+  }
+
+  .message-bubble {
+    max-width: min(680px, 72%);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 9px 11px;
+    box-shadow: 0 4px 14px rgba(20, 26, 34, 0.04);
+    color: var(--text);
+    font-size: var(--message-size);
+    line-height: 1.42;
+    overflow-wrap: anywhere;
+  }
+
+  .message-row.me .message-bubble {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .message-row.mentioned .message-bubble {
+    border-color: color-mix(in srgb, var(--warning) 55%, var(--line));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 18%, transparent);
+  }
+
+  .message-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .message-row.me .message-meta {
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  .message-sender {
+    font-weight: 800;
+  }
+
+  .mention-token {
+    color: var(--accent);
+    font-weight: 800;
+  }
+
+  .message-row.me .mention-token {
+    color: #fff;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+  }
+
+  .composer {
+    padding: 12px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+
+  .composer-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+  }
+
+  .composer .textarea {
+    min-height: 46px;
+    max-height: 140px;
+    resize: none;
+  }
+
+  .details-body {
+    padding: 16px;
+    overflow: auto;
+    min-height: 0;
+  }
+
+  .details h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 18px 0 8px;
+  }
+
+  .details h2:first-child {
+    margin-top: 0;
+  }
+
+  .detail-actions {
+    display: grid;
+    gap: 8px;
+    margin: 12px 0 2px;
+  }
+
+  .member-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .member-row {
+    gap: 9px;
+    min-width: 0;
+  }
+
+  .member-copy {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .member-row .small-btn {
+    min-height: 30px;
+    padding: 0 8px;
+  }
+
+  .status-line {
+    min-height: 18px;
+    margin-top: 9px;
+  }
+
+  .modal-backdrop,
+  .auth-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(7, 12, 18, 0.48);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+  }
+
+  .modal-backdrop.open,
+  .auth-screen.open {
+    display: flex;
+  }
+
+  .modal,
+  .auth-card {
+    width: min(560px, 100%);
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+
+  .modal {
+    max-height: min(760px, calc(100vh - 28px));
+    overflow: auto;
+  }
+
+  .modal-head,
+  .modal-body {
+    padding: 16px;
+  }
+
+  .modal-head {
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .modal-title {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .modal-body {
+    display: grid;
+    gap: 12px;
+  }
+
+  label {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  label span {
+    color: var(--text);
+  }
+
+  .switch-row {
+    min-height: 34px;
+    justify-content: space-between;
+    gap: 14px;
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  .switch-row input {
+    width: 20px;
+    height: 20px;
+  }
+
+  .modal-actions {
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 4px;
+  }
+
+  .auth-card {
+    padding: 18px;
+  }
+
+  .auth-card h1 {
+    margin: 0 0 6px;
+    font-size: 24px;
+  }
+
+  .auth-grid {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .auth-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .toast-stack {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 50;
+    display: grid;
+    gap: 8px;
+    width: min(360px, calc(100vw - 32px));
+  }
+
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 11px 12px;
+    color: var(--text);
+  }
+
+  .toast strong {
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  @media (max-width: 1040px) {
+    .app {
+      grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+    }
+
+    .details {
+      display: none;
+    }
+  }
+
+  @media (max-width: 760px) {
+    body {
+      overflow: auto;
+    }
+
+    .app {
+      height: auto;
+      min-height: 100vh;
+      grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+      max-height: 42vh;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .chat {
+      min-height: 58vh;
+    }
+
+    .chat-header {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+
+    .toolbar {
+      justify-content: start;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .field {
+      width: 100%;
+    }
+
+    .message-bubble {
+      max-width: 88%;
+    }
+  }
 </style>
 </head>
 <body>
-
-  <div class="sep"></div>
-
-  <div class="left" id="leftPanel">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <strong>Groups</strong>
-      <div class="controls">
-        <button class="btn small" id="btnCreateGroup">New</button>
-        <button class="btn small secondary" id="btnRefresh">Refresh</button>
-      </div>
-    </div>
-    <div class="groups" id="groupList"></div>
-    <hr/>
-    <div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-        <div id="leftProfile" class="profileCircle" style="width:36px;height:36px;"></div>
-        <div>
-          <div id="displayName" style="font-weight:700"></div>
-          <div id="displayHandle" class="tiny"></div>
+  <div class="app" id="appShell" aria-live="polite">
+    <aside class="sidebar">
+      <div class="side-head">
+        <div class="brand-row">
+          <div class="brand">Messager</div>
+          <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings">...</button>
+        </div>
+        <div class="quick-actions">
+          <button class="primary-btn" id="newGroupBtn" type="button">New</button>
+          <button class="secondary-btn" id="joinGroupBtn" type="button">Join</button>
+        </div>
+        <div class="search-box">
+          <input class="field" id="groupSearch" type="search" placeholder="Search groups" autocomplete="off" />
         </div>
       </div>
-    </div>
-  </div>
+      <div class="group-list" id="groupList">
+        <div class="empty-list">Sign in to load groups.</div>
+      </div>
+      <div class="me-panel">
+        <div class="user-row">
+          <div class="avatar" id="myAvatar">?</div>
+          <div class="user-text">
+            <div class="user-name" id="myName">Signed out</div>
+            <div class="muted" id="myHandle"></div>
+          </div>
+          <button class="small-btn hidden" id="logoutBtn" type="button">Out</button>
+        </div>
+        <div class="status-line" id="statusLine"></div>
+      </div>
+    </aside>
 
-  <div class="main">
-    <header>
-      <div class="title">
-        <div style="display:flex;flex-direction:column;">
+    <main class="chat">
+      <header class="chat-header">
+        <div class="chat-title-row">
+          <div class="group-icon" id="currentGroupIcon">#</div>
+          <div class="chat-heading">
+            <h1 id="chatTitle">Choose a group</h1>
+            <p id="chatSubtitle">Private groups only appear to members.</p>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input class="field" id="messageSearch" type="search" placeholder="Search messages" autocomplete="off" />
+          <button class="secondary-btn" id="exportBtn" type="button" disabled>Export</button>
+          <button class="danger-btn" id="leaveBtn" type="button" disabled>Leave</button>
+        </div>
+      </header>
+
+      <section class="messages" id="messages">
+        <div class="empty-state">No group selected.</div>
+      </section>
+
+      <footer class="composer">
+        <form class="composer-form" id="messageForm">
+          <textarea class="textarea" id="messageInput" placeholder="Message..." maxlength="2000" disabled></textarea>
+          <button class="primary-btn" id="sendBtn" type="submit" disabled>Send</button>
+        </form>
+      </footer>
+    </main>
+
+    <aside class="details">
+      <div class="details-head">
+        <strong>Group Details</strong>
+      </div>
+      <div class="details-body">
+        <h2>About</h2>
+        <div id="groupDescription" class="muted">Select a group to see details.</div>
+        <div class="detail-actions">
+          <button class="secondary-btn hidden" id="copyInviteBtn" type="button">Copy Invite</button>
+          <button class="secondary-btn hidden" id="rotateInviteBtn" type="button">New Invite Code</button>
+          <button class="danger-btn hidden" id="deleteGroupBtn" type="button">Delete Group</button>
+        </div>
+
+        <h2>Members</h2>
+        <div class="member-list" id="memberList">
+          <div class="empty-list">No group selected.</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div id="unreadBadge" class="inviteBadge" style="display:none;">0</div>
-        <div id="rightProfile" style="display:flex;align-items:center;gap:8px;">
-          <div id="profileCircleTop" class="profileCircle" style="width:40px;height:40px;"></div>
-          <div class="hamburger" id="settingsToggle">☰</div>
+    </aside>
+  </div>
+
+  <div class="auth-screen open" id="authScreen">
+    <section class="auth-card">
+      <h1>Sign in</h1>
+      <div class="muted">Accounts use Firebase Auth. Passwords are not stored in the chat database.</div>
+      <div class="auth-grid">
+        <label><span>Username</span><input class="field" id="authHandle" autocomplete="username" placeholder="firecatcher404" /></label>
+        <label><span>Display name</span><input class="field" id="authDisplayName" autocomplete="name" placeholder="Shown when registering" /></label>
+        <label><span>Password</span><input class="field" id="authPassword" type="password" autocomplete="current-password" /></label>
+        <div class="auth-actions">
+          <button class="secondary-btn" id="loginBtn" type="button">Login</button>
+          <button class="primary-btn" id="registerBtn" type="button">Register</button>
         </div>
+        <div class="status-line" id="authStatus"></div>
       </div>
-    </header>
-
-    <div id="chat" class="chatWindow"></div>
-
-    <div class="composer">
-      <input id="messageInput" type="text" placeholder="Message..." autocomplete="off" />
-      <button class="btn" id="sendBtn">Send</button>
-    </div>
+    </section>
   </div>
 
-  <!-- Modals and UI panels (hidden by default) -->
-  <div id="loginModal" class="modalBackdrop" style="display:none;">
-    <div class="modal">
-      <h2>Welcome — set your name & password</h2>
-      <div class="metaLine">Enter your full name (how you want it displayed) and a password. DO NOT USE ONE OF YOUR ACTUAL PASSWORDS, AS THE PASSWORD SAVING IS COOKIE BASED AND VULNERABLE</div>
-      <label>Full name</label><input id="fullNameInput" type="text" placeholder="e.g., Jane Doe" />
-      <label>Password</label><input id="passwordInput" type="password" />
-      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-        <button class="btn" id="createProfileBtn">Create</button>
+  <div class="modal-backdrop" id="createGroupModal">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="createGroupTitle">
+      <div class="modal-head">
+        <h2 class="modal-title" id="createGroupTitle">New Group</h2>
+        <button class="icon-btn" data-close-modal="createGroupModal" type="button" aria-label="Close">x</button>
       </div>
-      <div id="createProfileMsg" class="metaLine"></div>
-    </div>
+      <div class="modal-body">
+        <label><span>Name</span><input class="field" id="groupNameInput" maxlength="60" /></label>
+        <label><span>Description</span><input class="field" id="groupDescInput" maxlength="160" /></label>
+        <label><span>Privacy</span>
+          <select class="select" id="groupPrivacyInput">
+            <option value="private">Private, invite only</option>
+            <option value="public">Public, visible to signed-in users</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button class="secondary-btn" data-close-modal="createGroupModal" type="button">Cancel</button>
+          <button class="primary-btn" id="createGroupConfirm" type="button">Create</button>
+        </div>
+        <div class="status-line" id="createGroupStatus"></div>
+      </div>
+    </section>
   </div>
 
-  <div id="createGroupModal" class="modalBackdrop" style="display:none;">
-    <div class="modal">
-      <h3>Create group</h3>
-      <label>Group name</label><input id="grpName" type="text" />
-      <label>Description (optional)</label><input id="grpDesc" type="text" />
-      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-        <input id="grpInviteOnly" type="checkbox" /><label style="margin:0">Invite-only</label>
+  <div class="modal-backdrop" id="joinGroupModal">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="joinGroupTitle">
+      <div class="modal-head">
+        <h2 class="modal-title" id="joinGroupTitle">Join Private Group</h2>
+        <button class="icon-btn" data-close-modal="joinGroupModal" type="button" aria-label="Close">x</button>
       </div>
-      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-        <button class="btn secondary" id="cancelCreateGrp">Cancel</button>
-        <button class="btn" id="confirmCreateGrp">Create</button>
+      <div class="modal-body">
+        <label><span>Invite code</span><input class="field" id="inviteCodeInput" maxlength="20" autocomplete="off" /></label>
+        <div class="modal-actions">
+          <button class="secondary-btn" data-close-modal="joinGroupModal" type="button">Cancel</button>
+          <button class="primary-btn" id="joinInviteConfirm" type="button">Join</button>
+        </div>
+        <div class="status-line" id="joinGroupStatus"></div>
       </div>
-      <div id="createGrpMsg" class="metaLine"></div>
-    </div>
+    </section>
   </div>
 
-  <div id="joinGroupModal" class="modalBackdrop" style="display:none;">
-    <div class="modal">
-      <h3>Join group</h3>
-      <div id="joinGroupName" class="tiny"></div>
-      <label id="joinLabel">Invite code</label><input id="joinCode" type="text" />
-      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-        <button class="btn secondary" id="cancelJoinGrp">Cancel</button>
-        <button class="btn" id="confirmJoinGrp">Join</button>
+  <div class="modal-backdrop" id="settingsModal">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="modal-head">
+        <h2 class="modal-title" id="settingsTitle">Settings</h2>
+        <button class="icon-btn" data-close-modal="settingsModal" type="button" aria-label="Close">x</button>
       </div>
-      <div id="joinGrpMsg" class="metaLine"></div>
-    </div>
+      <div class="modal-body">
+        <label><span>Display name</span><input class="field" id="settingsDisplayName" maxlength="40" /></label>
+        <label><span>Status</span><input class="field" id="settingsStatus" maxlength="80" /></label>
+        <label><span>Theme</span>
+          <select class="select" id="settingsTheme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+        <label><span>Accent color</span><input class="field" id="settingsAccent" type="color" /></label>
+        <label><span>Profile color</span><input class="field" id="settingsProfileColor" type="color" /></label>
+        <label class="switch-row"><span>Compact layout</span><input id="settingsCompact" type="checkbox" /></label>
+        <label class="switch-row"><span>Larger message text</span><input id="settingsLargeText" type="checkbox" /></label>
+        <label class="switch-row"><span>Enter sends message</span><input id="settingsEnterSend" type="checkbox" /></label>
+        <label class="switch-row"><span>Show seconds on timestamps</span><input id="settingsSeconds" type="checkbox" /></label>
+        <label class="switch-row"><span>Desktop mention notifications</span><input id="settingsDesktopMentions" type="checkbox" /></label>
+        <label class="switch-row"><span>Sound on mention</span><input id="settingsSoundMentions" type="checkbox" /></label>
+        <div class="modal-actions">
+          <button class="secondary-btn" id="notificationPermissionBtn" type="button">Allow Notifications</button>
+          <button class="primary-btn" id="saveSettingsBtn" type="button">Save</button>
+        </div>
+        <div class="status-line" id="settingsStatusLine"></div>
+      </div>
+    </section>
   </div>
 
-  <div id="settingsPanel" class="modalBackdrop" style="display:none;">
-    <div class="modal">
-      <h3>Settings</h3>
-      <label>Profile circle background</label>
-      <input id="profileColor" type="color" value="#0b84ff" />
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-        <input id="darkMode" type="checkbox" /><label>Dark mode</label>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-        <button class="btn secondary" id="closeSettings">Close</button>
-      </div>
-    </div>
-  </div>
+  <div class="toast-stack" id="toastStack"></div>
 
 <script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js';
-import { getDatabase, ref, set, push, onValue } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+import {
+  getAuth,
+  browserLocalPersistence,
+  setPersistence,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile
+} from "https://www.gstatic.com/firebasejs/10.1.0/firebase-auth.js";
+import {
+  getDatabase,
+  ref,
+  set,
+  push,
+  get,
+  update,
+  remove,
+  onValue,
+  onChildAdded,
+  query,
+  limitToLast,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+import { firebaseConfig } from "./message-firebase-config.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
-  authDomain: "website-11b5c.firebaseapp.com",
-  databaseURL: "https://website-11b5c-default-rtdb.firebaseio.com",
-  projectId: "website-11b5c",
-  storageBucket: "website-11b5c.firebasestorage.app",
-  messagingSenderId: "821866548441",
-  appId: "1:821866548441:web:00a08e534699a6f97902c8"
+const PATH = "secureChat";
+const DEFAULT_SETTINGS = {
+  theme: "system",
+  accent: "#0b84ff",
+  profileColor: "#2563eb",
+  compact: false,
+  largeText: false,
+  enterToSend: true,
+  showSeconds: false,
+  desktopMentions: false,
+  soundMentions: true
 };
 
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getDatabase(app);
+const authReady = setPersistence(auth, browserLocalPersistence).catch(() => {});
 
-// === DOM Elements ===
-const msgInput = document.getElementById('messageInput');
-const sendBtn = document.getElementById('sendBtn');
-const settings = document.getElementById('settingsToggle');      // ☰ button
-const settingsMenu = document.getElementById('settingsPanel');    // modal backdrop
-const darkModeToggle = document.getElementById('darkMode');
-const pfpColor = document.getElementById('profileColor');
-const usernameInput = document.getElementById('fullNameInput');
-const passwordInput = document.getElementById('passwordInput');
-const joinBtn = document.getElementById('createProfileBtn');
-const groupListDiv = document.getElementById('groupList');
-const createGroupBtn = document.getElementById('btnCreateGroup');
-const joinGroupBtn = document.getElementById('confirmJoinGrp');
-const messages = document.getElementById('chat');
+const els = {
+  authScreen: document.getElementById("authScreen"),
+  authHandle: document.getElementById("authHandle"),
+  authDisplayName: document.getElementById("authDisplayName"),
+  authPassword: document.getElementById("authPassword"),
+  authStatus: document.getElementById("authStatus"),
+  loginBtn: document.getElementById("loginBtn"),
+  registerBtn: document.getElementById("registerBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  statusLine: document.getElementById("statusLine"),
+  groupList: document.getElementById("groupList"),
+  groupSearch: document.getElementById("groupSearch"),
+  newGroupBtn: document.getElementById("newGroupBtn"),
+  joinGroupBtn: document.getElementById("joinGroupBtn"),
+  chatTitle: document.getElementById("chatTitle"),
+  chatSubtitle: document.getElementById("chatSubtitle"),
+  currentGroupIcon: document.getElementById("currentGroupIcon"),
+  messages: document.getElementById("messages"),
+  messageForm: document.getElementById("messageForm"),
+  messageInput: document.getElementById("messageInput"),
+  sendBtn: document.getElementById("sendBtn"),
+  messageSearch: document.getElementById("messageSearch"),
+  exportBtn: document.getElementById("exportBtn"),
+  leaveBtn: document.getElementById("leaveBtn"),
+  myAvatar: document.getElementById("myAvatar"),
+  myName: document.getElementById("myName"),
+  myHandle: document.getElementById("myHandle"),
+  groupDescription: document.getElementById("groupDescription"),
+  memberList: document.getElementById("memberList"),
+  copyInviteBtn: document.getElementById("copyInviteBtn"),
+  rotateInviteBtn: document.getElementById("rotateInviteBtn"),
+  deleteGroupBtn: document.getElementById("deleteGroupBtn"),
+  createGroupModal: document.getElementById("createGroupModal"),
+  groupNameInput: document.getElementById("groupNameInput"),
+  groupDescInput: document.getElementById("groupDescInput"),
+  groupPrivacyInput: document.getElementById("groupPrivacyInput"),
+  createGroupConfirm: document.getElementById("createGroupConfirm"),
+  createGroupStatus: document.getElementById("createGroupStatus"),
+  joinGroupModal: document.getElementById("joinGroupModal"),
+  inviteCodeInput: document.getElementById("inviteCodeInput"),
+  joinInviteConfirm: document.getElementById("joinInviteConfirm"),
+  joinGroupStatus: document.getElementById("joinGroupStatus"),
+  settingsBtn: document.getElementById("settingsBtn"),
+  settingsModal: document.getElementById("settingsModal"),
+  settingsDisplayName: document.getElementById("settingsDisplayName"),
+  settingsStatus: document.getElementById("settingsStatus"),
+  settingsTheme: document.getElementById("settingsTheme"),
+  settingsAccent: document.getElementById("settingsAccent"),
+  settingsProfileColor: document.getElementById("settingsProfileColor"),
+  settingsCompact: document.getElementById("settingsCompact"),
+  settingsLargeText: document.getElementById("settingsLargeText"),
+  settingsEnterSend: document.getElementById("settingsEnterSend"),
+  settingsSeconds: document.getElementById("settingsSeconds"),
+  settingsDesktopMentions: document.getElementById("settingsDesktopMentions"),
+  settingsSoundMentions: document.getElementById("settingsSoundMentions"),
+  notificationPermissionBtn: document.getElementById("notificationPermissionBtn"),
+  saveSettingsBtn: document.getElementById("saveSettingsBtn"),
+  settingsStatusLine: document.getElementById("settingsStatusLine"),
+  toastStack: document.getElementById("toastStack")
+};
 
 let currentUser = null;
+let profile = null;
 let currentGroupId = null;
+let currentGroupData = null;
+let memberships = {};
+let publicGroups = {};
+let activeMessages = [];
+let settings = loadLocalSettings();
+let publicGroupsUnsub = null;
+let membershipsUnsub = null;
+let groupUnsub = null;
+let messagesUnsub = null;
+const notificationWatchers = new Map();
+const notificationStart = new Map();
 
-// === Helper functions ===
-function getInitials(name){
-  const words = name.trim().split(' ');
-  return words.length === 1
-    ? words[0][0].toUpperCase()
-    : (words[0][0] + words[words.length-1][0]).toUpperCase();
+applySettings();
+
+function loadLocalSettings() {
+  try {
+    return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem("messagerSettings") || "{}") };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
 }
 
-function setCookie(name,value,days=365){
-  const d = new Date();
-  d.setTime(d.getTime() + days*24*60*60*1000);
-  document.cookie = name + '=' + encodeURIComponent(value) + ';path=/;expires=' + d.toUTCString();
-}
-function getCookie(name){
-  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
-  return m ? decodeURIComponent(m[1]) : null;
+function saveLocalSettings() {
+  localStorage.setItem("messagerSettings", JSON.stringify(settings));
 }
 
-// === Login handling ===
-joinBtn.onclick = async () => {
-  const name = usernameInput.value.trim();
-  const pass = passwordInput.value.trim();
-  if (!name || !pass) return alert('Enter both fields');
+function applySettings() {
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const theme = settings.theme === "system" ? (prefersDark ? "dark" : "light") : settings.theme;
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.density = settings.compact ? "compact" : "comfortable";
+  document.documentElement.dataset.text = settings.largeText ? "large" : "normal";
+  document.documentElement.style.setProperty("--accent", settings.accent);
+  updateProfileChrome();
+}
 
-  currentUser = name;
-  setCookie('username', name);
-  setCookie('password', pass);
+function updateProfileChrome() {
+  const name = profile?.displayName || "Signed out";
+  const handle = profile?.handle ? "@" + profile.handle : "";
+  els.myName.textContent = name;
+  els.myHandle.textContent = handle;
+  els.myAvatar.textContent = initials(name || profile?.handle || "?");
+  els.myAvatar.style.background = profile?.color || settings.profileColor;
+  els.logoutBtn.classList.toggle("hidden", !currentUser);
+}
 
-  await set(ref(db, 'users/' + name), { color: localStorage.getItem('pfpColor') || '#4c8bf5' });
-  document.getElementById('loginModal').style.display = 'none';
-  loadGroups();
-};
+function setStatus(text, target = els.statusLine) {
+  target.textContent = text || "";
+}
 
-// === Load groups ===
-function loadGroups(){
-  const groupsRef = ref(db, 'groups');
-  onValue(groupsRef, snapshot => {
-    const data = snapshot.val() || {};
-    groupListDiv.innerHTML = '';
-    for (const id in data){
-      const g = data[id];
-      const div = document.createElement('div');
-      div.textContent = g.name;
-      div.className = 'groupEntry';
-      div.onclick = () => selectGroup(id);
-      groupListDiv.appendChild(div);
-    }
+function friendlyError(error) {
+  const code = error?.code || "";
+  if (code.includes("auth/email-already-in-use")) return "That username is already registered.";
+  if (code.includes("auth/invalid-email")) return "Use 3-24 letters, numbers, underscores, dots, or hyphens.";
+  if (code.includes("auth/weak-password")) return "Use a password with at least 6 characters.";
+  if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) return "Username or password is not correct.";
+  if (code.includes("auth/user-not-found")) return "No account exists for that username.";
+  if (code.includes("permission-denied")) return "Firebase denied that action. Check the database rules.";
+  return error?.message || "Something went wrong.";
+}
+
+function normalizeHandle(value) {
+  return value.trim().toLowerCase();
+}
+
+function isValidHandle(handle) {
+  return /^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/.test(handle);
+}
+
+function handleToEmail(handle) {
+  return `${handle}@firecatcher404.chat`;
+}
+
+function initials(name) {
+  const parts = String(name || "?").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function groupInitial(name) {
+  return String(name || "#").trim().slice(0, 1).toUpperCase() || "#";
+}
+
+function randomInviteCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  const values = new Uint8Array(12);
+  crypto.getRandomValues(values);
+  values.forEach(value => {
+    code += chars[value % chars.length];
   });
+  return code;
 }
 
-// === Select group ===
-function selectGroup(id){
-  currentGroupId = id;
-  messages.innerHTML = '';
-  const msgsRef = ref(db, 'messages/' + id);
-  onValue(msgsRef, snapshot => {
-    messages.innerHTML = '';
-    const msgs = snapshot.val() || {};
-    for (const mid in msgs){
-      addMessage(msgs[mid].sender, msgs[mid].text);
-    }
-  });
+function countKey(type, groupId) {
+  return `messager:${type}:${currentUser?.uid || "anon"}:${groupId}`;
 }
 
-// === Send message ===
-sendBtn.onclick = async () => {
-  if (!currentGroupId) return alert('Select a group first');
-  const text = msgInput.value.trim();
-  if (!text) return;
+function getCount(type, groupId) {
+  return Number(localStorage.getItem(countKey(type, groupId)) || 0);
+}
 
-  const newMsgRef = push(ref(db, 'messages/' + currentGroupId));
-  await set(newMsgRef, { sender: currentUser, text, ts: Date.now() });
-  msgInput.value = '';
-};
+function setCount(type, groupId, value) {
+  localStorage.setItem(countKey(type, groupId), String(Math.max(0, value)));
+}
 
-// === Press Enter to send ===
-msgInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendBtn.click();
+function incrementCount(type, groupId) {
+  setCount(type, groupId, getCount(type, groupId) + 1);
+}
+
+function resetCounts(groupId) {
+  setCount("unread", groupId, 0);
+  setCount("mentions", groupId, 0);
+}
+
+function openModal(id) {
+  document.getElementById(id)?.classList.add("open");
+}
+
+function closeModal(id) {
+  document.getElementById(id)?.classList.remove("open");
+}
+
+function formatTime(ts) {
+  const time = typeof ts === "number" ? ts : Date.now();
+  const d = new Date(time);
+  const opts = settings.showSeconds
+    ? { hour: "2-digit", minute: "2-digit", second: "2-digit" }
+    : { hour: "2-digit", minute: "2-digit" };
+  return d.toLocaleTimeString([], opts);
+}
+
+function preview(text, max = 120) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  return clean.length > max ? clean.slice(0, max - 1) + "..." : clean;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function register() {
+  await authReady;
+  const handle = normalizeHandle(els.authHandle.value);
+  const displayName = els.authDisplayName.value.trim() || handle;
+  const password = els.authPassword.value;
+  setStatus("", els.authStatus);
+  if (!isValidHandle(handle)) {
+    setStatus("Username must be 3-24 valid characters.", els.authStatus);
+    return;
+  }
+  if (password.length < 6) {
+    setStatus("Password must be at least 6 characters.", els.authStatus);
+    return;
+  }
+  try {
+    els.registerBtn.disabled = true;
+    const cred = await createUserWithEmailAndPassword(auth, handleToEmail(handle), password);
+    await updateProfile(cred.user, { displayName });
+    const color = settings.profileColor;
+    const userProfile = {
+      uid: cred.user.uid,
+      handle,
+      displayName,
+      status: "",
+      color,
+      settings: { ...settings, profileColor: color },
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+    await set(ref(db, `${PATH}/users/${cred.user.uid}`), userProfile);
+    await set(ref(db, `${PATH}/usernames/${handle}`), {
+      uid: cred.user.uid,
+      handle,
+      createdAt: serverTimestamp()
+    });
+  } catch (error) {
+    setStatus(friendlyError(error), els.authStatus);
+  } finally {
+    els.registerBtn.disabled = false;
+  }
+}
+
+async function login() {
+  await authReady;
+  const handle = normalizeHandle(els.authHandle.value);
+  const password = els.authPassword.value;
+  setStatus("", els.authStatus);
+  if (!isValidHandle(handle) || !password) {
+    setStatus("Enter your username and password.", els.authStatus);
+    return;
+  }
+  try {
+    els.loginBtn.disabled = true;
+    await signInWithEmailAndPassword(auth, handleToEmail(handle), password);
+  } catch (error) {
+    setStatus(friendlyError(error), els.authStatus);
+  } finally {
+    els.loginBtn.disabled = false;
+  }
+}
+
+async function ensureProfile(user) {
+  const snap = await get(ref(db, `${PATH}/users/${user.uid}`));
+  if (snap.exists()) return snap.val();
+  const handle = normalizeHandle((user.email || "").split("@")[0] || "user");
+  const displayName = user.displayName || handle;
+  const fallbackProfile = {
+    uid: user.uid,
+    handle,
+    displayName,
+    status: "",
+    color: settings.profileColor,
+    settings,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+  await set(ref(db, `${PATH}/users/${user.uid}`), fallbackProfile);
+  await set(ref(db, `${PATH}/usernames/${handle}`), { uid: user.uid, handle, createdAt: serverTimestamp() });
+  return fallbackProfile;
+}
+
+onAuthStateChanged(auth, async user => {
+  cleanupRealtime();
+  currentUser = user;
+  currentGroupId = null;
+  currentGroupData = null;
+  activeMessages = [];
+  if (!user) {
+    profile = null;
+    memberships = {};
+    publicGroups = {};
+    els.authScreen.classList.add("open");
+    setStatus("");
+    updateProfileChrome();
+    renderGroups();
+    resetChat();
+    return;
+  }
+
+  try {
+    profile = await ensureProfile(user);
+    settings = { ...settings, ...(profile.settings || {}), profileColor: profile.color || settings.profileColor };
+    applySettings();
+    updateProfileChrome();
+    els.authScreen.classList.remove("open");
+    setStatus("Signed in.");
+    startGroupListeners();
+    await update(ref(db, `${PATH}/users/${user.uid}`), { lastSeenAt: serverTimestamp() });
+  } catch (error) {
+    setStatus(friendlyError(error));
   }
 });
 
-// === Add message bubble ===
-async function addMessage(name, text){
-  // Create main row wrapper
-  const row = document.createElement('div');
-  row.className = 'messageRow' + (name === currentUser ? ' me' : '');
+function cleanupRealtime() {
+  if (publicGroupsUnsub) publicGroupsUnsub();
+  if (membershipsUnsub) membershipsUnsub();
+  if (groupUnsub) groupUnsub();
+  if (messagesUnsub) messagesUnsub();
+  publicGroupsUnsub = null;
+  membershipsUnsub = null;
+  groupUnsub = null;
+  messagesUnsub = null;
+  notificationWatchers.forEach(unsub => unsub());
+  notificationWatchers.clear();
+  notificationStart.clear();
+}
 
-  // Create profile circle
-  const pfp = document.createElement('div');
-  pfp.className = 'msgPfp';
-  pfp.textContent = getInitials(name);
+function startGroupListeners() {
+  publicGroupsUnsub = onValue(ref(db, `${PATH}/publicGroups`), snap => {
+    publicGroups = snap.val() || {};
+    renderGroups();
+  });
+  membershipsUnsub = onValue(ref(db, `${PATH}/memberships/${currentUser.uid}`), snap => {
+    memberships = snap.val() || {};
+    renderGroups();
+    syncMentionWatchers();
+  });
+}
 
-  // Try to load color from Firebase
-  import('https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js').then(({ get, ref }) => {
-    get(ref(db, 'users/' + name)).then(snapshot => {
-      const data = snapshot.val();
-      if (data && data.color) pfp.style.background = data.color;
-      else pfp.style.background = '#4c8bf5'; // fallback color
-    });
+function renderGroups() {
+  const search = els.groupSearch.value.trim().toLowerCase();
+  const byId = new Map();
+
+  Object.entries(publicGroups || {}).forEach(([id, group]) => {
+    byId.set(id, { ...group, id, isMember: Boolean(memberships[id]), source: "public" });
+  });
+  Object.entries(memberships || {}).forEach(([id, group]) => {
+    byId.set(id, { ...byId.get(id), ...group, id, isMember: true, source: "member" });
   });
 
-  // Message bubble
-  const msg = document.createElement('div');
-  msg.className = 'message' + (name === currentUser ? ' me' : '');
-  const meta = document.createElement('div');
-  meta.className = 'msgMeta';
-  meta.textContent = name;
-  const bubble = document.createElement('div');
-  bubble.textContent = text;
-  msg.appendChild(meta);
-  msg.appendChild(bubble);
+  const groups = [...byId.values()]
+    .filter(group => !search || `${group.name || ""} ${group.description || ""}`.toLowerCase().includes(search))
+    .sort((a, b) => {
+      const ap = a.pinned ? 0 : 1;
+      const bp = b.pinned ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
 
-  // Append to row
-  row.appendChild(pfp);
-  row.appendChild(msg);
-
-  // Add to chat
-  messages.appendChild(row);
-  messages.scrollTop = messages.scrollHeight;
-}
-
-
-// === Settings ===
-settings.onclick = () => {
-  settingsMenu.style.display =
-    settingsMenu.style.display === 'none' ? 'flex' : 'none';
-};
-document.getElementById('closeSettings').onclick = () => {
-  settingsMenu.style.display = 'none';
-};
-
-// === Profile color ===
-pfpColor.oninput = e => {
-  const color = e.target.value;
-  localStorage.setItem('pfpColor', color);
-
-  // Update current user's circles live
-  document.getElementById('profileCircleTop').style.background = color;
-  document.getElementById('leftProfile').style.background = color;
-
-  // Save to Firebase if logged in
-  if (currentUser) {
-    set(ref(db, 'users/' + currentUser + '/color'), color);
+  els.groupList.innerHTML = "";
+  if (!currentUser) {
+    els.groupList.innerHTML = '<div class="empty-list">Sign in to load groups.</div>';
+    return;
   }
-};
+  if (!groups.length) {
+    els.groupList.innerHTML = '<div class="empty-list">No groups found.</div>';
+    return;
+  }
 
-// === Dark mode ===
-darkModeToggle.onchange = e => {
-  document.documentElement.dataset.theme = e.target.checked ? 'dark' : '';
-  localStorage.setItem('darkMode', e.target.checked);
-};
-if (localStorage.getItem('darkMode') === 'true') {
-  document.documentElement.dataset.theme = 'dark';
-  darkModeToggle.checked = true;
+  groups.forEach(group => {
+    const unread = getCount("unread", group.id);
+    const mentions = getCount("mentions", group.id);
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "group-entry";
+    row.classList.toggle("active", group.id === currentGroupId);
+    row.addEventListener("click", () => openGroup(group.id, group));
+
+    const icon = document.createElement("div");
+    icon.className = "group-icon";
+    icon.textContent = groupInitial(group.name);
+    icon.style.background = group.privacy === "private" ? "#7c3aed" : settings.accent;
+
+    const main = document.createElement("div");
+    main.className = "group-main";
+    const name = document.createElement("div");
+    name.className = "group-name";
+    name.textContent = group.name || "Unnamed group";
+    const meta = document.createElement("div");
+    meta.className = "group-meta";
+    const privacy = group.privacy === "private" ? "Private" : "Public";
+    const membership = group.isMember ? (group.role === "owner" ? "owner" : "member") : "tap to join";
+    meta.textContent = `${privacy} - ${membership}`;
+    main.append(name, meta);
+
+    const badges = document.createElement("div");
+    badges.className = "badge-stack";
+    if (mentions) badges.append(makeBadge(mentions, "mention"));
+    if (unread) badges.append(makeBadge(unread, ""));
+
+    row.append(icon, main, badges);
+    els.groupList.appendChild(row);
+  });
 }
-if (localStorage.getItem('pfpColor')) {
-  pfpColor.value = localStorage.getItem('pfpColor');
+
+function makeBadge(value, extraClass) {
+  const badge = document.createElement("span");
+  badge.className = `badge ${extraClass}`.trim();
+  badge.textContent = value > 99 ? "99+" : String(value);
+  return badge;
 }
 
-// === Create / Join groups ===
-createGroupBtn.onclick = () => {
-  const name = prompt('Group name');
-  if (!name) return;
-  const id = 'g_' + Date.now().toString(36);
-  set(ref(db, 'groups/' + id), { name, owner: currentUser });
-};
-joinGroupBtn.onclick = () => {
-  const id = prompt('Enter group ID to join');
-  if (!id) return;
-  set(ref(db, 'groups/' + id + '/members/' + currentUser), true);
-};
+async function openGroup(id, groupSummary) {
+  if (!currentUser) return;
+  try {
+    if (!memberships[id] && groupSummary?.privacy === "public") {
+      await joinPublicGroup(id, groupSummary);
+    }
+    selectGroup(id);
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
 
-// === Auto login ===
-const cookieUser = getCookie('username');
-if (cookieUser) {
-  currentUser = cookieUser;
-  document.getElementById('loginModal').style.display = 'none';
-  loadGroups();
-} else {
-  document.getElementById('loginModal').style.display = 'flex';
+async function joinPublicGroup(groupId, summary) {
+  const groupSnap = await get(ref(db, `${PATH}/groups/${groupId}`));
+  if (!groupSnap.exists() || groupSnap.val().privacy !== "public") throw new Error("Public group not found.");
+  const member = memberPayload("member");
+  const updates = {};
+  updates[`${PATH}/groups/${groupId}/members/${currentUser.uid}`] = member;
+  updates[`${PATH}/memberships/${currentUser.uid}/${groupId}`] = {
+    name: groupSnap.val().name || summary.name || "Unnamed group",
+    privacy: "public",
+    role: "member",
+    ownerHandle: groupSnap.val().ownerHandle || "",
+    joinedAt: serverTimestamp()
+  };
+  await update(ref(db), updates);
+}
+
+function selectGroup(id) {
+  saveDraft();
+  if (groupUnsub) groupUnsub();
+  if (messagesUnsub) messagesUnsub();
+  groupUnsub = null;
+  messagesUnsub = null;
+  currentGroupId = id;
+  currentGroupData = null;
+  activeMessages = [];
+  resetCounts(id);
+  renderGroups();
+  els.messages.innerHTML = '<div class="empty-state">Loading messages...</div>';
+  els.messageInput.disabled = true;
+  els.sendBtn.disabled = true;
+  els.exportBtn.disabled = true;
+  els.leaveBtn.disabled = true;
+
+  groupUnsub = onValue(ref(db, `${PATH}/groups/${id}`), snap => {
+    if (!snap.exists()) {
+      resetChat("Group not found.");
+      return;
+    }
+    currentGroupData = snap.val();
+    renderCurrentGroup();
+    renderGroups();
+  }, error => setStatus(friendlyError(error)));
+
+  const msgQuery = query(ref(db, `${PATH}/messages/${id}`), limitToLast(200));
+  messagesUnsub = onChildAdded(msgQuery, snap => {
+    if (!currentGroupData) {
+      currentGroupData = { members: {} };
+    }
+    const msg = { id: snap.key, ...snap.val() };
+    activeMessages.push(msg);
+    if (activeMessages.length === 1) els.messages.innerHTML = "";
+    appendMessage(msg);
+    applyMessageSearch();
+    els.messages.scrollTop = els.messages.scrollHeight;
+  }, error => setStatus(friendlyError(error)));
+
+  get(ref(db, `${PATH}/messages/${id}`)).then(snap => {
+    if (currentGroupId === id && activeMessages.length === 0 && !snap.exists()) {
+      els.messages.innerHTML = '<div class="empty-state">No messages yet.</div>';
+    }
+  }).catch(error => setStatus(friendlyError(error)));
+}
+
+function resetChat(text = "No group selected.") {
+  els.chatTitle.textContent = "Choose a group";
+  els.chatSubtitle.textContent = "Private groups only appear to members.";
+  els.currentGroupIcon.textContent = "#";
+  els.currentGroupIcon.style.background = settings.accent;
+  els.messages.innerHTML = `<div class="empty-state">${text}</div>`;
+  els.groupDescription.textContent = "Select a group to see details.";
+  els.memberList.innerHTML = '<div class="empty-list">No group selected.</div>';
+  els.copyInviteBtn.classList.add("hidden");
+  els.rotateInviteBtn.classList.add("hidden");
+  els.deleteGroupBtn.classList.add("hidden");
+  els.messageInput.disabled = true;
+  els.sendBtn.disabled = true;
+  els.exportBtn.disabled = true;
+  els.leaveBtn.disabled = true;
+}
+
+function renderCurrentGroup() {
+  const group = currentGroupData;
+  if (!group) return;
+  const memberCount = Object.keys(group.members || {}).length;
+  const isOwner = group.ownerUid === currentUser.uid;
+  const privacy = group.privacy === "private" ? "Private" : "Public";
+  els.chatTitle.textContent = group.name || "Unnamed group";
+  els.chatSubtitle.textContent = `${privacy} - ${memberCount} member${memberCount === 1 ? "" : "s"} - owner @${group.ownerHandle || "unknown"}`;
+  els.currentGroupIcon.textContent = groupInitial(group.name);
+  els.currentGroupIcon.style.background = group.privacy === "private" ? "#7c3aed" : settings.accent;
+  els.groupDescription.textContent = group.description || "No description.";
+  els.messageInput.disabled = false;
+  els.sendBtn.disabled = false;
+  els.exportBtn.disabled = false;
+  els.leaveBtn.disabled = false;
+  els.copyInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
+  els.rotateInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
+  els.deleteGroupBtn.classList.toggle("hidden", !isOwner);
+  restoreDraft();
+  renderMembers();
+}
+
+function renderMembers() {
+  const members = currentGroupData?.members || {};
+  const isOwner = currentGroupData?.ownerUid === currentUser?.uid;
+  els.memberList.innerHTML = "";
+  const rows = Object.entries(members).sort((a, b) => {
+    const ar = a[1]?.role === "owner" ? 0 : 1;
+    const br = b[1]?.role === "owner" ? 0 : 1;
+    if (ar !== br) return ar - br;
+    return String(a[1]?.displayName || a[1]?.handle || "").localeCompare(String(b[1]?.displayName || b[1]?.handle || ""));
+  });
+  if (!rows.length) {
+    els.memberList.innerHTML = '<div class="empty-list">No members.</div>';
+    return;
+  }
+  rows.forEach(([uid, member]) => {
+    const row = document.createElement("div");
+    row.className = "member-row";
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.style.width = "32px";
+    avatar.style.height = "32px";
+    avatar.style.background = uid === currentUser.uid ? (profile?.color || settings.profileColor) : "#64748b";
+    avatar.textContent = initials(member.displayName || member.handle);
+
+    const copy = document.createElement("div");
+    copy.className = "member-copy";
+    const name = document.createElement("div");
+    name.className = "member-name";
+    name.textContent = member.displayName || member.handle || "Unknown";
+    const meta = document.createElement("div");
+    meta.className = "member-meta";
+    meta.textContent = `@${member.handle || "unknown"} - ${member.role || "member"}`;
+    copy.append(name, meta);
+    row.append(avatar, copy);
+
+    if (isOwner && uid !== currentUser.uid) {
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "small-btn";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => removeMember(uid, member));
+      row.appendChild(removeBtn);
+    }
+    els.memberList.appendChild(row);
+  });
+}
+
+function memberPayload(role, inviteCode = null) {
+  const payload = {
+    role,
+    handle: profile.handle,
+    displayName: profile.displayName,
+    joinedAt: serverTimestamp()
+  };
+  if (inviteCode) payload.inviteCode = inviteCode;
+  return payload;
+}
+
+async function createGroup() {
+  if (!currentUser) return;
+  const name = els.groupNameInput.value.trim();
+  const description = els.groupDescInput.value.trim();
+  const privacy = els.groupPrivacyInput.value;
+  setStatus("", els.createGroupStatus);
+  if (!name) {
+    setStatus("Enter a group name.", els.createGroupStatus);
+    return;
+  }
+  try {
+    els.createGroupConfirm.disabled = true;
+    const groupRef = push(ref(db, `${PATH}/groups`));
+    const groupId = groupRef.key;
+    const inviteCode = privacy === "private" ? randomInviteCode() : null;
+    const group = {
+      name,
+      description,
+      privacy,
+      ownerUid: currentUser.uid,
+      ownerHandle: profile.handle,
+      inviteCode,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      members: {
+        [currentUser.uid]: memberPayload("owner")
+      }
+    };
+    await set(groupRef, group);
+    await set(ref(db, `${PATH}/memberships/${currentUser.uid}/${groupId}`), {
+      name,
+      description,
+      privacy,
+      role: "owner",
+      ownerHandle: profile.handle,
+      joinedAt: serverTimestamp()
+    });
+    if (privacy === "public") {
+      await set(ref(db, `${PATH}/publicGroups/${groupId}`), {
+        name,
+        description,
+        privacy,
+        ownerUid: currentUser.uid,
+        ownerHandle: profile.handle,
+        createdAt: serverTimestamp()
+      });
+    } else {
+      await set(ref(db, `${PATH}/invites/${inviteCode}`), {
+        groupId,
+        groupName: name,
+        createdBy: currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+    }
+    closeModal("createGroupModal");
+    els.groupNameInput.value = "";
+    els.groupDescInput.value = "";
+    selectGroup(groupId);
+    if (inviteCode) {
+      try {
+        await copyText(inviteCode);
+      } catch {
+        // Clipboard access can fail outside a direct user gesture.
+      }
+      toast("Invite copied", `Code ${inviteCode}`);
+    }
+  } catch (error) {
+    setStatus(friendlyError(error), els.createGroupStatus);
+  } finally {
+    els.createGroupConfirm.disabled = false;
+  }
+}
+
+async function joinPrivateGroup() {
+  if (!currentUser) return;
+  const code = els.inviteCodeInput.value.trim().toUpperCase();
+  setStatus("", els.joinGroupStatus);
+  if (!/^[A-Z0-9]{10,16}$/.test(code)) {
+    setStatus("Enter a valid invite code.", els.joinGroupStatus);
+    return;
+  }
+  try {
+    els.joinInviteConfirm.disabled = true;
+    const inviteSnap = await get(ref(db, `${PATH}/invites/${code}`));
+    if (!inviteSnap.exists()) {
+      setStatus("Invite code not found.", els.joinGroupStatus);
+      return;
+    }
+    const invite = inviteSnap.val();
+    const updates = {};
+    updates[`${PATH}/groups/${invite.groupId}/members/${currentUser.uid}`] = memberPayload("member", code);
+    updates[`${PATH}/memberships/${currentUser.uid}/${invite.groupId}`] = {
+      name: invite.groupName || "Private group",
+      privacy: "private",
+      role: "member",
+      joinedAt: serverTimestamp()
+    };
+    await update(ref(db), updates);
+    closeModal("joinGroupModal");
+    els.inviteCodeInput.value = "";
+    selectGroup(invite.groupId);
+  } catch (error) {
+    setStatus(friendlyError(error), els.joinGroupStatus);
+  } finally {
+    els.joinInviteConfirm.disabled = false;
+  }
+}
+
+function parseMentions(text) {
+  const mentions = {};
+  const members = currentGroupData?.members || {};
+  const lower = String(text).toLowerCase();
+  const mentionEveryone = /(^|\s)@(all|everyone)(?=$|[\s.,!?;:])/i.test(text);
+  Object.entries(members).forEach(([uid, member]) => {
+    const handle = member.handle;
+    if (!handle) return;
+    const re = new RegExp(`(^|\\s)@${escapeRegExp(handle)}(?=$|[\\s.,!?;:])`, "i");
+    if (mentionEveryone || re.test(lower)) mentions[uid] = true;
+  });
+  return mentions;
+}
+
+async function sendMessage(event) {
+  event.preventDefault();
+  if (!currentUser || !currentGroupId || !currentGroupData) return;
+  const text = els.messageInput.value.trim();
+  if (!text) return;
+  try {
+    const msgRef = push(ref(db, `${PATH}/messages/${currentGroupId}`));
+    await set(msgRef, {
+      senderUid: currentUser.uid,
+      senderHandle: profile.handle,
+      senderName: profile.displayName,
+      text,
+      mentions: parseMentions(text),
+      ts: serverTimestamp()
+    });
+    els.messageInput.value = "";
+    saveDraft();
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+function appendMessage(msg) {
+  if (!msg || !msg.text) return;
+  const row = document.createElement("article");
+  row.className = "message-row";
+  row.classList.toggle("me", msg.senderUid === currentUser?.uid);
+  row.classList.toggle("mentioned", Boolean(msg.mentions && msg.mentions[currentUser?.uid]));
+  row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${msg.text || ""}`.toLowerCase();
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = initials(msg.senderName || msg.senderHandle);
+  avatar.style.background = msg.senderUid === currentUser?.uid ? (profile?.color || settings.profileColor) : "#64748b";
+
+  const bubble = document.createElement("div");
+  bubble.className = "message-bubble";
+  const meta = document.createElement("div");
+  meta.className = "message-meta";
+  const sender = document.createElement("span");
+  sender.className = "message-sender";
+  sender.textContent = msg.senderName || msg.senderHandle || "Unknown";
+  const handle = document.createElement("span");
+  handle.textContent = `@${msg.senderHandle || "unknown"}`;
+  const time = document.createElement("span");
+  time.textContent = formatTime(msg.ts);
+  meta.append(sender, handle, time);
+
+  const body = document.createElement("div");
+  appendHighlightedText(body, msg.text);
+  bubble.append(meta, body);
+  row.append(avatar, bubble);
+  els.messages.appendChild(row);
+}
+
+function appendHighlightedText(container, text) {
+  const mentionRe = /(@[a-z0-9_.-]{3,24}|@all|@everyone)/gi;
+  let last = 0;
+  String(text).replace(mentionRe, (match, _token, offset) => {
+    if (offset > last) container.appendChild(document.createTextNode(text.slice(last, offset)));
+    const span = document.createElement("span");
+    span.className = "mention-token";
+    span.textContent = match;
+    container.appendChild(span);
+    last = offset + match.length;
+    return match;
+  });
+  if (last < text.length) container.appendChild(document.createTextNode(text.slice(last)));
+}
+
+function applyMessageSearch() {
+  const term = els.messageSearch.value.trim().toLowerCase();
+  [...els.messages.querySelectorAll(".message-row")].forEach(row => {
+    row.classList.toggle("hidden", Boolean(term && !row.dataset.search.includes(term)));
+  });
+}
+
+function syncMentionWatchers() {
+  const ids = new Set(Object.keys(memberships || {}));
+  for (const [id, unsub] of notificationWatchers.entries()) {
+    if (!ids.has(id)) {
+      unsub();
+      notificationWatchers.delete(id);
+      notificationStart.delete(id);
+    }
+  }
+  ids.forEach(id => {
+    if (notificationWatchers.has(id)) return;
+    const startedAt = Date.now();
+    notificationStart.set(id, startedAt);
+    const q = query(ref(db, `${PATH}/messages/${id}`), limitToLast(30));
+    const unsub = onChildAdded(q, snap => {
+      const msg = snap.val();
+      if (!msg || !currentUser || msg.senderUid === currentUser.uid) return;
+      const ts = typeof msg.ts === "number" ? msg.ts : Date.now();
+      if (ts < startedAt - 3000) return;
+      if (id !== currentGroupId) incrementCount("unread", id);
+      if (msg.mentions && msg.mentions[currentUser.uid]) {
+        if (id !== currentGroupId || document.hidden) incrementCount("mentions", id);
+        notifyMention(id, msg);
+      }
+      renderGroups();
+    });
+    notificationWatchers.set(id, unsub);
+  });
+}
+
+function notifyMention(groupId, msg) {
+  const group = memberships[groupId] || publicGroups[groupId] || {};
+  const title = `${msg.senderName || msg.senderHandle || "Someone"} mentioned you`;
+  const body = `${group.name || "A group"}: ${preview(msg.text, 100)}`;
+  toast(title, body);
+  if (settings.soundMentions) playMentionSound();
+  if (
+    settings.desktopMentions &&
+    "Notification" in window &&
+    Notification.permission === "granted" &&
+    document.hidden
+  ) {
+    const note = new Notification(title, { body, tag: `mention-${groupId}` });
+    note.onclick = () => {
+      window.focus();
+      selectGroup(groupId);
+      note.close();
+    };
+  }
+}
+
+function toast(title, body) {
+  const node = document.createElement("div");
+  node.className = "toast";
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  const text = document.createElement("div");
+  text.textContent = body || "";
+  node.append(strong, text);
+  els.toastStack.appendChild(node);
+  setTimeout(() => node.remove(), 5200);
+}
+
+function playMentionSound() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 740;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.18);
+  } catch {
+    // Sound is best-effort because browsers can block audio before user interaction.
+  }
+}
+
+async function copyInvite() {
+  if (!currentGroupData?.inviteCode) return;
+  await copyText(currentGroupData.inviteCode);
+  toast("Invite copied", `Code ${currentGroupData.inviteCode}`);
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+  }
+}
+
+async function rotateInvite() {
+  if (!currentGroupData || currentGroupData.ownerUid !== currentUser.uid) return;
+  if (!confirm("Replace the old invite code?")) return;
+  const oldCode = currentGroupData.inviteCode;
+  const newCode = randomInviteCode();
+  try {
+    const updates = {};
+    updates[`${PATH}/groups/${currentGroupId}/inviteCode`] = newCode;
+    updates[`${PATH}/groups/${currentGroupId}/updatedAt`] = serverTimestamp();
+    updates[`${PATH}/invites/${newCode}`] = {
+      groupId: currentGroupId,
+      groupName: currentGroupData.name,
+      createdBy: currentUser.uid,
+      createdAt: serverTimestamp()
+    };
+    if (oldCode) updates[`${PATH}/invites/${oldCode}`] = null;
+    await update(ref(db), updates);
+    await copyText(newCode);
+    toast("New invite copied", `Code ${newCode}`);
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+async function removeMember(uid, member) {
+  if (!currentGroupData || currentGroupData.ownerUid !== currentUser.uid) return;
+  if (!confirm(`Remove @${member.handle || "member"} from this group?`)) return;
+  try {
+    const updates = {};
+    updates[`${PATH}/groups/${currentGroupId}/members/${uid}`] = null;
+    updates[`${PATH}/memberships/${uid}/${currentGroupId}`] = null;
+    await update(ref(db), updates);
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+async function leaveGroup() {
+  if (!currentGroupId || !currentGroupData) return;
+  if (currentGroupData.ownerUid === currentUser.uid) {
+    setStatus("Owners can delete the group instead of leaving it.");
+    return;
+  }
+  if (!confirm("Leave this group?")) return;
+  try {
+    const updates = {};
+    updates[`${PATH}/groups/${currentGroupId}/members/${currentUser.uid}`] = null;
+    updates[`${PATH}/memberships/${currentUser.uid}/${currentGroupId}`] = null;
+    await update(ref(db), updates);
+    currentGroupId = null;
+    currentGroupData = null;
+    resetChat();
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+async function deleteGroup() {
+  if (!currentGroupData || currentGroupData.ownerUid !== currentUser.uid) return;
+  if (!confirm("Delete this group and its messages?")) return;
+  const groupId = currentGroupId;
+  try {
+    if (currentGroupData.inviteCode) await remove(ref(db, `${PATH}/invites/${currentGroupData.inviteCode}`));
+    await remove(ref(db, `${PATH}/messages/${groupId}`));
+    const updates = {};
+    Object.keys(currentGroupData.members || {}).forEach(uid => {
+      updates[`${PATH}/memberships/${uid}/${groupId}`] = null;
+    });
+    updates[`${PATH}/publicGroups/${groupId}`] = null;
+    updates[`${PATH}/groups/${groupId}`] = null;
+    await update(ref(db), updates);
+    currentGroupId = null;
+    currentGroupData = null;
+    resetChat("Group deleted.");
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+function saveDraft() {
+  if (!currentGroupId) return;
+  localStorage.setItem(`messager:draft:${currentUser.uid}:${currentGroupId}`, els.messageInput.value);
+}
+
+function restoreDraft() {
+  if (!currentGroupId || document.activeElement === els.messageInput) return;
+  els.messageInput.value = localStorage.getItem(`messager:draft:${currentUser.uid}:${currentGroupId}`) || "";
+}
+
+function exportMessages() {
+  if (!currentGroupData || !activeMessages.length) return;
+  const lines = activeMessages.map(msg => {
+    const date = new Date(typeof msg.ts === "number" ? msg.ts : Date.now()).toISOString();
+    return `[${date}] ${msg.senderName || msg.senderHandle}: ${msg.text}`;
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${(currentGroupData.name || "messages").replace(/[^a-z0-9_-]+/gi, "-").toLowerCase()}-chat.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function fillSettingsForm() {
+  els.settingsDisplayName.value = profile?.displayName || "";
+  els.settingsStatus.value = profile?.status || "";
+  els.settingsTheme.value = settings.theme;
+  els.settingsAccent.value = settings.accent;
+  els.settingsProfileColor.value = profile?.color || settings.profileColor;
+  els.settingsCompact.checked = Boolean(settings.compact);
+  els.settingsLargeText.checked = Boolean(settings.largeText);
+  els.settingsEnterSend.checked = Boolean(settings.enterToSend);
+  els.settingsSeconds.checked = Boolean(settings.showSeconds);
+  els.settingsDesktopMentions.checked = Boolean(settings.desktopMentions);
+  els.settingsSoundMentions.checked = Boolean(settings.soundMentions);
+}
+
+function readSettingsForm() {
+  settings = {
+    ...settings,
+    theme: els.settingsTheme.value,
+    accent: els.settingsAccent.value,
+    profileColor: els.settingsProfileColor.value,
+    compact: els.settingsCompact.checked,
+    largeText: els.settingsLargeText.checked,
+    enterToSend: els.settingsEnterSend.checked,
+    showSeconds: els.settingsSeconds.checked,
+    desktopMentions: els.settingsDesktopMentions.checked,
+    soundMentions: els.settingsSoundMentions.checked
+  };
+  saveLocalSettings();
+  applySettings();
+}
+
+async function saveSettings() {
+  if (!currentUser || !profile) return;
+  readSettingsForm();
+  const displayName = els.settingsDisplayName.value.trim() || profile.handle;
+  const status = els.settingsStatus.value.trim();
+  const color = els.settingsProfileColor.value;
+  try {
+    profile = { ...profile, displayName, status, color, settings };
+    await updateProfile(currentUser, { displayName });
+    await update(ref(db, `${PATH}/users/${currentUser.uid}`), {
+      displayName,
+      status,
+      color,
+      settings,
+      updatedAt: serverTimestamp()
+    });
+    const updates = {};
+    Object.keys(memberships || {}).forEach(groupId => {
+      updates[`${PATH}/groups/${groupId}/members/${currentUser.uid}/displayName`] = displayName;
+      updates[`${PATH}/groups/${groupId}/members/${currentUser.uid}/handle`] = profile.handle;
+    });
+    if (Object.keys(updates).length) await update(ref(db), updates);
+    updateProfileChrome();
+    renderMembers();
+    setStatus("Settings saved.", els.settingsStatusLine);
+  } catch (error) {
+    setStatus(friendlyError(error), els.settingsStatusLine);
+  }
+}
+
+els.registerBtn.addEventListener("click", register);
+els.loginBtn.addEventListener("click", login);
+els.authPassword.addEventListener("keydown", event => {
+  if (event.key === "Enter") login();
+});
+els.logoutBtn.addEventListener("click", () => signOut(auth));
+els.newGroupBtn.addEventListener("click", () => openModal("createGroupModal"));
+els.joinGroupBtn.addEventListener("click", () => openModal("joinGroupModal"));
+els.createGroupConfirm.addEventListener("click", createGroup);
+els.joinInviteConfirm.addEventListener("click", joinPrivateGroup);
+els.groupSearch.addEventListener("input", renderGroups);
+els.messageSearch.addEventListener("input", applyMessageSearch);
+els.messageForm.addEventListener("submit", sendMessage);
+els.messageInput.addEventListener("input", saveDraft);
+els.messageInput.addEventListener("keydown", event => {
+  if (event.key === "Enter" && !event.shiftKey && settings.enterToSend) {
+    event.preventDefault();
+    els.messageForm.requestSubmit();
+  }
+});
+els.copyInviteBtn.addEventListener("click", copyInvite);
+els.rotateInviteBtn.addEventListener("click", rotateInvite);
+els.leaveBtn.addEventListener("click", leaveGroup);
+els.deleteGroupBtn.addEventListener("click", deleteGroup);
+els.exportBtn.addEventListener("click", exportMessages);
+els.settingsBtn.addEventListener("click", () => {
+  fillSettingsForm();
+  setStatus("", els.settingsStatusLine);
+  openModal("settingsModal");
+});
+els.saveSettingsBtn.addEventListener("click", saveSettings);
+els.notificationPermissionBtn.addEventListener("click", async () => {
+  if (!("Notification" in window)) {
+    setStatus("This browser does not support desktop notifications.", els.settingsStatusLine);
+    return;
+  }
+  const permission = await Notification.requestPermission();
+  setStatus(`Notification permission: ${permission}.`, els.settingsStatusLine);
+});
+[
+  els.settingsTheme,
+  els.settingsAccent,
+  els.settingsProfileColor,
+  els.settingsCompact,
+  els.settingsLargeText,
+  els.settingsEnterSend,
+  els.settingsSeconds,
+  els.settingsDesktopMentions,
+  els.settingsSoundMentions
+].forEach(input => input.addEventListener("input", readSettingsForm));
+
+document.querySelectorAll("[data-close-modal]").forEach(button => {
+  button.addEventListener("click", () => closeModal(button.dataset.closeModal));
+});
+document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
+  backdrop.addEventListener("click", event => {
+    if (event.target === backdrop) backdrop.classList.remove("open");
+  });
+});
+if (window.matchMedia) {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applySettings);
 }
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
