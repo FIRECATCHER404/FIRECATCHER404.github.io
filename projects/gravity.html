@@ -352,8 +352,10 @@ function clampUnit(value) {
   return Math.max(-1, Math.min(1, value));
 }
 
-function applyPhoneGravity(rawX, rawY) {
-  const rotated = rotatePhoneVectorToCanvas(rawX, rawY);
+function applyPhoneGravity(rawX, rawY, shouldRotateToCanvas = true) {
+  const rotated = shouldRotateToCanvas
+    ? rotatePhoneVectorToCanvas(rawX, rawY)
+    : { x: rawX, y: rawY };
   const magnitude = Math.hypot(rotated.x, rotated.y);
   const deadzone = 0.04;
   const limitedMagnitude = magnitude > 1 ? 1 / magnitude : 1;
@@ -379,7 +381,8 @@ function updateOrientationGravity(event) {
   const gamma = Math.max(-90, Math.min(90, event.gamma));
   applyPhoneGravity(
     Math.sin(gamma * Math.PI / 180),
-    Math.sin(beta * Math.PI / 180)
+    Math.sin(beta * Math.PI / 180),
+    true
   );
 }
 
@@ -392,7 +395,8 @@ function updateMotionGravity(event) {
   lastMotionGravityTime = performance.now();
   applyPhoneGravity(
     clampUnit(gravity.x / SENSOR_GRAVITY),
-    clampUnit(-gravity.y / SENSOR_GRAVITY)
+    clampUnit(-gravity.y / SENSOR_GRAVITY),
+    false
   );
 }
 
