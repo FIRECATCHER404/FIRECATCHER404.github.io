@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Opening Messager</title>
+  <link rel="canonical" href="../message.html" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      background: #eef2f6;
+      color: #141a22;
+    }
+
+    main {
+      width: min(420px, calc(100vw - 32px));
+      padding: 18px;
+      border: 1px solid #d8dee8;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 12px 30px rgba(20, 26, 34, 0.08);
+    }
+
+    a {
+      color: #0b84ff;
+      font-weight: 800;
+    }
+  </style>
+  <script>
+    const target = new URL("../message.html", window.location.href);
+    target.search = window.location.search;
+    target.hash = window.location.hash;
+    window.location.replace(target.href);
+  </script>
+</head>
+<body>
+  <main>
+    <h1>Opening Messager...</h1>
+    <p><a id="fallbackLink" href="../message.html">Open Messager</a></p>
+  </main>
+  <script>
+    document.getElementById("fallbackLink").href = target.href;
+  </script>
+</body>
+</html>

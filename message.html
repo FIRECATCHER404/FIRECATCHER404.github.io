@@ -1020,6 +1020,7 @@ let publicGroupsUnsub = null;
 let membershipsUnsub = null;
 let groupUnsub = null;
 let messagesUnsub = null;
+let pendingInviteCode = readInviteCodeFromUrl();
 const notificationWatchers = new Map();
 const notificationStart = new Map();
 
@@ -1108,6 +1109,34 @@ function randomInviteCode() {
     code += chars[value % chars.length];
   });
   return code;
+}
+
+function normalizeInviteCode(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function isValidInviteCode(code) {
+  return /^[A-Z0-9]{10,16}$/.test(code);
+}
+
+function readInviteCodeFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const code = normalizeInviteCode(params.get("invite") || params.get("join"));
+  return isValidInviteCode(code) ? code : "";
+}
+
+function inviteLink(code) {
+  const url = new URL("/message", window.location.origin);
+  url.searchParams.set("invite", normalizeInviteCode(code));
+  return url.toString();
+}
+
+function clearInviteFromUrl() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("invite") && !url.searchParams.has("join")) return;
+  url.searchParams.delete("invite");
+  url.searchParams.delete("join");
+  history.replaceState(null, "", url.pathname + url.search + url.hash);
 }
 
 function countKey(type, groupId) {
@@ -1255,6 +1284,10 @@ onAuthStateChanged(auth, async user => {
     updateProfileChrome();
     renderGroups();
     resetChat();
+    if (pendingInviteCode) {
+      els.inviteCodeInput.value = pendingInviteCode;
+      setStatus(`Sign in or register to join invite ${pendingInviteCode}.`, els.authStatus);
+    }
     return;
   }
 
@@ -1267,6 +1300,7 @@ onAuthStateChanged(auth, async user => {
     setStatus("Signed in.");
     startGroupListeners();
     await update(ref(db, `${PATH}/users/${user.uid}`), { lastSeenAt: serverTimestamp() });
+    if (pendingInviteCode) await applyPendingInvite();
   } catch (error) {
     console.error("Profile load failed:", error);
     setStatus(friendlyError(error));
@@ -1605,11 +1639,11 @@ async function createGroup() {
     selectGroup(groupId);
     if (inviteCode) {
       try {
-        await copyText(inviteCode);
+        await copyText(inviteLink(inviteCode));
       } catch {
         // Clipboard access can fail outside a direct user gesture.
       }
-      toast("Invite copied", `Code ${inviteCode}`);
+      toast("Invite link copied", inviteCode);
     }
   } catch (error) {
     setStatus(friendlyError(error), els.createGroupStatus);
@@ -1620,36 +1654,62 @@ async function createGroup() {
 
 async function joinPrivateGroup() {
   if (!currentUser) return;
-  const code = els.inviteCodeInput.value.trim().toUpperCase();
+  const code = normalizeInviteCode(els.inviteCodeInput.value);
   setStatus("", els.joinGroupStatus);
-  if (!/^[A-Z0-9]{10,16}$/.test(code)) {
+  if (!isValidInviteCode(code)) {
     setStatus("Enter a valid invite code.", els.joinGroupStatus);
     return;
   }
   try {
     els.joinInviteConfirm.disabled = true;
-    const inviteSnap = await get(ref(db, `${PATH}/invites/${code}`));
-    if (!inviteSnap.exists()) {
-      setStatus("Invite code not found.", els.joinGroupStatus);
-      return;
-    }
-    const invite = inviteSnap.val();
-    const updates = {};
-    updates[`${PATH}/groups/${invite.groupId}/members/${currentUser.uid}`] = memberPayload("member", code);
-    updates[`${PATH}/memberships/${currentUser.uid}/${invite.groupId}`] = {
-      name: invite.groupName || "Private group",
-      privacy: "private",
-      role: "member",
-      joinedAt: serverTimestamp()
-    };
-    await update(ref(db), updates);
+    await joinPrivateGroupByCode(code, els.joinGroupStatus);
     closeModal("joinGroupModal");
     els.inviteCodeInput.value = "";
-    selectGroup(invite.groupId);
+    pendingInviteCode = "";
+    clearInviteFromUrl();
   } catch (error) {
     setStatus(friendlyError(error), els.joinGroupStatus);
   } finally {
     els.joinInviteConfirm.disabled = false;
+  }
+}
+
+async function joinPrivateGroupByCode(code, statusTarget = els.statusLine) {
+  code = normalizeInviteCode(code);
+  setStatus("", statusTarget);
+  if (!isValidInviteCode(code)) throw new Error("Enter a valid invite code.");
+  const inviteSnap = await get(ref(db, `${PATH}/invites/${code}`));
+  if (!inviteSnap.exists()) throw new Error("Invite code not found.");
+
+  const invite = inviteSnap.val();
+  const updates = {};
+  updates[`${PATH}/groups/${invite.groupId}/members/${currentUser.uid}`] = memberPayload("member", code);
+  updates[`${PATH}/memberships/${currentUser.uid}/${invite.groupId}`] = {
+    name: invite.groupName || "Private group",
+    privacy: "private",
+    role: "member",
+    joinedAt: serverTimestamp()
+  };
+  await update(ref(db), updates);
+  selectGroup(invite.groupId);
+  return invite;
+}
+
+async function applyPendingInvite() {
+  if (!pendingInviteCode || !currentUser || !profile) return;
+  const code = pendingInviteCode;
+  pendingInviteCode = "";
+  els.inviteCodeInput.value = code;
+  setStatus(`Joining invite ${code}...`);
+  try {
+    const invite = await joinPrivateGroupByCode(code, els.statusLine);
+    clearInviteFromUrl();
+    toast("Joined group", invite.groupName || "Private group");
+    setStatus("");
+  } catch (error) {
+    pendingInviteCode = code;
+    openModal("joinGroupModal");
+    setStatus(friendlyError(error), els.joinGroupStatus);
   }
 }
 
@@ -1828,8 +1888,8 @@ function playMentionSound() {
 
 async function copyInvite() {
   if (!currentGroupData?.inviteCode) return;
-  await copyText(currentGroupData.inviteCode);
-  toast("Invite copied", `Code ${currentGroupData.inviteCode}`);
+  await copyText(inviteLink(currentGroupData.inviteCode));
+  toast("Invite link copied", currentGroupData.inviteCode);
 }
 
 async function copyText(text) {
@@ -1855,8 +1915,8 @@ async function rotateInvite() {
     };
     if (oldCode) updates[`${PATH}/invites/${oldCode}`] = null;
     await update(ref(db), updates);
-    await copyText(newCode);
-    toast("New invite copied", `Code ${newCode}`);
+    await copyText(inviteLink(newCode));
+    toast("New invite link copied", newCode);
   } catch (error) {
     setStatus(friendlyError(error));
   }
