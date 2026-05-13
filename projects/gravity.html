@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Gravity Lab</title>
   <style>
     body, html {
@@ -16,6 +19,7 @@
     canvas {
       display: block;
       background: #222;
+      touch-action: none;
     }
 
     .controls {
@@ -34,6 +38,45 @@
 
     .controls input, .controls select {
       width: 200px;
+    }
+
+    .mobile-motion {
+      display: none;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    .mobile-motion button {
+      width: 130px;
+      margin-top: 4px;
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: #00aaff;
+      color: white;
+      cursor: pointer;
+    }
+
+    .mobile-motion button.active {
+      background: #20c76f;
+    }
+
+    .mobile-motion button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+
+    .motion-status {
+      display: inline-block;
+      margin-left: 8px;
+      min-width: 62px;
+      color: #cfcfcf;
+      font-size: 13px;
+    }
+
+    .mobile-motion.available {
+      display: block;
     }
 
     .back-btn {
@@ -64,6 +107,11 @@
   <input type="range" id="gy" min="-1" max="1" step="0.01" value="0.2">
   <label>Gravity Strength</label>
   <input type="range" id="gstrength" min="0" max="2" step="0.01" value="1">
+  <div class="mobile-motion" id="mobileMotion">
+    <label>Phone Tilt</label>
+    <button type="button" id="motionToggle">Enable Tilt</button>
+    <span class="motion-status" id="motionStatus">Off</span>
+  </div>
   <label>Shape</label>
   <select id="shapeSelect">
     <option value="circle">Circle</option>
@@ -80,22 +128,70 @@
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+const screenOrientation = window.screen && window.screen.orientation;
+
+function getScreenAngle() {
+  const angle = screenOrientation && typeof screenOrientation.angle === 'number'
+    ? screenOrientation.angle
+    : (typeof window.orientation === 'number' ? window.orientation : 0);
+  return ((Math.round(angle / 90) * 90) % 360 + 360) % 360;
+}
+
+let lastScreenAngle = getScreenAngle();
+
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let gravityX = 0;
 let gravityY = 0.2;
 let gravityStrength = 1;
+let tiltGravityEnabled = false;
+let tiltGravityX = 0;
+let tiltGravityY = 0.2;
+let tiltListenerAttached = false;
+let lastTiltEventTime = 0;
+let lastOrientationTiltTime = 0;
+let tiltDataTimer = 0;
 
 const gxSlider = document.getElementById('gx');
 const gySlider = document.getElementById('gy');
 const gstrengthSlider = document.getElementById('gstrength');
 const shapeSelect = document.getElementById('shapeSelect');
 const colorPicker = document.getElementById('colorPicker');
+const mobileMotion = document.getElementById('mobileMotion');
+const motionToggle = document.getElementById('motionToggle');
+const motionStatus = document.getElementById('motionStatus');
+const hasTouchScreen =
+  navigator.maxTouchPoints > 0 ||
+  navigator.msMaxTouchPoints > 0 ||
+  window.matchMedia('(pointer: coarse)').matches ||
+  'ontouchstart' in window;
+const hasOrientationSensor = typeof window.DeviceOrientationEvent !== 'undefined';
+const hasMotionSensor = typeof window.DeviceMotionEvent !== 'undefined';
+const hasTiltSensor = hasOrientationSensor || hasMotionSensor;
+const likelyTabletSize =
+  Math.min(window.innerWidth, window.innerHeight) <= 1024 &&
+  Math.max(window.innerWidth, window.innerHeight) <= 1400;
+const canShowTiltControls = hasTouchScreen || likelyTabletSize;
+const pageProtocol = window.location ? window.location.protocol : '';
+const isSensorContextAllowed =
+  window.isSecureContext ||
+  pageProtocol === 'https:' ||
+  pageProtocol === 'file:';
 
 gxSlider.addEventListener('input', () => gravityX = parseFloat(gxSlider.value));
 gySlider.addEventListener('input', () => gravityY = parseFloat(gySlider.value));
 gstrengthSlider.addEventListener('input', () => gravityStrength = parseFloat(gstrengthSlider.value));
+
+if (canShowTiltControls) {
+  mobileMotion.classList.add('available');
+}
+
+if (canShowTiltControls && !hasTiltSensor) {
+  motionStatus.textContent = 'Unavailable';
+} else if (!isSensorContextAllowed) {
+  motionStatus.textContent = 'Needs HTTPS';
+}
 
 function createShape(x, y, shape, color, size, vx = 0, vy = 0) {
   return { x, y, shape, color, size, vx, vy };
@@ -141,8 +237,8 @@ function resolveCollisions() {
       const dist = Math.sqrt(dx * dx + dy * dy);
       const overlap = ca.r + cb.r - dist;
       if (overlap > 0) {
-        const nx = dx / dist;
-        const ny = dy / dist;
+        const nx = dist === 0 ? 1 : dx / dist;
+        const ny = dist === 0 ? 0 : dy / dist;
 
         a.x -= nx * overlap / 2;
         a.y -= ny * overlap / 2;
@@ -173,22 +269,225 @@ const minSize = 5;
 const maxSize = 40;
 const growthRate = 0.03;
 
-canvas.addEventListener('mousedown', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  dragStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  dragEnd = { ...dragStart };
-  dragStartTime = performance.now();
-  isDragging = true;
-});
+function clampShapeToCanvas(shape) {
+  const radius = getBoundingCircle(shape).r;
+  shape.x = Math.min(Math.max(shape.x, radius), Math.max(radius, canvas.width - radius));
+  shape.y = Math.min(Math.max(shape.y, radius), Math.max(radius, canvas.height - radius));
+}
 
-canvas.addEventListener('mousemove', (e) => {
-  if (isDragging) {
-    const rect = canvas.getBoundingClientRect();
-    dragEnd = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+function transformForResize(obj, oldWidth, oldHeight, newWidth, newHeight, rotationDelta) {
+  let x = obj.x;
+  let y = obj.y;
+  let vx = obj.vx;
+  let vy = obj.vy;
+  let rotatedWidth = oldWidth;
+  let rotatedHeight = oldHeight;
+
+  if (rotationDelta === 90) {
+    x = oldHeight - obj.y;
+    y = obj.x;
+    vx = -obj.vy;
+    vy = obj.vx;
+    rotatedWidth = oldHeight;
+    rotatedHeight = oldWidth;
+  } else if (rotationDelta === 180) {
+    x = oldWidth - obj.x;
+    y = oldHeight - obj.y;
+    vx = -obj.vx;
+    vy = -obj.vy;
+  } else if (rotationDelta === 270) {
+    x = obj.y;
+    y = oldWidth - obj.x;
+    vx = obj.vy;
+    vy = -obj.vx;
+    rotatedWidth = oldHeight;
+    rotatedHeight = oldWidth;
+  }
+
+  obj.x = x * (newWidth / rotatedWidth);
+  obj.y = y * (newHeight / rotatedHeight);
+  obj.vx = vx * (newWidth / rotatedWidth);
+  obj.vy = vy * (newHeight / rotatedHeight);
+}
+
+function resizeCanvas() {
+  const oldWidth = canvas.width;
+  const oldHeight = canvas.height;
+  const newWidth = window.innerWidth;
+  const newHeight = window.innerHeight;
+  const newAngle = getScreenAngle();
+  const rotationDelta = ((newAngle - lastScreenAngle) % 360 + 360) % 360;
+
+  if (oldWidth === newWidth && oldHeight === newHeight && rotationDelta === 0) return;
+
+  canvas.width = newWidth;
+  canvas.height = newHeight;
+
+  for (const shape of shapes) {
+    transformForResize(shape, oldWidth, oldHeight, newWidth, newHeight, rotationDelta);
+    clampShapeToCanvas(shape);
+  }
+
+  isDragging = false;
+  dragStart = null;
+  dragEnd = null;
+  lastScreenAngle = newAngle;
+}
+
+function rotateTiltToScreen(x, y) {
+  const angle = getScreenAngle();
+
+  if (angle === 90) return { x: y, y: -x };
+  if (angle === 180) return { x: -x, y: -y };
+  if (angle === 270) return { x: -y, y: x };
+
+  return { x, y };
+}
+
+function clampUnit(value) {
+  return Math.max(-1, Math.min(1, value));
+}
+
+function applyTiltGravity(rawX, rawY) {
+  const rotated = rotateTiltToScreen(rawX, rawY);
+  const deadzone = 0.03;
+  const targetX = Math.abs(rotated.x) < deadzone ? 0 : rotated.x;
+  const targetY = Math.abs(rotated.y) < deadzone ? 0 : rotated.y;
+
+  tiltGravityX += (targetX - tiltGravityX) * 0.2;
+  tiltGravityY += (targetY - tiltGravityY) * 0.2;
+
+  gxSlider.value = tiltGravityX.toFixed(2);
+  gySlider.value = tiltGravityY.toFixed(2);
+  lastTiltEventTime = performance.now();
+  motionStatus.textContent = 'Active';
+}
+
+function updateTiltGravity(event) {
+  if (!tiltGravityEnabled || event.beta == null || event.gamma == null) return;
+
+  const beta = Math.max(-90, Math.min(90, event.beta));
+  const gamma = Math.max(-90, Math.min(90, event.gamma));
+  lastOrientationTiltTime = performance.now();
+  applyTiltGravity(
+    Math.sin(gamma * Math.PI / 180),
+    Math.sin(beta * Math.PI / 180)
+  );
+}
+
+function updateMotionGravity(event) {
+  if (!tiltGravityEnabled || !event.accelerationIncludingGravity) return;
+  if (performance.now() - lastOrientationTiltTime < 250) return;
+
+  const gravity = event.accelerationIncludingGravity;
+  if (gravity.x == null || gravity.y == null) return;
+
+  applyTiltGravity(
+    clampUnit(gravity.x / 9.81),
+    clampUnit(-gravity.y / 9.81)
+  );
+}
+
+function attachTiltListener() {
+  if (tiltListenerAttached) return;
+
+  window.addEventListener('deviceorientation', updateTiltGravity);
+  window.addEventListener('devicemotion', updateMotionGravity);
+  tiltListenerAttached = true;
+}
+
+function watchForTiltData() {
+  clearTimeout(tiltDataTimer);
+  lastTiltEventTime = 0;
+  motionStatus.textContent = 'Waiting';
+  tiltDataTimer = setTimeout(() => {
+    if (tiltGravityEnabled && lastTiltEventTime === 0) {
+      motionStatus.textContent = 'No data';
+    }
+  }, 1500);
+}
+
+function setTiltGravityEnabled(enabled) {
+  tiltGravityEnabled = enabled;
+  motionToggle.classList.toggle('active', enabled);
+  motionToggle.textContent = enabled ? 'Tilt On' : 'Enable Tilt';
+  motionStatus.textContent = enabled ? 'Active' : 'Off';
+  gxSlider.disabled = enabled;
+  gySlider.disabled = enabled;
+
+  if (!enabled) {
+    gxSlider.value = gravityX.toFixed(2);
+    gySlider.value = gravityY.toFixed(2);
+  }
+
+  if (enabled) {
+    attachTiltListener();
+    watchForTiltData();
+  } else {
+    clearTimeout(tiltDataTimer);
+  }
+}
+
+async function requestSensorPermission(EventClass) {
+  if (!EventClass || typeof EventClass.requestPermission !== 'function') {
+    return EventClass ? 'granted' : 'unsupported';
+  }
+
+  return EventClass.requestPermission();
+}
+
+motionToggle.addEventListener('click', async () => {
+  if (tiltGravityEnabled) {
+    setTiltGravityEnabled(false);
+    return;
+  }
+
+  if (!hasTiltSensor) {
+    motionStatus.textContent = 'Unavailable';
+    return;
+  }
+
+  if (!isSensorContextAllowed) {
+    motionStatus.textContent = 'Needs HTTPS';
+    return;
+  }
+
+  try {
+    const permissions = await Promise.all([
+      requestSensorPermission(window.DeviceOrientationEvent),
+      requestSensorPermission(window.DeviceMotionEvent)
+    ]);
+
+    if (!permissions.some((result) => result === 'granted')) {
+      motionStatus.textContent = 'Blocked';
+      return;
+    }
+
+    setTiltGravityEnabled(true);
+  } catch (error) {
+    motionStatus.textContent = 'Blocked';
   }
 });
 
-canvas.addEventListener('mouseup', () => {
+function getCanvasPoint(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function startDrag(point) {
+  dragStart = point;
+  dragEnd = { ...dragStart };
+  dragStartTime = performance.now();
+  isDragging = true;
+}
+
+function moveDrag(point) {
+  if (isDragging) {
+    dragEnd = point;
+  }
+}
+
+function finishDrag() {
   if (isDragging) {
     const dx = (dragEnd.x - dragStart.x) * 0.1;
     const dy = (dragEnd.y - dragStart.y) * 0.1;
@@ -199,16 +498,90 @@ canvas.addEventListener('mouseup', () => {
     shapes.push(createShape(dragStart.x, dragStart.y, shape, color, size, dx, dy));
   }
   isDragging = false;
-});
+}
+
+function cancelDrag() {
+  isDragging = false;
+}
+
+function getTouchPoint(e) {
+  const touch = e.changedTouches[0] || e.touches[0];
+  if (!touch) return dragEnd || dragStart || { x: 0, y: 0 };
+  return getCanvasPoint(touch);
+}
+
+if (window.PointerEvent) {
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+
+    e.preventDefault();
+    startDrag(getCanvasPoint(e));
+    if (canvas.setPointerCapture) {
+      canvas.setPointerCapture(e.pointerId);
+    }
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (isDragging) {
+      e.preventDefault();
+      moveDrag(getCanvasPoint(e));
+    }
+  });
+
+  canvas.addEventListener('pointerup', finishDrag);
+  canvas.addEventListener('pointercancel', cancelDrag);
+  canvas.addEventListener('lostpointercapture', cancelDrag);
+} else {
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+
+    startDrag(getCanvasPoint(e));
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    moveDrag(getCanvasPoint(e));
+  });
+
+  window.addEventListener('mouseup', finishDrag);
+
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startDrag(getTouchPoint(e));
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    moveDrag(getTouchPoint(e));
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    finishDrag();
+  }, { passive: false });
+
+  canvas.addEventListener('touchcancel', (e) => {
+    e.preventDefault();
+    cancelDrag();
+  }, { passive: false });
+}
+
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => requestAnimationFrame(resizeCanvas));
+if (screenOrientation && typeof screenOrientation.addEventListener === 'function') {
+  screenOrientation.addEventListener('change', resizeCanvas);
+}
 
 function loop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   resolveCollisions();
 
+  const activeGravityX = tiltGravityEnabled ? tiltGravityX : gravityX;
+  const activeGravityY = tiltGravityEnabled ? tiltGravityY : gravityY;
+
   for (let s of shapes) {
-    s.vx += gravityX * gravityStrength;
-    s.vy += gravityY * gravityStrength;
+    s.vx += activeGravityX * gravityStrength;
+    s.vy += activeGravityY * gravityStrength;
 
     s.x += s.vx;
     s.y += s.vy;
