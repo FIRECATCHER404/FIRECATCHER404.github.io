@@ -339,14 +339,91 @@ function stepPhysics() {
 }
 
 function drawWater() {
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
+  if (water.length === 0) return;
 
+  const binWidth = 6;
+  const binCount = Math.ceil(canvas.width / binWidth);
+  const top = new Array(binCount).fill(Infinity);
+  const bottom = new Array(binCount).fill(-Infinity);
+  const count = new Array(binCount).fill(0);
+  const renderRadius = particleRadius * 2.2;
+
+  function markBin(index, high, low) {
+    if (index < 0 || index >= binCount) return;
+    top[index] = Math.min(top[index], high);
+    bottom[index] = Math.max(bottom[index], low);
+    count[index]++;
+  }
+
+  // The water is still made of circle particles, but this draws them as joined bodies.
   for (const p of water) {
+    const start = Math.floor((p.x - renderRadius) / binWidth);
+    const end = Math.ceil((p.x + renderRadius) / binWidth);
+
+    for (let i = start; i <= end; i++) {
+      const x = i * binWidth + binWidth / 2;
+      const dx = x - p.x;
+      if (Math.abs(dx) > renderRadius) continue;
+
+      const edge = Math.sqrt(renderRadius * renderRadius - dx * dx);
+      markBin(i, p.y - edge, p.y + edge);
+    }
+  }
+
+  for (let pass = 0; pass < 2; pass++) {
+    const nextTop = top.slice();
+    const nextBottom = bottom.slice();
+
+    for (let i = 1; i < binCount - 1; i++) {
+      if (!count[i]) continue;
+
+      const neighbors = [i - 1, i, i + 1].filter(index => count[index]);
+      nextTop[i] = neighbors.reduce((sum, index) => sum + top[index], 0) / neighbors.length;
+      nextBottom[i] = neighbors.reduce((sum, index) => sum + bottom[index], 0) / neighbors.length;
+    }
+
+    for (let i = 0; i < binCount; i++) {
+      top[i] = nextTop[i];
+      bottom[i] = nextBottom[i];
+    }
+  }
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 145, 235, 0.58)';
+  ctx.strokeStyle = 'rgba(125, 210, 255, 0.72)';
+  ctx.lineWidth = 2;
+
+  let i = 0;
+  while (i < binCount) {
+    while (i < binCount && !count[i]) i++;
+    if (i >= binCount) break;
+
+    const start = i;
+    while (i < binCount && count[i]) i++;
+    const end = i - 1;
+
+    if (end - start < 1) continue;
+
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0, 170, 255, 0.42)';
+    ctx.moveTo(start * binWidth, top[start]);
+
+    for (let j = start + 1; j <= end; j++) {
+      ctx.lineTo(j * binWidth, top[j]);
+    }
+
+    for (let j = end; j >= start; j--) {
+      ctx.lineTo(j * binWidth, bottom[j]);
+    }
+
+    ctx.closePath();
     ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(start * binWidth, top[start]);
+    for (let j = start + 1; j <= end; j++) {
+      ctx.lineTo(j * binWidth, top[j]);
+    }
+    ctx.stroke();
   }
 
   ctx.restore();
