@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shader Lab</title>
+  <style>
+    :root {
+      --panel: rgba(10, 11, 15, 0.82);
+      --panel-solid: #12141a;
+      --line: rgba(255, 255, 255, 0.13);
+      --text: #f3f6ff;
+      --muted: #aab2c5;
+      --accent: #ffcf5c;
+      --hot: #ff5a8b;
+      --cool: #54d6ff;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #05060a;
+      color: var(--text);
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .topbar,
+    .editor,
+    .status {
+      position: fixed;
+      z-index: 2;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+    }
+
+    .topbar {
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: 0.04em;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 28% 30%, #fff 0 6%, transparent 7%),
+        conic-gradient(from 90deg, var(--hot), var(--accent), var(--cool), var(--hot));
+      box-shadow: 0 0 28px rgba(84, 214, 255, 0.35);
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    button,
+    select,
+    input,
+    textarea {
+      color: inherit;
+      font: inherit;
+    }
+
+    button,
+    select {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 7px 10px;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:hover,
+    select:hover {
+      border-color: rgba(84, 214, 255, 0.65);
+      background: rgba(84, 214, 255, 0.13);
+    }
+
+    .primary {
+      border-color: rgba(255, 207, 92, 0.6);
+      background: rgba(255, 207, 92, 0.17);
+    }
+
+    .editor {
+      left: 12px;
+      bottom: 12px;
+      width: min(560px, calc(100vw - 24px));
+      max-height: calc(100vh - 92px);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto minmax(220px, 42vh) auto;
+    }
+
+    .sliders {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    textarea {
+      width: 100%;
+      height: 100%;
+      resize: none;
+      border: 0;
+      outline: 0;
+      padding: 12px;
+      background: rgba(4, 5, 9, 0.86);
+      color: #e8f0ff;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.45;
+      tab-size: 2;
+    }
+
+    .editor-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .status {
+      right: 12px;
+      bottom: 12px;
+      max-width: min(520px, calc(100vw - 24px));
+      padding: 9px 11px;
+      color: var(--muted);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+
+    .status.bad {
+      color: #ff9dad;
+      border-color: rgba(255, 90, 139, 0.45);
+    }
+
+    @media (max-width: 760px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .sliders {
+        grid-template-columns: 1fr;
+      }
+
+      .editor {
+        max-height: calc(100vh - 150px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>Shader Lab</h1>
+        <div class="subtitle">live WebGL visualizer playground</div>
+      </div>
+    </div>
+    <div class="actions">
+      <select id="preset"></select>
+      <button id="randomBtn">Randomize</button>
+      <button id="pauseBtn">Pause</button>
+      <button onclick="location.href='index.html'">Projects</button>
+    </div>
+  </header>
+
+  <section class="editor">
+    <div class="sliders">
+      <label>Intensity <input id="intensity" type="range" min="0" max="3" step="0.01" value="1.25"></label>
+      <label>Zoom <input id="zoom" type="range" min="0.4" max="4" step="0.01" value="1"></label>
+      <label>Color Shift <input id="colorShift" type="range" min="0" max="6.283" step="0.001" value="0"></label>
+    </div>
+    <textarea id="shader"></textarea>
+    <div class="editor-actions">
+      <button class="primary" id="compileBtn">Compile</button>
+      <button id="copyBtn">Copy Shader</button>
+      <button id="resetBtn">Reset Preset</button>
+    </div>
+  </section>
+
+  <div id="status" class="status">Ready.</div>
+
+  <script>
+    const canvas = document.getElementById('gl');
+    const gl = canvas.getContext('webgl', { antialias: false, preserveDrawingBuffer: true });
+    const shaderEl = document.getElementById('shader');
+    const presetEl = document.getElementById('preset');
+    const compileBtn = document.getElementById('compileBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const randomBtn = document.getElementById('randomBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const statusEl = document.getElementById('status');
+    const intensityEl = document.getElementById('intensity');
+    const zoomEl = document.getElementById('zoom');
+    const colorShiftEl = document.getElementById('colorShift');
+
+    const vertexSource = `
+      attribute vec2 a_position;
+      void main() {
+        gl_Position = vec4(a_position, 0.0, 1.0);
+      }
+    `;
+
+    const header = `
+      precision highp float;
+      uniform vec2 u_resolution;
+      uniform vec2 u_mouse;
+      uniform float u_time;
+      uniform float u_intensity;
+      uniform float u_zoom;
+      uniform float u_colorShift;
+
+      vec3 palette(float t) {
+        return 0.5 + 0.5 * cos(6.28318 * (vec3(0.0, 0.33, 0.67) + t + u_colorShift));
+      }
+
+      mat2 rot(float a) {
+        float s = sin(a);
+        float c = cos(a);
+        return mat2(c, -s, s, c);
+      }
+    `;
+
+    const presets = {
+      Plasma: `
+        void main() {
+          vec2 uv = (gl_FragCoord.xy * 2.0 - u_resolution) / min(u_resolution.x, u_resolution.y);
+          uv *= u_zoom;
+          vec2 m = (u_mouse * 2.0 - u_resolution) / min(u_resolution.x, u_resolution.y);
+          float v = 0.0;
+          v += sin(uv.x * 4.0 + u_time);
+          v += sin((uv.y + m.y) * 5.0 - u_time * 1.2);
+          v += sin(length(uv - m * 0.35) * 9.0 - u_time * 2.0);
+          v += sin((uv.x + uv.y) * 5.0 + u_time * 0.7);
+          vec3 col = palette(v * 0.08 + u_time * 0.035) * (0.55 + u_intensity * 0.28);
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+      Tunnel: `
+        void main() {
+          vec2 uv = (gl_FragCoord.xy * 2.0 - u_resolution) / min(u_resolution.x, u_resolution.y);
+          uv *= u_zoom;
+          uv *= rot(u_time * 0.08);
+          float r = length(uv);
+          float a = atan(uv.y, uv.x);
+          float rings = sin(18.0 / max(r, 0.08) + u_time * 4.0);
+          float spokes = sin(a * 9.0 + u_time * 1.5);
+          float glow = smoothstep(1.3, 0.05, r);
+          vec3 col = palette(rings * 0.12 + spokes * 0.04 + u_time * 0.04);
+          col *= glow * (0.65 + u_intensity * 0.45);
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+      Cells: `
+        float hash(vec2 p) {
+          p = fract(p * vec2(123.34, 345.45));
+          p += dot(p, p + 34.345);
+          return fract(p.x * p.y);
+        }
+
+        void main() {
+          vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+          vec2 p = (uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0) * 10.0 * u_zoom;
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          float d = 10.0;
+          for (int y = -1; y <= 1; y++) {
+            for (int x = -1; x <= 1; x++) {
+              vec2 g = vec2(float(x), float(y));
+              vec2 o = vec2(hash(i + g), hash(i + g + 9.7));
+              o = 0.5 + 0.5 * sin(u_time + 6.28318 * o);
+              d = min(d, length(g + o - f));
+            }
+          }
+          float edge = smoothstep(0.08, 0.12, d) * smoothstep(0.72, 0.2, d);
+          vec3 col = palette(d * 0.8 + u_time * 0.03) * edge * (0.8 + u_intensity * 0.35);
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+      Fire: `
+        float noise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          float a = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453);
+          float b = fract(sin(dot(i + vec2(1.0, 0.0), vec2(127.1, 311.7))) * 43758.5453);
+          float c = fract(sin(dot(i + vec2(0.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
+          float d = fract(sin(dot(i + vec2(1.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
+          vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+        }
+
+        void main() {
+          vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+          vec2 p = (uv - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
+          p *= 3.0 * u_zoom;
+          float n = 0.0;
+          n += noise(p * 2.0 + vec2(0.0, -u_time * 1.4)) * 0.55;
+          n += noise(p * 5.0 + vec2(0.0, -u_time * 2.2)) * 0.28;
+          n += noise(p * 11.0 + vec2(0.0, -u_time * 3.0)) * 0.17;
+          float flame = smoothstep(0.82, 0.18, uv.y + abs(p.x) * 0.35 - n * u_intensity);
+          vec3 col = mix(vec3(0.03, 0.02, 0.04), vec3(1.0, 0.18, 0.03), flame);
+          col = mix(col, vec3(1.0, 0.78, 0.22), smoothstep(0.45, 1.0, flame));
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `
+    };
+
+    let program = null;
+    let uniforms = {};
+    let mouse = { x: 0, y: 0 };
+    let paused = false;
+    let start = performance.now();
+    let pauseOffset = 0;
+
+    function setStatus(message, bad = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('bad', bad);
+    }
+
+    function createShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const error = gl.getShaderInfoLog(shader);
+        gl.deleteShader(shader);
+        throw new Error(error);
+      }
+      return shader;
+    }
+
+    function compile(fragmentBody) {
+      const vertex = createShader(gl.VERTEX_SHADER, vertexSource);
+      const fragment = createShader(gl.FRAGMENT_SHADER, header + fragmentBody);
+      const nextProgram = gl.createProgram();
+      gl.attachShader(nextProgram, vertex);
+      gl.attachShader(nextProgram, fragment);
+      gl.linkProgram(nextProgram);
+
+      if (!gl.getProgramParameter(nextProgram, gl.LINK_STATUS)) {
+        const error = gl.getProgramInfoLog(nextProgram);
+        gl.deleteProgram(nextProgram);
+        throw new Error(error);
+      }
+
+      if (program) gl.deleteProgram(program);
+      program = nextProgram;
+      gl.useProgram(program);
+
+      const buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1,
+        1, -1,
+        -1, 1,
+        -1, 1,
+        1, -1,
+        1, 1
+      ]), gl.STATIC_DRAW);
+
+      const position = gl.getAttribLocation(program, 'a_position');
+      gl.enableVertexAttribArray(position);
+      gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+      uniforms = {
+        resolution: gl.getUniformLocation(program, 'u_resolution'),
+        mouse: gl.getUniformLocation(program, 'u_mouse'),
+        time: gl.getUniformLocation(program, 'u_time'),
+        intensity: gl.getUniformLocation(program, 'u_intensity'),
+        zoom: gl.getUniformLocation(program, 'u_zoom'),
+        colorShift: gl.getUniformLocation(program, 'u_colorShift')
+      };
+
+      setStatus('Compiled.');
+    }
+
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+
+    function render(now) {
+      if (program) {
+        const time = paused ? pauseOffset : (now - start) / 1000;
+        gl.useProgram(program);
+        gl.uniform2f(uniforms.resolution, canvas.width, canvas.height);
+        gl.uniform2f(uniforms.mouse, mouse.x * (window.devicePixelRatio || 1), canvas.height - mouse.y * (window.devicePixelRatio || 1));
+        gl.uniform1f(uniforms.time, time);
+        gl.uniform1f(uniforms.intensity, Number(intensityEl.value));
+        gl.uniform1f(uniforms.zoom, Number(zoomEl.value));
+        gl.uniform1f(uniforms.colorShift, Number(colorShiftEl.value));
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    Object.keys(presets).forEach((name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      presetEl.append(option);
+    });
+
+    function loadPreset(name) {
+      shaderEl.value = presets[name].trim();
+      try {
+        compile(shaderEl.value);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
+    compileBtn.addEventListener('click', () => {
+      try {
+        compile(shaderEl.value);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    });
+
+    resetBtn.addEventListener('click', () => loadPreset(presetEl.value));
+    presetEl.addEventListener('change', () => loadPreset(presetEl.value));
+
+    randomBtn.addEventListener('click', () => {
+      intensityEl.value = (Math.random() * 2.5 + 0.25).toFixed(2);
+      zoomEl.value = (Math.random() * 2.8 + 0.5).toFixed(2);
+      colorShiftEl.value = (Math.random() * Math.PI * 2).toFixed(3);
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      paused = !paused;
+      if (paused) {
+        pauseOffset = (performance.now() - start) / 1000;
+      } else {
+        start = performance.now() - pauseOffset * 1000;
+      }
+      pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(shaderEl.value);
+      setStatus('Shader copied.');
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+      mouse.x = event.clientX;
+      mouse.y = event.clientY;
+    });
+
+    window.addEventListener('resize', resize);
+
+    if (!gl) {
+      setStatus('WebGL is not available in this browser.', true);
+    } else {
+      resize();
+      loadPreset('Plasma');
+      requestAnimationFrame(render);
+    }
+  </script>
+</body>
+</html>

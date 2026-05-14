@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Water Lab</title>
+  <style>
+    :root {
+      --panel: rgba(8, 12, 17, 0.84);
+      --line: rgba(255, 255, 255, 0.13);
+      --text: #f5f8fb;
+      --muted: #a9b7c2;
+      --water: #37b8ff;
+      --foam: #f3fbff;
+      --wood: #e0a85d;
+      --accent: #8ee07c;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #071019;
+      color: var(--text);
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      background:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+        radial-gradient(circle at 20% 8%, rgba(55,184,255,0.17), transparent 28rem),
+        #071019;
+      background-size: 48px 48px, 48px 48px, auto, auto;
+      cursor: crosshair;
+    }
+
+    .topbar,
+    .panel {
+      position: fixed;
+      z-index: 3;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+      border-radius: 8px;
+    }
+
+    .topbar {
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      min-height: 56px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background:
+        radial-gradient(circle at 36% 28%, #fff 0 7%, transparent 8%),
+        linear-gradient(145deg, #37b8ff, #174b7a 62%, #e0a85d 63%);
+      box-shadow: 0 0 26px rgba(55, 184, 255, 0.35);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: 0.03em;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    button,
+    select,
+    input {
+      color: inherit;
+      font: inherit;
+    }
+
+    button,
+    select {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 7px 10px;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:hover,
+    select:hover {
+      border-color: rgba(55, 184, 255, 0.7);
+      background: rgba(55, 184, 255, 0.14);
+    }
+
+    .primary {
+      border-color: rgba(142, 224, 124, 0.55);
+      background: rgba(142, 224, 124, 0.16);
+    }
+
+    .panel {
+      left: 12px;
+      bottom: 12px;
+      width: min(390px, calc(100vw - 24px));
+      padding: 13px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      padding: 8px;
+    }
+
+    .stat span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.7rem;
+      margin-bottom: 3px;
+    }
+
+    .stat strong {
+      font-size: 1.15rem;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--water);
+    }
+
+    .wide {
+      grid-column: 1 / -1;
+    }
+
+    @media (max-width: 760px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .panel {
+        max-height: 42vh;
+        overflow: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="tank"></canvas>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>Water Lab</h1>
+        <div class="sub">gravity, foam, drawn hulls, and buoyancy testing</div>
+      </div>
+    </div>
+    <div class="actions">
+      <select id="tool">
+        <option value="water">Place water</option>
+        <option value="wall">Draw wall</option>
+        <option value="boat">Draw boat</option>
+        <option value="erase">Erase</option>
+        <option value="push">Push</option>
+      </select>
+      <button id="boatBtn">Boat Preset</button>
+      <button id="waveBtn">Wave</button>
+      <button id="drainBtn">Drain</button>
+      <button class="primary" id="resetBtn">Reset</button>
+      <button onclick="location.href='index.html'">Projects</button>
+    </div>
+  </header>
+
+  <aside class="panel">
+    <div class="stats">
+      <div class="stat"><span>Water</span><strong id="waterCount">0</strong></div>
+      <div class="stat"><span>Foam</span><strong id="foamCount">0</strong></div>
+      <div class="stat"><span>Bodies</span><strong id="bodyCount">0</strong></div>
+    </div>
+    <div class="controls">
+      <label>Brush <input id="brush" type="range" min="12" max="90" step="1" value="42"></label>
+      <label>Gravity <input id="gravity" type="range" min="0" max="1.4" step="0.01" value="0.42"></label>
+      <label>Pressure <input id="pressure" type="range" min="0.25" max="1.8" step="0.01" value="0.95"></label>
+      <label>Viscosity <input id="viscosity" type="range" min="0" max="0.22" step="0.005" value="0.045"></label>
+      <label>Boat density <input id="boatDensity" type="range" min="0.18" max="2.4" step="0.01" value="0.72"></label>
+      <label>Solver <input id="solver" type="range" min="1" max="6" step="1" value="4"></label>
+      <label class="wide">Water limit <input id="limit" type="range" min="300" max="1900" step="50" value="1300"></label>
+    </div>
+  </aside>
+
+  <script>
+    const canvas = document.getElementById('tank');
+    const ctx = canvas.getContext('2d');
+    const toolEl = document.getElementById('tool');
+    const brushEl = document.getElementById('brush');
+    const gravityEl = document.getElementById('gravity');
+    const pressureEl = document.getElementById('pressure');
+    const viscosityEl = document.getElementById('viscosity');
+    const boatDensityEl = document.getElementById('boatDensity');
+    const solverEl = document.getElementById('solver');
+    const limitEl = document.getElementById('limit');
+    const waterCountEl = document.getElementById('waterCount');
+    const foamCountEl = document.getElementById('foamCount');
+    const bodyCountEl = document.getElementById('bodyCount');
+    const boatBtn = document.getElementById('boatBtn');
+    const waveBtn = document.getElementById('waveBtn');
+    const drainBtn = document.getElementById('drainBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let water = [];
+    let foam = [];
+    let walls = [];
+    let bodies = [];
+    let grid = new Map();
+    let pointerDown = false;
+    let lastPoint = null;
+    let drawPath = [];
+    let surfaceBins = [];
+    let tick = 0;
+
+    const CELL = 18;
+    const WATER_RADIUS = 4.4;
+    const REST_DISTANCE = 9.2;
+    const NEIGHBOR_RADIUS = 17;
+    const FLOOR_PAD = 18;
+    const rand = (min, max) => Math.random() * (max - min) + min;
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function length(x, y) {
+      return Math.hypot(x, y);
+    }
+
+    function normalize(x, y) {
+      const len = length(x, y) || 1;
+      return { x: x / len, y: y / len };
+    }
+
+    function dot(ax, ay, bx, by) {
+      return ax * bx + ay * by;
+    }
+
+    function cross(ax, ay, bx, by) {
+      return ax * by - ay * bx;
+    }
+
+    function closestPointOnSegment(px, py, ax, ay, bx, by) {
+      const abx = bx - ax;
+      const aby = by - ay;
+      const t = clamp(dot(px - ax, py - ay, abx, aby) / Math.max(abx * abx + aby * aby, 0.0001), 0, 1);
+      return {
+        x: ax + abx * t,
+        y: ay + aby * t,
+        t
+      };
+    }
+
+    function addWater(x, y, radius = Number(brushEl.value)) {
+      const max = Number(limitEl.value);
+      const spacing = WATER_RADIUS * 1.65;
+      for (let yy = -radius; yy <= radius; yy += spacing) {
+        for (let xx = -radius; xx <= radius; xx += spacing) {
+          if (water.length >= max) return;
+          if (xx * xx + yy * yy <= radius * radius && Math.random() > 0.16) {
+            water.push({
+              x: x + xx + rand(-0.8, 0.8),
+              y: y + yy + rand(-0.8, 0.8),
+              vx: rand(-0.2, 0.2),
+              vy: rand(-0.15, 0.15),
+              r: WATER_RADIUS
+            });
+          }
+        }
+      }
+    }
+
+    function emitFoam(x, y, vx = 0, vy = 0, count = 1) {
+      for (let i = 0; i < count && foam.length < 520; i++) {
+        foam.push({
+          x: x + rand(-2, 2),
+          y: y + rand(-2, 2),
+          vx: vx * 0.25 + rand(-0.7, 0.7),
+          vy: vy * 0.18 + rand(-0.9, 0.2),
+          life: rand(0.55, 1.8),
+          r: rand(1.2, 3.4)
+        });
+      }
+    }
+
+    function gridKey(cx, cy) {
+      return `${cx},${cy}`;
+    }
+
+    function buildGrid() {
+      grid = new Map();
+      for (let i = 0; i < water.length; i++) {
+        const p = water[i];
+        const cx = Math.floor(p.x / CELL);
+        const cy = Math.floor(p.y / CELL);
+        const key = gridKey(cx, cy);
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(i);
+      }
+    }
+
+    function eachNeighbor(p, callback) {
+      const cx = Math.floor(p.x / CELL);
+      const cy = Math.floor(p.y / CELL);
+      for (let y = cy - 1; y <= cy + 1; y++) {
+        for (let x = cx - 1; x <= cx + 1; x++) {
+          const bucket = grid.get(gridKey(x, y));
+          if (!bucket) continue;
+          for (const index of bucket) callback(water[index], index);
+        }
+      }
+    }
+
+    function solveWater() {
+      const pressure = Number(pressureEl.value);
+      const viscosity = Number(viscosityEl.value);
+      const iterations = Number(solverEl.value);
+
+      for (let n = 0; n < iterations; n++) {
+        buildGrid();
+        for (let i = 0; i < water.length; i++) {
+          const a = water[i];
+          eachNeighbor(a, (b, j) => {
+            if (j <= i) return;
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist <= 0.001 || dist > NEIGHBOR_RADIUS) return;
+
+            const overlap = (REST_DISTANCE - dist) / REST_DISTANCE;
+            if (overlap > 0) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const push = overlap * pressure * 1.65;
+              a.x -= nx * push;
+              a.y -= ny * push;
+              b.x += nx * push;
+              b.y += ny * push;
+
+              const rvx = b.vx - a.vx;
+              const rvy = b.vy - a.vy;
+              a.vx += rvx * viscosity;
+              a.vy += rvy * viscosity;
+              b.vx -= rvx * viscosity;
+              b.vy -= rvy * viscosity;
+            }
+          });
+        }
+      }
+    }
+
+    function collideParticleBounds(p) {
+      if (p.x < p.r) {
+        p.x = p.r;
+        p.vx = Math.abs(p.vx) * 0.28;
+        emitFoam(p.x, p.y, p.vx, p.vy, 1);
+      }
+      if (p.x > width - p.r) {
+        p.x = width - p.r;
+        p.vx = -Math.abs(p.vx) * 0.28;
+        emitFoam(p.x, p.y, p.vx, p.vy, 1);
+      }
+      if (p.y < 76 + p.r) {
+        p.y = 76 + p.r;
+        p.vy = Math.abs(p.vy) * 0.2;
+      }
+      if (p.y > height - FLOOR_PAD - p.r) {
+        p.y = height - FLOOR_PAD - p.r;
+        if (Math.abs(p.vy) > 1.2) emitFoam(p.x, p.y, p.vx, p.vy, 2);
+        p.vy = -Math.abs(p.vy) * 0.18;
+        p.vx *= 0.86;
+      }
+    }
+
+    function collideParticleWalls(p) {
+      for (const wall of walls) {
+        const close = closestPointOnSegment(p.x, p.y, wall.x1, wall.y1, wall.x2, wall.y2);
+        const dx = p.x - close.x;
+        const dy = p.y - close.y;
+        const dist = Math.hypot(dx, dy);
+        const radius = p.r + wall.r;
+        if (dist < radius && dist > 0.0001) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+          p.x += nx * (radius - dist);
+          p.y += ny * (radius - dist);
+          const vn = dot(p.vx, p.vy, nx, ny);
+          if (vn < 0) {
+            p.vx -= nx * vn * 1.35;
+            p.vy -= ny * vn * 1.35;
+            p.vx *= 0.82;
+            p.vy *= 0.82;
+            if (Math.abs(vn) > 1.2) emitFoam(close.x, close.y, p.vx, p.vy, 1);
+          }
+        }
+      }
+    }
+
+    function polygonArea(points) {
+      let area = 0;
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        area += a.x * b.y - b.x * a.y;
+      }
+      return area / 2;
+    }
+
+    function polygonCentroid(points) {
+      let cx = 0;
+      let cy = 0;
+      let area = 0;
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        const f = a.x * b.y - b.x * a.y;
+        cx += (a.x + b.x) * f;
+        cy += (a.y + b.y) * f;
+        area += f;
+      }
+      area *= 0.5;
+      if (Math.abs(area) < 0.0001) return points.reduce((sum, p) => ({ x: sum.x + p.x / points.length, y: sum.y + p.y / points.length }), { x: 0, y: 0 });
+      return { x: cx / (6 * area), y: cy / (6 * area) };
+    }
+
+    function convexHull(points) {
+      const sorted = [...points].sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+      if (sorted.length < 4) return sorted;
+      const crossTurn = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+      const lower = [];
+      for (const p of sorted) {
+        while (lower.length >= 2 && crossTurn(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+        lower.push(p);
+      }
+      const upper = [];
+      for (let i = sorted.length - 1; i >= 0; i--) {
+        const p = sorted[i];
+        while (upper.length >= 2 && crossTurn(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+        upper.push(p);
+      }
+      upper.pop();
+      lower.pop();
+      return lower.concat(upper);
+    }
+
+    function simplifyPath(points) {
+      const out = [];
+      for (const point of points) {
+        const last = out[out.length - 1];
+        if (!last || Math.hypot(point.x - last.x, point.y - last.y) > 10) out.push(point);
+      }
+      return out;
+    }
+
+    function worldBodyPoints(body) {
+      const c = Math.cos(body.angle);
+      const s = Math.sin(body.angle);
+      return body.points.map((p) => ({
+        x: body.x + p.x * c - p.y * s,
+        y: body.y + p.x * s + p.y * c
+      }));
+    }
+
+    function pointInPolygon(point, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const a = poly[i];
+        const b = poly[j];
+        if ((a.y > point.y) !== (b.y > point.y) && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
+
+    function makeBody(points, density = Number(boatDensityEl.value)) {
+      let hull = convexHull(simplifyPath(points));
+      if (hull.length < 3) {
+        const p = points[0] || { x: width * 0.5, y: height * 0.45 };
+        hull = [
+          { x: p.x - 62, y: p.y - 16 },
+          { x: p.x + 62, y: p.y - 16 },
+          { x: p.x + 42, y: p.y + 20 },
+          { x: p.x - 42, y: p.y + 20 }
+        ];
+      }
+
+      if (polygonArea(hull) < 0) hull.reverse();
+      const center = polygonCentroid(hull);
+      const local = hull.map((p) => ({ x: p.x - center.x, y: p.y - center.y }));
+      const area = Math.abs(polygonArea(local));
+      const radiusSq = local.reduce((best, p) => Math.max(best, p.x * p.x + p.y * p.y), 1);
+      const mass = Math.max(12, area * density * 0.018);
+
+      bodies.push({
+        x: center.x,
+        y: center.y,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        av: 0,
+        points: local,
+        area,
+        density,
+        mass,
+        invMass: 1 / mass,
+        inertia: mass * radiusSq * 0.45,
+        wet: 0
+      });
+    }
+
+    function applyBodyImpulse(body, ix, iy, px, py) {
+      const rx = px - body.x;
+      const ry = py - body.y;
+      body.vx += ix * body.invMass;
+      body.vy += iy * body.invMass;
+      body.av += cross(rx, ry, ix, iy) / body.inertia;
+    }
+
+    function applyBodyForce(body, fx, fy, px, py, dt) {
+      applyBodyImpulse(body, fx * dt, fy * dt, px, py);
+    }
+
+    function collideParticleBody(p, body) {
+      const poly = worldBodyPoints(body);
+      if (!pointInPolygon(p, poly)) return;
+
+      let best = null;
+      let bestDist = Infinity;
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i];
+        const b = poly[(i + 1) % poly.length];
+        const close = closestPointOnSegment(p.x, p.y, a.x, a.y, b.x, b.y);
+        const dx = close.x - p.x;
+        const dy = close.y - p.y;
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = close;
+        }
+      }
+
+      const nx = best ? best.x - p.x : p.x - body.x;
+      const ny = best ? best.y - p.y : p.y - body.y;
+      const normal = normalize(nx, ny);
+      const depth = Math.sqrt(bestDist) + p.r + 1;
+      p.x += normal.x * depth;
+      p.y += normal.y * depth;
+
+      const contactVx = body.vx - body.av * (best.y - body.y);
+      const contactVy = body.vy + body.av * (best.x - body.x);
+      const rvx = p.vx - contactVx;
+      const rvy = p.vy - contactVy;
+      const vn = dot(rvx, rvy, normal.x, normal.y);
+
+      if (vn < 0.4) {
+        const impulse = (-vn + 0.7) * 0.62;
+        p.vx += normal.x * impulse;
+        p.vy += normal.y * impulse;
+        applyBodyImpulse(body, -normal.x * impulse * 0.85, -normal.y * impulse * 0.85, best.x, best.y);
+        if (impulse > 1.1) emitFoam(best.x, best.y, p.vx, p.vy, 2);
+      }
+    }
+
+    function computeSurface() {
+      const bins = Math.max(8, Math.ceil(width / 18));
+      surfaceBins = new Array(bins).fill(height - FLOOR_PAD);
+      const counts = new Array(bins).fill(0);
+      for (const p of water) {
+        const index = clamp(Math.floor(p.x / width * bins), 0, bins - 1);
+        surfaceBins[index] = Math.min(surfaceBins[index], p.y);
+        counts[index]++;
+      }
+      for (let i = 0; i < bins; i++) {
+        if (!counts[i]) {
+          const left = surfaceBins[Math.max(0, i - 1)];
+          const right = surfaceBins[Math.min(bins - 1, i + 1)];
+          surfaceBins[i] = Math.min(left, right, height - FLOOR_PAD);
+        }
+      }
+      for (let pass = 0; pass < 3; pass++) {
+        const copy = surfaceBins.slice();
+        for (let i = 1; i < bins - 1; i++) {
+          surfaceBins[i] = copy[i] * 0.5 + copy[i - 1] * 0.25 + copy[i + 1] * 0.25;
+        }
+      }
+    }
+
+    function surfaceAt(x) {
+      if (!surfaceBins.length) return height - FLOOR_PAD;
+      const index = clamp(Math.floor(x / width * surfaceBins.length), 0, surfaceBins.length - 1);
+      return surfaceBins[index];
+    }
+
+    function sampleBodyBuoyancy(body, dt) {
+      const poly = worldBodyPoints(body);
+      const xs = poly.map((p) => p.x);
+      const ys = poly.map((p) => p.y);
+      const minX = Math.max(0, Math.min(...xs));
+      const maxX = Math.min(width, Math.max(...xs));
+      const minY = Math.max(76, Math.min(...ys));
+      const maxY = Math.min(height - FLOOR_PAD, Math.max(...ys));
+      const step = 13;
+      let wet = 0;
+      let total = 0;
+      const gravity = Number(gravityEl.value);
+
+      for (let y = minY; y <= maxY; y += step) {
+        for (let x = minX; x <= maxX; x += step) {
+          if (!pointInPolygon({ x, y }, poly)) continue;
+          total++;
+          const surface = surfaceAt(x);
+          if (y > surface - 4) {
+            const depth = clamp((y - surface) / 76, 0, 1);
+            const lift = gravity * step * step * (1.65 + depth * 2.8) / Math.max(body.density, 0.18);
+            applyBodyForce(body, 0, -lift, x, y, dt);
+            wet += depth;
+          }
+        }
+      }
+
+      body.wet = total ? wet / total : 0;
+      if (body.wet > 0) {
+        body.vx *= Math.pow(0.986, dt);
+        body.vy *= Math.pow(0.982, dt);
+        body.av *= Math.pow(0.965, dt);
+      }
+    }
+
+    function collideBodyBounds(body) {
+      const poly = worldBodyPoints(body);
+      for (const point of poly) {
+        if (point.x < 0) applyBodyImpulse(body, (0 - point.x) * 0.55, 0, point.x, point.y);
+        if (point.x > width) applyBodyImpulse(body, (width - point.x) * 0.55, 0, point.x, point.y);
+        if (point.y < 76) applyBodyImpulse(body, 0, (76 - point.y) * 0.55, point.x, point.y);
+        if (point.y > height - FLOOR_PAD) {
+          applyBodyImpulse(body, 0, (height - FLOOR_PAD - point.y) * 0.65, point.x, point.y);
+          body.vx *= 0.992;
+          body.av *= 0.94;
+        }
+      }
+
+      for (const wall of walls) {
+        for (const point of poly) {
+          const close = closestPointOnSegment(point.x, point.y, wall.x1, wall.y1, wall.x2, wall.y2);
+          const dx = point.x - close.x;
+          const dy = point.y - close.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < wall.r + 2 && dist > 0.0001) {
+            const n = normalize(dx, dy);
+            applyBodyImpulse(body, n.x * (wall.r + 2 - dist) * 0.9, n.y * (wall.r + 2 - dist) * 0.9, point.x, point.y);
+          }
+        }
+      }
+    }
+
+    function step(dt) {
+      tick += dt;
+      const gravity = Number(gravityEl.value);
+
+      for (const p of water) {
+        p.vy += gravity * dt;
+        p.vx *= Math.pow(0.999, dt);
+        p.vy *= Math.pow(0.999, dt);
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+      }
+
+      solveWater();
+
+      for (const body of bodies) {
+        body.vy += gravity * dt;
+        sampleBodyBuoyancy(body, dt);
+        body.x += body.vx * dt;
+        body.y += body.vy * dt;
+        body.angle += body.av * dt;
+        body.vx *= Math.pow(0.998, dt);
+        body.vy *= Math.pow(0.998, dt);
+        body.av *= Math.pow(0.992, dt);
+      }
+
+      for (const p of water) {
+        collideParticleBounds(p);
+        collideParticleWalls(p);
+        for (const body of bodies) collideParticleBody(p, body);
+      }
+
+      for (const body of bodies) collideBodyBounds(body);
+
+      for (let i = foam.length - 1; i >= 0; i--) {
+        const f = foam[i];
+        f.life -= 0.012 * dt;
+        f.vy += gravity * 0.08 * dt;
+        f.x += f.vx * dt;
+        f.y += f.vy * dt;
+        if (f.y > height - FLOOR_PAD) f.vy *= -0.25;
+        if (f.life <= 0) foam.splice(i, 1);
+      }
+
+      if (water.length > Number(limitEl.value)) water.splice(0, water.length - Number(limitEl.value));
+    }
+
+    function drawTank() {
+      ctx.fillStyle = 'rgba(255,255,255,0.055)';
+      ctx.fillRect(0, 76, width, 1);
+      ctx.fillRect(0, height - FLOOR_PAD, width, FLOOR_PAD);
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < width; x += 48) {
+        ctx.beginPath();
+        ctx.moveTo(x, 76);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+    }
+
+    function drawWater() {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of water) {
+        const speed = Math.min(1, Math.hypot(p.vx, p.vy) / 8);
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(${45 + speed * 70}, ${148 + speed * 58}, 255, 0.55)`;
+        ctx.arc(p.x, p.y, p.r + 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.strokeStyle = '#9ee8ff';
+      ctx.lineWidth = 2;
+      if (surfaceBins.length) {
+        ctx.beginPath();
+        surfaceBins.forEach((y, index) => {
+          const x = index / Math.max(1, surfaceBins.length - 1) * width;
+          if (index === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawWalls() {
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (const wall of walls) {
+        ctx.beginPath();
+        ctx.strokeStyle = '#bcc6ce';
+        ctx.lineWidth = wall.r * 2;
+        ctx.moveTo(wall.x1, wall.y1);
+        ctx.lineTo(wall.x2, wall.y2);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(20,24,28,0.55)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    function drawBodies() {
+      for (const body of bodies) {
+        const points = worldBodyPoints(body);
+        ctx.beginPath();
+        points.forEach((point, index) => {
+          if (index === 0) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+        });
+        ctx.closePath();
+        ctx.fillStyle = `rgba(224, 168, 93, ${0.72 + body.wet * 0.2})`;
+        ctx.strokeStyle = body.wet > 0.35 ? '#f7d79f' : '#8b5d2f';
+        ctx.lineWidth = 3;
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    function drawFoam() {
+      for (const f of foam) {
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(243, 251, 255, ${clamp(f.life, 0, 1) * 0.78})`;
+        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawPreview() {
+      if (toolEl.value === 'boat' && drawPath.length > 1) {
+        ctx.beginPath();
+        drawPath.forEach((point, index) => {
+          if (index === 0) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+        });
+        ctx.strokeStyle = '#f7d79f';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+
+      if (pointerDown && lastPoint && toolEl.value === 'water') {
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(55, 184, 255, 0.65)';
+        ctx.lineWidth = 2;
+        ctx.arc(lastPoint.x, lastPoint.y, Number(brushEl.value), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+      drawTank();
+      drawWater();
+      drawWalls();
+      drawBodies();
+      drawFoam();
+      drawPreview();
+    }
+
+    function updateUi() {
+      waterCountEl.textContent = water.length;
+      foamCountEl.textContent = foam.length;
+      bodyCountEl.textContent = bodies.length;
+    }
+
+    let last = performance.now();
+    function frame(now) {
+      const dt = Math.min((now - last) / 16.666, 2);
+      last = now;
+      computeSurface();
+      const substeps = 2;
+      for (let i = 0; i < substeps; i++) step(dt / substeps);
+      computeSurface();
+      draw();
+      updateUi();
+      requestAnimationFrame(frame);
+    }
+
+    function pointerPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      };
+    }
+
+    function eraseAt(point) {
+      const radius = Number(brushEl.value);
+      water = water.filter((p) => Math.hypot(p.x - point.x, p.y - point.y) > radius);
+      foam = foam.filter((p) => Math.hypot(p.x - point.x, p.y - point.y) > radius);
+      walls = walls.filter((wall) => {
+        const close = closestPointOnSegment(point.x, point.y, wall.x1, wall.y1, wall.x2, wall.y2);
+        return Math.hypot(point.x - close.x, point.y - close.y) > radius;
+      });
+      bodies = bodies.filter((body) => Math.hypot(body.x - point.x, body.y - point.y) > radius);
+    }
+
+    function pushAt(point) {
+      for (const p of water) {
+        const dx = p.x - point.x;
+        const dy = p.y - point.y;
+        const d = Math.hypot(dx, dy);
+        const radius = Number(brushEl.value) * 1.5;
+        if (d < radius && d > 0.001) {
+          const power = (1 - d / radius) * 5.5;
+          p.vx += dx / d * power;
+          p.vy += dy / d * power;
+        }
+      }
+      for (const body of bodies) {
+        const dx = body.x - point.x;
+        const dy = body.y - point.y;
+        const d = Math.hypot(dx, dy);
+        const radius = Number(brushEl.value) * 1.8;
+        if (d < radius && d > 0.001) {
+          applyBodyImpulse(body, dx / d * 55, dy / d * 55, body.x, body.y);
+        }
+      }
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      pointerDown = true;
+      canvas.setPointerCapture(event.pointerId);
+      const point = pointerPoint(event);
+      lastPoint = point;
+      drawPath = toolEl.value === 'boat' ? [point] : [];
+
+      if (toolEl.value === 'water') addWater(point.x, point.y);
+      if (toolEl.value === 'erase') eraseAt(point);
+      if (toolEl.value === 'push') pushAt(point);
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (!pointerDown) return;
+      const point = pointerPoint(event);
+
+      if (toolEl.value === 'water') {
+        addWater(point.x, point.y);
+      } else if (toolEl.value === 'wall' && lastPoint) {
+        if (Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) > 5) {
+          walls.push({ x1: lastPoint.x, y1: lastPoint.y, x2: point.x, y2: point.y, r: 7 });
+          lastPoint = point;
+        }
+      } else if (toolEl.value === 'boat') {
+        const last = drawPath[drawPath.length - 1];
+        if (!last || Math.hypot(point.x - last.x, point.y - last.y) > 6) drawPath.push(point);
+      } else if (toolEl.value === 'erase') {
+        eraseAt(point);
+      } else if (toolEl.value === 'push') {
+        pushAt(point);
+      }
+
+      lastPoint = point;
+    });
+
+    canvas.addEventListener('pointerup', () => {
+      if (toolEl.value === 'boat' && drawPath.length > 2) {
+        makeBody(drawPath);
+      }
+      pointerDown = false;
+      lastPoint = null;
+      drawPath = [];
+    });
+
+    canvas.addEventListener('pointercancel', () => {
+      pointerDown = false;
+      lastPoint = null;
+      drawPath = [];
+    });
+
+    function addPresetBoat() {
+      const x = width * 0.55;
+      const y = height * 0.38;
+      makeBody([
+        { x: x - 86, y: y - 14 },
+        { x: x + 86, y: y - 14 },
+        { x: x + 58, y: y + 28 },
+        { x: x, y: y + 42 },
+        { x: x - 58, y: y + 28 }
+      ], Number(boatDensityEl.value));
+    }
+
+    function reset() {
+      water = [];
+      foam = [];
+      walls = [];
+      bodies = [];
+      for (let i = 0; i < 25; i++) addWater(width * 0.35 + rand(-120, 80), height * 0.38 + rand(-90, 70), 34);
+      walls.push({ x1: width * 0.18, y1: height * 0.72, x2: width * 0.82, y2: height * 0.72, r: 8 });
+      addPresetBoat();
+    }
+
+    boatBtn.addEventListener('click', addPresetBoat);
+    waveBtn.addEventListener('click', () => {
+      for (const p of water) {
+        if (p.x < width * 0.35) {
+          p.vx += rand(3, 8);
+          p.vy += rand(-2.5, 1);
+        }
+      }
+      for (let i = 0; i < 50; i++) emitFoam(width * 0.25, height * 0.55 + rand(-80, 80), 4, -1, 1);
+    });
+    drainBtn.addEventListener('click', () => {
+      water.splice(0, Math.ceil(water.length * 0.35));
+      foam.splice(0, Math.ceil(foam.length * 0.65));
+    });
+    resetBtn.addEventListener('click', reset);
+    window.addEventListener('resize', resize);
+
+    resize();
+    reset();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

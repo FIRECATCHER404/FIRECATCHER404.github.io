@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Creature Lab</title>
+  <style>
+    :root {
+      --panel: rgba(9, 12, 16, 0.82);
+      --line: rgba(255, 255, 255, 0.12);
+      --text: #f4f7ee;
+      --muted: #aeb8ab;
+      --accent: #f6c35b;
+      --good: #62e686;
+      --bad: #ff5f72;
+      --blue: #5bbdff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #0b0d11;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(96, 230, 134, 0.15), transparent 28rem),
+        radial-gradient(circle at 80% 70%, rgba(91, 189, 255, 0.13), transparent 30rem),
+        #0b0d11;
+      cursor: crosshair;
+    }
+
+    .topbar,
+    .panel {
+      position: fixed;
+      z-index: 2;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.38);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar {
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 11px;
+      border-radius: 8px;
+    }
+
+    .title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 65% 32%, #ffffff 0 7%, transparent 8%),
+        conic-gradient(from 30deg, var(--good), var(--blue), var(--accent), var(--good));
+      box-shadow: 0 0 24px rgba(98, 230, 134, 0.34);
+      flex: 0 0 auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    button,
+    select,
+    input {
+      color: var(--text);
+      font: inherit;
+    }
+
+    button,
+    select {
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 7px 10px;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:hover,
+    select:hover {
+      border-color: rgba(246, 195, 91, 0.55);
+      background: rgba(246, 195, 91, 0.13);
+    }
+
+    .primary {
+      background: rgba(98, 230, 134, 0.16);
+      border-color: rgba(98, 230, 134, 0.45);
+    }
+
+    .panel {
+      top: 78px;
+      left: 12px;
+      width: min(330px, calc(100vw - 24px));
+      max-height: calc(100vh - 96px);
+      overflow: auto;
+      border-radius: 8px;
+      padding: 13px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px;
+      background: rgba(255, 255, 255, 0.055);
+      min-height: 64px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+      margin-bottom: 4px;
+    }
+
+    .metric strong {
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    .control {
+      padding: 10px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .species {
+      display: grid;
+      gap: 7px;
+    }
+
+    .species-row {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 8px;
+      background: rgba(255, 255, 255, 0.045);
+      font-size: 0.78rem;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    .hint {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 760px) {
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .panel {
+        top: 128px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="world"></canvas>
+
+  <header class="topbar">
+    <div class="title">
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>Creature Lab</h1>
+        <div class="sub">bots evolve by eating, avoiding danger, and reproducing</div>
+      </div>
+    </div>
+    <div class="actions">
+      <select id="tool">
+        <option value="food">Place food</option>
+        <option value="hazard">Place hazard</option>
+        <option value="bot">Place bot</option>
+      </select>
+      <button id="pauseBtn">Pause</button>
+      <button id="stormBtn">Stress Test</button>
+      <button class="primary" id="resetBtn">New World</button>
+      <button onclick="location.href='index.html'">Projects</button>
+    </div>
+  </header>
+
+  <aside class="panel">
+    <div class="grid">
+      <div class="metric"><span>Population</span><strong id="pop">0</strong></div>
+      <div class="metric"><span>Food</span><strong id="foodCount">0</strong></div>
+      <div class="metric"><span>Best Gen</span><strong id="bestGen">0</strong></div>
+      <div class="metric"><span>Time</span><strong id="time">0</strong></div>
+    </div>
+
+    <div class="control">
+      <label for="speed">Sim speed <span id="speedLabel">1.0x</span></label>
+      <input id="speed" type="range" min="0.2" max="3" step="0.1" value="1">
+    </div>
+
+    <div class="control">
+      <label for="foodRate">Food growth <span id="foodRateLabel">80</span></label>
+      <input id="foodRate" type="range" min="15" max="180" step="1" value="80">
+    </div>
+
+    <div class="control">
+      <label for="mutation">Mutation <span id="mutationLabel">18%</span></label>
+      <input id="mutation" type="range" min="0" max="0.55" step="0.01" value="0.18">
+    </div>
+
+    <div class="control">
+      <label>Dominant lines</label>
+      <div class="species" id="species"></div>
+      <p class="hint">Click the world with the selected tool. Survivors pass their genes forward, so fast eaters, careful wanderers, or tiny low-energy bots can take over.</p>
+    </div>
+  </aside>
+
+  <script>
+    const canvas = document.getElementById('world');
+    const ctx = canvas.getContext('2d');
+    const toolEl = document.getElementById('tool');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stormBtn = document.getElementById('stormBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const speedEl = document.getElementById('speed');
+    const foodRateEl = document.getElementById('foodRate');
+    const mutationEl = document.getElementById('mutation');
+    const speedLabel = document.getElementById('speedLabel');
+    const foodRateLabel = document.getElementById('foodRateLabel');
+    const mutationLabel = document.getElementById('mutationLabel');
+    const popEl = document.getElementById('pop');
+    const foodCountEl = document.getElementById('foodCount');
+    const bestGenEl = document.getElementById('bestGen');
+    const timeEl = document.getElementById('time');
+    const speciesEl = document.getElementById('species');
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let paused = false;
+    let elapsed = 0;
+    let foodSpawnBank = 0;
+    let bots = [];
+    let foods = [];
+    let hazards = [];
+    let particles = [];
+
+    const rand = (min, max) => Math.random() * (max - min) + min;
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const distSq = (a, b) => {
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      return dx * dx + dy * dy;
+    };
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function randomGenes() {
+      const hue = rand(80, 210);
+      return {
+        speed: rand(0.75, 1.65),
+        sense: rand(60, 150),
+        turn: rand(0.035, 0.12),
+        size: rand(4.5, 8.2),
+        caution: rand(0.25, 1.3),
+        fertility: rand(0.75, 1.35),
+        hue
+      };
+    }
+
+    function mutateGene(value, amount, min, max) {
+      return clamp(value + rand(-amount, amount), min, max);
+    }
+
+    function mutateGenes(genes) {
+      const rate = Number(mutationEl.value);
+      return {
+        speed: mutateGene(genes.speed, rate * 0.9, 0.35, 2.35),
+        sense: mutateGene(genes.sense, rate * 90, 35, 230),
+        turn: mutateGene(genes.turn, rate * 0.075, 0.015, 0.18),
+        size: mutateGene(genes.size, rate * 4.5, 3.2, 12),
+        caution: mutateGene(genes.caution, rate * 1.1, 0, 2.2),
+        fertility: mutateGene(genes.fertility, rate * 0.65, 0.45, 1.9),
+        hue: (genes.hue + rand(-rate * 80, rate * 80) + 360) % 360
+      };
+    }
+
+    function makeBot(x = rand(80, width - 80), y = rand(90, height - 80), genes = randomGenes(), generation = 1) {
+      return {
+        x,
+        y,
+        vx: rand(-1, 1),
+        vy: rand(-1, 1),
+        angle: rand(0, Math.PI * 2),
+        wobble: rand(0, 1000),
+        energy: rand(90, 150),
+        age: 0,
+        generation,
+        cooldown: rand(1, 4),
+        genes
+      };
+    }
+
+    function makeFood(x = rand(26, width - 26), y = rand(82, height - 26), value = rand(18, 32)) {
+      return { x, y, value, r: Math.sqrt(value) * 0.9 };
+    }
+
+    function makeHazard(x = rand(60, width - 60), y = rand(120, height - 60)) {
+      return { x, y, r: rand(20, 42), pulse: rand(0, 1000) };
+    }
+
+    function resetWorld() {
+      elapsed = 0;
+      foodSpawnBank = 0;
+      bots = [];
+      foods = [];
+      hazards = [];
+      particles = [];
+
+      for (let i = 0; i < 42; i++) bots.push(makeBot());
+      for (let i = 0; i < 140; i++) foods.push(makeFood());
+      for (let i = 0; i < 8; i++) hazards.push(makeHazard());
+    }
+
+    function nearestFrom(list, bot, maxDistance) {
+      let best = null;
+      let bestDistance = maxDistance * maxDistance;
+
+      for (const item of list) {
+        const distance = distSq(bot, item);
+        if (distance < bestDistance) {
+          best = item;
+          bestDistance = distance;
+        }
+      }
+
+      return best;
+    }
+
+    function emit(x, y, hue, count = 5) {
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x,
+          y,
+          vx: rand(-1.5, 1.5),
+          vy: rand(-1.5, 1.5),
+          life: rand(0.35, 0.8),
+          hue
+        });
+      }
+    }
+
+    function reproduce(bot) {
+      const childEnergy = bot.energy * 0.44;
+      bot.energy *= 0.48;
+      bot.cooldown = 3.5;
+
+      const child = makeBot(
+        bot.x + rand(-14, 14),
+        bot.y + rand(-14, 14),
+        mutateGenes(bot.genes),
+        bot.generation + 1
+      );
+      child.energy = childEnergy;
+      bots.push(child);
+      emit(bot.x, bot.y, bot.genes.hue, 12);
+    }
+
+    function updateBot(bot, dt) {
+      bot.age += dt;
+      bot.cooldown -= dt;
+      bot.wobble += dt * 2;
+
+      const food = nearestFrom(foods, bot, bot.genes.sense);
+      const danger = nearestFrom(hazards, bot, bot.genes.sense * (1 + bot.genes.caution * 0.45));
+
+      let targetAngle = bot.angle + Math.sin(bot.wobble) * 1.2;
+      let urgency = 0.28;
+
+      if (food) {
+        targetAngle = Math.atan2(food.y - bot.y, food.x - bot.x);
+        urgency = 1;
+      }
+
+      if (danger) {
+        const dangerDistance = Math.sqrt(distSq(bot, danger));
+        const avoidPower = clamp(1 - dangerDistance / (bot.genes.sense * 1.4), 0, 1) * bot.genes.caution;
+        if (avoidPower > 0.1) {
+          targetAngle = Math.atan2(bot.y - danger.y, bot.x - danger.x);
+          urgency = Math.max(urgency, avoidPower);
+        }
+      }
+
+      let diff = Math.atan2(Math.sin(targetAngle - bot.angle), Math.cos(targetAngle - bot.angle));
+      bot.angle += clamp(diff, -bot.genes.turn * dt * 60, bot.genes.turn * dt * 60);
+
+      const pace = bot.genes.speed * (0.58 + urgency * 0.52);
+      bot.vx += Math.cos(bot.angle) * pace * dt * 4.6;
+      bot.vy += Math.sin(bot.angle) * pace * dt * 4.6;
+      bot.vx *= Math.pow(0.88, dt * 60);
+      bot.vy *= Math.pow(0.88, dt * 60);
+      bot.x += bot.vx * dt * 60;
+      bot.y += bot.vy * dt * 60;
+
+      if (bot.x < bot.genes.size || bot.x > width - bot.genes.size) {
+        bot.vx *= -0.65;
+        bot.x = clamp(bot.x, bot.genes.size, width - bot.genes.size);
+      }
+      if (bot.y < 76 + bot.genes.size || bot.y > height - bot.genes.size) {
+        bot.vy *= -0.65;
+        bot.y = clamp(bot.y, 76 + bot.genes.size, height - bot.genes.size);
+      }
+
+      bot.energy -= dt * (2.1 + bot.genes.speed * 1.5 + bot.genes.size * 0.12 + bot.genes.sense * 0.006);
+
+      for (let i = foods.length - 1; i >= 0; i--) {
+        const foodItem = foods[i];
+        const eatingDistance = bot.genes.size + foodItem.r + 3;
+        if (distSq(bot, foodItem) < eatingDistance * eatingDistance) {
+          bot.energy += foodItem.value;
+          emit(foodItem.x, foodItem.y, 95, 4);
+          foods.splice(i, 1);
+        }
+      }
+
+      for (const hazard of hazards) {
+        const range = hazard.r + bot.genes.size;
+        if (distSq(bot, hazard) < range * range) {
+          bot.energy -= dt * (38 + hazard.r * 0.35);
+          bot.vx += (bot.x - hazard.x) * dt * 0.04;
+          bot.vy += (bot.y - hazard.y) * dt * 0.04;
+        }
+      }
+
+      const threshold = 170 * bot.genes.fertility;
+      if (bot.energy > threshold && bot.cooldown <= 0 && bots.length < 180) {
+        reproduce(bot);
+      }
+    }
+
+    function spawnFood(dt) {
+      foodSpawnBank += Number(foodRateEl.value) * dt;
+      while (foodSpawnBank > 1 && foods.length < 460) {
+        foods.push(makeFood());
+        foodSpawnBank -= 1;
+      }
+    }
+
+    function update(dt) {
+      if (paused) return;
+      const simSpeed = Number(speedEl.value);
+      const scaledDt = Math.min(dt * simSpeed, 0.075);
+      elapsed += scaledDt;
+
+      spawnFood(scaledDt);
+
+      for (const hazard of hazards) hazard.pulse += scaledDt;
+      for (const bot of bots) updateBot(bot, scaledDt);
+
+      for (let i = bots.length - 1; i >= 0; i--) {
+        if (bots[i].energy <= 0 || bots[i].age > 280) {
+          emit(bots[i].x, bots[i].y, 4, 5);
+          bots.splice(i, 1);
+        }
+      }
+
+      if (bots.length < 16) {
+        for (let i = bots.length; i < 28; i++) bots.push(makeBot());
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life -= scaledDt;
+        p.x += p.vx * scaledDt * 60;
+        p.y += p.vy * scaledDt * 60;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function drawGrid() {
+      ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+      ctx.lineWidth = 1;
+      const gap = 44;
+      for (let x = (elapsed * 5) % gap; x < width; x += gap) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = 76; y < height; y += gap) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+      drawGrid();
+
+      for (const food of foods) {
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(141, 255, 121, 0.82)';
+        ctx.arc(food.x, food.y, food.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (const hazard of hazards) {
+        const pulse = Math.sin(hazard.pulse * 4) * 0.14 + 1;
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(255, 95, 114, 0.18)';
+        ctx.arc(hazard.x, hazard.y, hazard.r * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 95, 114, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      for (const bot of bots) {
+        const hue = bot.genes.hue;
+        const energyGlow = clamp(bot.energy / 180, 0.2, 1);
+        ctx.save();
+        ctx.translate(bot.x, bot.y);
+        ctx.rotate(bot.angle);
+        ctx.beginPath();
+        ctx.moveTo(bot.genes.size * 1.55, 0);
+        ctx.lineTo(-bot.genes.size, bot.genes.size * 0.86);
+        ctx.lineTo(-bot.genes.size * 0.62, 0);
+        ctx.lineTo(-bot.genes.size, -bot.genes.size * 0.86);
+        ctx.closePath();
+        ctx.fillStyle = `hsla(${hue}, 86%, ${44 + energyGlow * 16}%, 0.92)`;
+        ctx.shadowColor = `hsla(${hue}, 90%, 62%, 0.65)`;
+        ctx.shadowBlur = 12 * energyGlow;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      for (const p of particles) {
+        ctx.beginPath();
+        ctx.fillStyle = `hsla(${p.hue}, 90%, 64%, ${Math.max(p.life, 0)})`;
+        ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function updateUi() {
+      popEl.textContent = bots.length;
+      foodCountEl.textContent = foods.length;
+      bestGenEl.textContent = bots.reduce((best, bot) => Math.max(best, bot.generation), 0);
+      timeEl.textContent = Math.floor(elapsed);
+      speedLabel.textContent = `${Number(speedEl.value).toFixed(1)}x`;
+      foodRateLabel.textContent = foodRateEl.value;
+      mutationLabel.textContent = `${Math.round(Number(mutationEl.value) * 100)}%`;
+
+      const lines = new Map();
+      for (const bot of bots) {
+        const key = Math.round(bot.genes.hue / 24) * 24;
+        const current = lines.get(key) || { count: 0, best: 0, speed: 0, sense: 0 };
+        current.count += 1;
+        current.best = Math.max(current.best, bot.generation);
+        current.speed += bot.genes.speed;
+        current.sense += bot.genes.sense;
+        lines.set(key, current);
+      }
+
+      const top = [...lines.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5);
+      speciesEl.innerHTML = top.map(([hue, line]) => `
+        <div class="species-row">
+          <span class="swatch" style="color:hsl(${hue},85%,60%);background:hsl(${hue},85%,55%)"></span>
+          <span>${line.count} bots | gen ${line.best}</span>
+          <span>${(line.speed / line.count).toFixed(1)} spd</span>
+        </div>
+      `).join('');
+    }
+
+    let last = performance.now();
+    let uiTimer = 0;
+    function frame(now) {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      update(dt);
+      draw();
+      uiTimer += dt;
+      if (uiTimer > 0.15) {
+        updateUi();
+        uiTimer = 0;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    function pointerPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      };
+    }
+
+    canvas.addEventListener('pointerdown', (event) => {
+      if (event.clientY < 76) return;
+      const point = pointerPoint(event);
+      if (toolEl.value === 'food') {
+        for (let i = 0; i < 14; i++) foods.push(makeFood(point.x + rand(-26, 26), point.y + rand(-26, 26)));
+      } else if (toolEl.value === 'hazard') {
+        hazards.push(makeHazard(point.x, point.y));
+      } else {
+        bots.push(makeBot(point.x, point.y));
+      }
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      paused = !paused;
+      pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+    });
+
+    stormBtn.addEventListener('click', () => {
+      for (let i = 0; i < Math.min(foods.length, 90); i++) foods.splice(Math.floor(Math.random() * foods.length), 1);
+      hazards.push(makeHazard(rand(100, width - 100), rand(130, height - 100)));
+      hazards.push(makeHazard(rand(100, width - 100), rand(130, height - 100)));
+    });
+
+    resetBtn.addEventListener('click', resetWorld);
+    window.addEventListener('resize', resize);
+
+    resize();
+    resetWorld();
+    updateUi();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

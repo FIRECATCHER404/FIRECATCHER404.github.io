@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gameCR Level Gallery</title>
+  <style>
+    :root {
+      --bg: #101114;
+      --panel: #181b20;
+      --soft: #22262d;
+      --text: #f6f2e8;
+      --muted: #b4ada1;
+      --line: #343943;
+      --accent: #f2b84b;
+      --green: #53d68a;
+      --blue: #60b7ff;
+      --red: #ff6d75;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.035), transparent 220px),
+        radial-gradient(circle at 10% 10%, rgba(242, 184, 75, 0.18), transparent 24rem),
+        radial-gradient(circle at 90% 20%, rgba(96, 183, 255, 0.13), transparent 30rem),
+        var(--bg);
+      color: var(--text);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+      color: inherit;
+    }
+
+    .shell {
+      width: min(1280px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 18px 0 48px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 0 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 9px;
+      background:
+        linear-gradient(90deg, transparent 46%, rgba(0,0,0,0.24) 47% 53%, transparent 54%),
+        linear-gradient(0deg, transparent 46%, rgba(0,0,0,0.24) 47% 53%, transparent 54%),
+        linear-gradient(135deg, var(--accent), var(--green));
+      box-shadow: 0 12px 24px rgba(0,0,0,0.3);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      letter-spacing: 0.02em;
+    }
+
+    .sub {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    button,
+    .link-button {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+      padding: 8px 11px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    button:hover,
+    .link-button:hover {
+      border-color: rgba(242, 184, 75, 0.7);
+      background: #2a2f38;
+    }
+
+    .primary {
+      border-color: rgba(83, 214, 138, 0.6);
+      background: rgba(83, 214, 138, 0.18);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 380px) 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel,
+    .level-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(24, 27, 32, 0.88);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.25);
+    }
+
+    .panel {
+      padding: 14px;
+      position: sticky;
+      top: 14px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin: 11px 0 5px;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0f1115;
+      padding: 9px 10px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 88px;
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: rgba(96, 183, 255, 0.65);
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .row button {
+      flex: 1 1 120px;
+    }
+
+    .status {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin: 10px 0 0;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr 160px;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .level-card {
+      overflow: hidden;
+    }
+
+    .preview {
+      height: 132px;
+      position: relative;
+      background: #0d1015;
+    }
+
+    .preview canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.52);
+      color: #fff;
+      padding: 4px 8px;
+      font-size: 0.72rem;
+    }
+
+    .level-body {
+      padding: 12px;
+    }
+
+    .level-card h3 {
+      margin: 0 0 4px;
+      font-size: 1.02rem;
+    }
+
+    .meta {
+      margin: 0 0 9px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .desc {
+      min-height: 42px;
+      margin: 0 0 11px;
+      color: #ddd7cb;
+      font-size: 0.88rem;
+      line-height: 1.35;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .tag {
+      border: 1px solid rgba(242, 184, 75, 0.33);
+      border-radius: 999px;
+      background: rgba(242, 184, 75, 0.12);
+      color: #f8dca0;
+      padding: 3px 7px;
+      font-size: 0.7rem;
+    }
+
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      padding: 22px;
+      text-align: center;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 860px) {
+      .layout,
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div>
+          <h1>gameCR Level Gallery</h1>
+          <div class="sub">publish, import, and trade gameCR level cards</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a class="link-button" href="gameCR/">Open gameCR</a>
+        <a class="link-button" href="index.html">Projects</a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="panel">
+        <h2>Add Level</h2>
+        <label for="title">Title</label>
+        <input id="title" maxlength="60" placeholder="Sky Castle Escape" />
+
+        <label for="creator">Creator</label>
+        <input id="creator" maxlength="32" placeholder="firecatcher_303" />
+
+        <label for="description">Description</label>
+        <textarea id="description" maxlength="260" placeholder="Short level description"></textarea>
+
+        <label for="tags">Tags</label>
+        <input id="tags" maxlength="90" placeholder="platformer, hard, boss" />
+
+        <label for="levelFile">Level JSON or playable HTML</label>
+        <input id="levelFile" type="file" accept=".json,.html,.txt,application/json,text/html,text/plain" />
+
+        <label for="shareCode">Paste share code</label>
+        <textarea id="shareCode" placeholder="Optional: paste a copied gallery share code"></textarea>
+
+        <div class="row">
+          <button class="primary" id="publishBtn">Publish Card</button>
+          <button id="importCodeBtn">Import Code</button>
+          <button id="sampleBtn">Add Sample</button>
+        </div>
+        <p class="status" id="status">Connecting to gallery...</p>
+      </section>
+
+      <section>
+        <div class="toolbar">
+          <input id="search" type="search" placeholder="Search levels, tags, creators..." />
+          <select id="sort">
+            <option value="new">Newest</option>
+            <option value="name">Name</option>
+            <option value="creator">Creator</option>
+          </select>
+        </div>
+        <div id="gallery" class="gallery"></div>
+        <div id="empty" class="empty hidden">No levels yet.</div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js';
+    import { getDatabase, ref, push, onValue } from 'https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js';
+    import { firebaseConfig } from '../message-firebase-config.js';
+
+    const titleEl = document.getElementById('title');
+    const creatorEl = document.getElementById('creator');
+    const descriptionEl = document.getElementById('description');
+    const tagsEl = document.getElementById('tags');
+    const fileEl = document.getElementById('levelFile');
+    const shareCodeEl = document.getElementById('shareCode');
+    const publishBtn = document.getElementById('publishBtn');
+    const importCodeBtn = document.getElementById('importCodeBtn');
+    const sampleBtn = document.getElementById('sampleBtn');
+    const galleryEl = document.getElementById('gallery');
+    const emptyEl = document.getElementById('empty');
+    const searchEl = document.getElementById('search');
+    const sortEl = document.getElementById('sort');
+    const statusEl = document.getElementById('status');
+
+    const LOCAL_KEY = 'gamecr-level-gallery-v1';
+    const MAX_PAYLOAD = 140000;
+    let cloudReady = false;
+    let cloudLevels = [];
+    let localLevels = loadLocalLevels();
+    let selectedFile = null;
+
+    const samples = [
+      {
+        title: 'Starter Valley',
+        creator: 'gameCR',
+        description: 'A short jump-and-checkpoint layout for testing a first exported level.',
+        tags: ['starter', 'platformer', 'checkpoint'],
+        payload: '{"name":"Starter Valley","things":[{"type":"player","x":80,"y":220},{"type":"platform","x":20,"y":280,"w":420,"h":30},{"type":"goal","x":390,"y":220}]}'
+      },
+      {
+        title: 'Lava Elevator',
+        creator: 'gameCR',
+        description: 'A vertical route idea with lava pressure and moving-platform timing.',
+        tags: ['lava', 'vertical', 'timing'],
+        payload: '{"name":"Lava Elevator","things":[{"type":"player","x":70,"y":430},{"type":"lava","x":0,"y":500,"w":600,"h":80},{"type":"goal","x":440,"y":70}]}'
+      }
+    ];
+
+    function setStatus(message, bad = false) {
+      statusEl.textContent = message;
+      statusEl.style.color = bad ? 'var(--red)' : 'var(--muted)';
+    }
+
+    function escapeHtml(value = '') {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function normalizeTags(value) {
+      if (Array.isArray(value)) return value.map(String).map((tag) => tag.trim()).filter(Boolean).slice(0, 8);
+      return String(value || '')
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+        .slice(0, 8);
+    }
+
+    function loadLocalLevels() {
+      try {
+        return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveLocalLevels() {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(localLevels.slice(0, 80)));
+    }
+
+    function encodeShare(level) {
+      const packed = JSON.stringify({
+        title: level.title,
+        creator: level.creator,
+        description: level.description,
+        tags: level.tags,
+        payload: level.payload,
+        fileName: level.fileName
+      });
+      return btoa(unescape(encodeURIComponent(packed)));
+    }
+
+    function decodeShare(code) {
+      const clean = String(code || '').trim();
+      const json = decodeURIComponent(escape(atob(clean)));
+      return JSON.parse(json);
+    }
+
+    function cleanLevel(level) {
+      return {
+        id: level.id || crypto.randomUUID(),
+        title: String(level.title || 'Untitled Level').slice(0, 60),
+        creator: String(level.creator || 'anonymous').slice(0, 32),
+        description: String(level.description || '').slice(0, 260),
+        tags: normalizeTags(level.tags),
+        fileName: String(level.fileName || 'level.json').slice(0, 80),
+        payload: String(level.payload || '').slice(0, MAX_PAYLOAD),
+        createdAt: Number(level.createdAt || Date.now()),
+        source: level.source || 'local'
+      };
+    }
+
+    async function readFilePayload() {
+      const file = selectedFile;
+      if (!file) return '';
+      if (file.size > MAX_PAYLOAD) {
+        throw new Error('File is too large for a gallery card.');
+      }
+      return file.text();
+    }
+
+    async function createLevelFromForm() {
+      let fromCode = null;
+      if (shareCodeEl.value.trim()) {
+        fromCode = decodeShare(shareCodeEl.value);
+      }
+
+      const payload = fromCode ? fromCode.payload : await readFilePayload();
+      const fileName = fromCode ? fromCode.fileName : (selectedFile ? selectedFile.name : 'level.json');
+      return cleanLevel({
+        title: titleEl.value || fromCode?.title,
+        creator: creatorEl.value || fromCode?.creator,
+        description: descriptionEl.value || fromCode?.description,
+        tags: tagsEl.value || fromCode?.tags,
+        payload,
+        fileName,
+        createdAt: Date.now()
+      });
+    }
+
+    async function saveLevel(level) {
+      if (cloudReady) {
+        try {
+          const cloudLevel = { ...level, source: 'cloud' };
+          delete cloudLevel.id;
+          await push(ref(getDatabase(), 'games/gamecrLevelGallery'), cloudLevel);
+          setStatus('Published to the shared gallery.');
+          return;
+        } catch (error) {
+          setStatus('Cloud save failed, saved locally instead.', true);
+        }
+      }
+
+      localLevels.unshift({ ...level, source: 'local' });
+      saveLocalLevels();
+      render();
+    }
+
+    function downloadLevel(level) {
+      const blob = new Blob([level.payload || JSON.stringify(level, null, 2)], {
+        type: level.fileName.endsWith('.html') ? 'text/html' : 'application/json'
+      });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = level.fileName || `${level.title.replace(/\W+/g, '-').toLowerCase()}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    async function copyCode(level) {
+      const code = encodeShare(level);
+      await navigator.clipboard.writeText(code);
+      setStatus('Share code copied.');
+    }
+
+    function drawPreview(canvas, level) {
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width = canvas.clientWidth * Math.min(window.devicePixelRatio || 1, 2);
+      const h = canvas.height = canvas.clientHeight * Math.min(window.devicePixelRatio || 1, 2);
+      ctx.scale(w / canvas.clientWidth, h / canvas.clientHeight);
+      const cw = canvas.clientWidth;
+      const ch = canvas.clientHeight;
+      const seed = [...level.title + level.creator].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+
+      ctx.fillStyle = '#0b0e13';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      for (let x = 0; x < cw; x += 22) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, ch);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 9; i++) {
+        const x = ((seed * (i + 3)) % 190) / 190 * cw;
+        const y = 30 + ((seed * (i + 11)) % 80);
+        const ww = 26 + ((seed + i * 17) % 56);
+        ctx.fillStyle = i % 3 === 0 ? '#53d68a' : i % 3 === 1 ? '#f2b84b' : '#60b7ff';
+        ctx.fillRect(x, y, ww, 7);
+      }
+
+      ctx.fillStyle = '#ff6d75';
+      ctx.fillRect(0, ch - 18, cw, 18);
+      ctx.fillStyle = '#f6f2e8';
+      ctx.beginPath();
+      ctx.arc(28 + seed % 60, ch - 42, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#53d68a';
+      ctx.fillRect(cw - 42, 38 + seed % 46, 18, 18);
+    }
+
+    function getLevels() {
+      const merged = [...cloudLevels, ...localLevels];
+      const seen = new Set();
+      return merged.filter((level) => {
+        const key = `${level.title}-${level.creator}-${level.createdAt}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function render() {
+      const search = searchEl.value.toLowerCase().trim();
+      let levels = getLevels().filter((level) => {
+        const text = [level.title, level.creator, level.description, ...(level.tags || [])].join(' ').toLowerCase();
+        return !search || text.includes(search);
+      });
+
+      if (sortEl.value === 'name') {
+        levels.sort((a, b) => a.title.localeCompare(b.title));
+      } else if (sortEl.value === 'creator') {
+        levels.sort((a, b) => a.creator.localeCompare(b.creator));
+      } else {
+        levels.sort((a, b) => b.createdAt - a.createdAt);
+      }
+
+      galleryEl.innerHTML = levels.map((level, index) => `
+        <article class="level-card" data-index="${index}">
+          <div class="preview">
+            <canvas></canvas>
+            <span class="badge">${escapeHtml(level.source === 'cloud' ? 'shared' : 'local')}</span>
+          </div>
+          <div class="level-body">
+            <h3>${escapeHtml(level.title)}</h3>
+            <p class="meta">by ${escapeHtml(level.creator)} | ${new Date(level.createdAt).toLocaleDateString()}</p>
+            <p class="desc">${escapeHtml(level.description || 'No description.')}</p>
+            <div class="tags">${level.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>
+            <div class="row">
+              <button data-action="download" data-id="${escapeHtml(level.id)}">Download</button>
+              <button data-action="copy" data-id="${escapeHtml(level.id)}">Copy Code</button>
+            </div>
+          </div>
+        </article>
+      `).join('');
+
+      emptyEl.classList.toggle('hidden', levels.length > 0);
+
+      galleryEl.querySelectorAll('.level-card').forEach((card, index) => {
+        drawPreview(card.querySelector('canvas'), levels[index]);
+      });
+
+      galleryEl.querySelectorAll('button[data-action]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const card = button.closest('.level-card');
+          const level = levels[Number(card.dataset.index)];
+          if (button.dataset.action === 'download') downloadLevel(level);
+          if (button.dataset.action === 'copy') copyCode(level);
+        });
+      });
+    }
+
+    function connectCloud() {
+      try {
+        initializeApp(firebaseConfig);
+        const db = getDatabase();
+        onValue(ref(db, 'games/gamecrLevelGallery'), (snapshot) => {
+          cloudReady = true;
+          const value = snapshot.val() || {};
+          cloudLevels = Object.entries(value).map(([id, level]) => cleanLevel({
+            ...level,
+            id,
+            source: 'cloud'
+          }));
+          setStatus('Shared gallery connected.');
+          render();
+        }, (error) => {
+          cloudReady = false;
+          setStatus('Using local gallery. Cloud is blocked right now.', true);
+          render();
+        });
+      } catch (error) {
+        cloudReady = false;
+        setStatus('Using local gallery. Cloud did not load.', true);
+      }
+    }
+
+    fileEl.addEventListener('change', () => {
+      selectedFile = fileEl.files[0] || null;
+      if (selectedFile && !titleEl.value) {
+        titleEl.value = selectedFile.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
+      }
+    });
+
+    publishBtn.addEventListener('click', async () => {
+      try {
+        const level = await createLevelFromForm();
+        await saveLevel(level);
+        titleEl.value = '';
+        descriptionEl.value = '';
+        tagsEl.value = '';
+        shareCodeEl.value = '';
+        fileEl.value = '';
+        selectedFile = null;
+        render();
+      } catch (error) {
+        setStatus(error.message || 'Could not publish that level.', true);
+      }
+    });
+
+    importCodeBtn.addEventListener('click', () => {
+      try {
+        const level = cleanLevel({ ...decodeShare(shareCodeEl.value), createdAt: Date.now() });
+        localLevels.unshift(level);
+        saveLocalLevels();
+        setStatus('Imported share code locally.');
+        render();
+      } catch {
+        setStatus('That share code could not be read.', true);
+      }
+    });
+
+    sampleBtn.addEventListener('click', () => {
+      const sample = cleanLevel({ ...samples[Math.floor(Math.random() * samples.length)], createdAt: Date.now() });
+      localLevels.unshift(sample);
+      saveLocalLevels();
+      render();
+      setStatus('Sample level added locally.');
+    });
+
+    searchEl.addEventListener('input', render);
+    sortEl.addEventListener('change', render);
+    window.addEventListener('resize', render);
+
+    if (localLevels.length === 0) {
+      localLevels = samples.map((sample, index) => cleanLevel({
+        ...sample,
+        createdAt: Date.now() - index * 86400000,
+        source: 'local'
+      }));
+      saveLocalLevels();
+    }
+
+    connectCloud();
+    render();
+  </script>
+</body>
+</html>

@@ -201,68 +201,544 @@ if (canShowTiltControls && !hasTiltSensor) {
   motionStatus.textContent = 'Needs HTTPS';
 }
 
+const RESTITUTION = 0.5;
+const WALL_RESTITUTION = 0.55;
+const FRICTION = 0.42;
+const WALL_FRICTION = 0.58;
+const PHYSICS_SUBSTEPS = 3;
+const COLLISION_ITERATIONS = 5;
+const LINEAR_DAMPING = 0.999;
+const ANGULAR_DAMPING = 0.992;
+const MAX_SPEED = 90;
+const MAX_ANGULAR_SPEED = 0.65;
+const CONTACT_SLOP = 0.02;
+
+function dot(a, b) {
+  return a.x * b.x + a.y * b.y;
+}
+
+function cross(a, b) {
+  return a.x * b.y - a.y * b.x;
+}
+
+function lengthSq(v) {
+  return v.x * v.x + v.y * v.y;
+}
+
+function normalize(v) {
+  const length = Math.hypot(v.x, v.y);
+  if (length < 0.000001) return { x: 1, y: 0 };
+  return { x: v.x / length, y: v.y / length };
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getShapeArea(shape, size) {
+  if (shape === 'circle') return Math.PI * size * size;
+  if (shape === 'square') return size * size * 4;
+  return size * size * 2;
+}
+
+function getShapeInertia(shape, mass, size) {
+  if (shape === 'circle') return 0.5 * mass * size * size;
+  if (shape === 'square') return (2 / 3) * mass * size * size;
+  return 0.5 * mass * size * size;
+}
+
 function createShape(x, y, shape, color, size, vx = 0, vy = 0) {
-  return { x, y, shape, color, size, vx, vy };
+  const mass = Math.max(0.8, getShapeArea(shape, size) / 900);
+  const inertia = Math.max(1, getShapeInertia(shape, mass, size));
+
+  return {
+    x,
+    y,
+    shape,
+    color,
+    size,
+    vx,
+    vy,
+    angle: 0,
+    angularVelocity: 0,
+    mass,
+    invMass: 1 / mass,
+    inertia,
+    invInertia: 1 / inertia
+  };
 }
 
 function drawShape(obj) {
   ctx.save();
   ctx.translate(obj.x, obj.y);
+  ctx.rotate(obj.angle || 0);
   ctx.fillStyle = obj.color;
   ctx.beginPath();
   if (obj.shape === 'circle') {
     ctx.arc(0, 0, obj.size, 0, Math.PI * 2);
     ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(obj.size, 0);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = Math.max(1, obj.size * 0.08);
+    ctx.stroke();
   } else if (obj.shape === 'square') {
     ctx.fillRect(-obj.size, -obj.size, obj.size * 2, obj.size * 2);
   } else if (obj.shape === 'triangle') {
-    ctx.moveTo(0, -obj.size);
-    ctx.lineTo(obj.size, obj.size);
-    ctx.lineTo(-obj.size, obj.size);
+    ctx.moveTo(0, -obj.size * 4 / 3);
+    ctx.lineTo(obj.size, obj.size * 2 / 3);
+    ctx.lineTo(-obj.size, obj.size * 2 / 3);
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
 }
 
-function getBoundingCircle(obj) {
+function drawShapeOutline(x, y, shape, size, color, angle = 0) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.beginPath();
+
+  if (shape === 'circle') {
+    ctx.arc(0, 0, size, 0, Math.PI * 2);
+  } else if (shape === 'square') {
+    ctx.rect(-size, -size, size * 2, size * 2);
+  } else {
+    ctx.moveTo(0, -size * 4 / 3);
+    ctx.lineTo(size, size * 2 / 3);
+    ctx.lineTo(-size, size * 2 / 3);
+    ctx.closePath();
+  }
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function getLocalVertices(obj) {
+  if (obj.shape === 'square') {
+    return [
+      { x: -obj.size, y: -obj.size },
+      { x: obj.size, y: -obj.size },
+      { x: obj.size, y: obj.size },
+      { x: -obj.size, y: obj.size }
+    ];
+  }
+
+  if (obj.shape === 'triangle') {
+    return [
+      { x: 0, y: -obj.size * 4 / 3 },
+      { x: obj.size, y: obj.size * 2 / 3 },
+      { x: -obj.size, y: obj.size * 2 / 3 }
+    ];
+  }
+
+  return [];
+}
+
+function getWorldVertices(obj) {
+  const cos = Math.cos(obj.angle || 0);
+  const sin = Math.sin(obj.angle || 0);
+
+  return getLocalVertices(obj).map((point) => ({
+    x: obj.x + point.x * cos - point.y * sin,
+    y: obj.y + point.x * sin + point.y * cos
+  }));
+}
+
+function getBroadRadius(obj) {
+  if (obj.shape === 'circle') return obj.size;
+  return Math.SQRT2 * obj.size;
+}
+
+function getBounds(obj) {
+  if (obj.shape === 'circle') {
+    return {
+      minX: obj.x - obj.size,
+      maxX: obj.x + obj.size,
+      minY: obj.y - obj.size,
+      maxY: obj.y + obj.size
+    };
+  }
+
+  const vertices = getWorldVertices(obj);
+  return vertices.reduce((bounds, vertex) => ({
+    minX: Math.min(bounds.minX, vertex.x),
+    maxX: Math.max(bounds.maxX, vertex.x),
+    minY: Math.min(bounds.minY, vertex.y),
+    maxY: Math.max(bounds.maxY, vertex.y)
+  }), {
+    minX: Infinity,
+    maxX: -Infinity,
+    minY: Infinity,
+    maxY: -Infinity
+  });
+}
+
+function projectVertices(vertices, axis) {
+  let min = Infinity;
+  let max = -Infinity;
+
+  for (const vertex of vertices) {
+    const projected = dot(vertex, axis);
+    min = Math.min(min, projected);
+    max = Math.max(max, projected);
+  }
+
+  return { min, max };
+}
+
+function projectCircle(circle, axis) {
+  const center = dot(circle, axis);
   return {
-    x: obj.x,
-    y: obj.y,
-    r: obj.size * (obj.shape === 'circle' ? 1 : Math.SQRT2)
+    min: center - circle.size,
+    max: center + circle.size
   };
 }
 
+function getPolygonAxes(vertices) {
+  const axes = [];
+
+  for (let i = 0; i < vertices.length; i++) {
+    const current = vertices[i];
+    const next = vertices[(i + 1) % vertices.length];
+    const edge = { x: next.x - current.x, y: next.y - current.y };
+    axes.push(normalize({ x: -edge.y, y: edge.x }));
+  }
+
+  return axes;
+}
+
+function getAverageSupportPoint(vertices, axis, direction) {
+  let target = direction > 0 ? -Infinity : Infinity;
+
+  for (const vertex of vertices) {
+    const projected = dot(vertex, axis);
+    target = direction > 0
+      ? Math.max(target, projected)
+      : Math.min(target, projected);
+  }
+
+  const points = vertices.filter((vertex) => Math.abs(dot(vertex, axis) - target) < 0.5);
+  return averagePoints(points.length ? points : vertices);
+}
+
+function averagePoints(points) {
+  const total = points.reduce((sum, point) => ({
+    x: sum.x + point.x,
+    y: sum.y + point.y
+  }), { x: 0, y: 0 });
+
+  return {
+    x: total.x / points.length,
+    y: total.y / points.length
+  };
+}
+
+function closestPointOnSegment(point, a, b) {
+  const ab = { x: b.x - a.x, y: b.y - a.y };
+  const t = clamp(
+    dot({ x: point.x - a.x, y: point.y - a.y }, ab) / Math.max(lengthSq(ab), 0.000001),
+    0,
+    1
+  );
+
+  return {
+    x: a.x + ab.x * t,
+    y: a.y + ab.y * t
+  };
+}
+
+function closestPointOnPolygon(point, vertices) {
+  let bestPoint = vertices[0];
+  let bestDistance = Infinity;
+
+  for (let i = 0; i < vertices.length; i++) {
+    const candidate = closestPointOnSegment(point, vertices[i], vertices[(i + 1) % vertices.length]);
+    const distance = lengthSq({ x: point.x - candidate.x, y: point.y - candidate.y });
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestPoint = candidate;
+    }
+  }
+
+  return bestPoint;
+}
+
+function closestVertex(point, vertices) {
+  let bestVertex = vertices[0];
+  let bestDistance = Infinity;
+
+  for (const vertex of vertices) {
+    const distance = lengthSq({ x: point.x - vertex.x, y: point.y - vertex.y });
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestVertex = vertex;
+    }
+  }
+
+  return bestVertex;
+}
+
+function overlapAmount(projectedA, projectedB) {
+  return Math.min(projectedA.max, projectedB.max) - Math.max(projectedA.min, projectedB.min);
+}
+
+function collideCircles(a, b) {
+  const delta = { x: b.x - a.x, y: b.y - a.y };
+  const distance = Math.hypot(delta.x, delta.y);
+  const penetration = a.size + b.size - distance;
+
+  if (penetration <= 0) return null;
+
+  const normal = distance < 0.000001
+    ? { x: 1, y: 0 }
+    : { x: delta.x / distance, y: delta.y / distance };
+  const aSurface = {
+    x: a.x + normal.x * a.size,
+    y: a.y + normal.y * a.size
+  };
+  const bSurface = {
+    x: b.x - normal.x * b.size,
+    y: b.y - normal.y * b.size
+  };
+
+  return {
+    normal,
+    penetration,
+    contact: {
+      x: (aSurface.x + bSurface.x) / 2,
+      y: (aSurface.y + bSurface.y) / 2
+    }
+  };
+}
+
+function collidePolygons(a, b) {
+  const aVertices = getWorldVertices(a);
+  const bVertices = getWorldVertices(b);
+  const axes = [...getPolygonAxes(aVertices), ...getPolygonAxes(bVertices)];
+  let bestAxis = null;
+  let smallestOverlap = Infinity;
+
+  for (const axis of axes) {
+    const projectedA = projectVertices(aVertices, axis);
+    const projectedB = projectVertices(bVertices, axis);
+    const overlap = overlapAmount(projectedA, projectedB);
+
+    if (overlap <= 0) return null;
+
+    if (overlap < smallestOverlap) {
+      smallestOverlap = overlap;
+      bestAxis = axis;
+    }
+  }
+
+  const centerDelta = { x: b.x - a.x, y: b.y - a.y };
+  if (dot(centerDelta, bestAxis) < 0) {
+    bestAxis = { x: -bestAxis.x, y: -bestAxis.y };
+  }
+
+  const aSupport = getAverageSupportPoint(aVertices, bestAxis, 1);
+  const bSupport = getAverageSupportPoint(bVertices, bestAxis, -1);
+
+  return {
+    normal: bestAxis,
+    penetration: smallestOverlap,
+    contact: {
+      x: (aSupport.x + bSupport.x) / 2,
+      y: (aSupport.y + bSupport.y) / 2
+    }
+  };
+}
+
+function collideCirclePolygon(circle, polygon) {
+  const vertices = getWorldVertices(polygon);
+  const nearestVertex = closestVertex(circle, vertices);
+  const vertexAxis = normalize({
+    x: nearestVertex.x - circle.x,
+    y: nearestVertex.y - circle.y
+  });
+  const axes = [...getPolygonAxes(vertices), vertexAxis];
+  let bestAxis = null;
+  let smallestOverlap = Infinity;
+
+  for (const axis of axes) {
+    const projectedCircle = projectCircle(circle, axis);
+    const projectedPolygon = projectVertices(vertices, axis);
+    const overlap = overlapAmount(projectedCircle, projectedPolygon);
+
+    if (overlap <= 0) return null;
+
+    if (overlap < smallestOverlap) {
+      smallestOverlap = overlap;
+      bestAxis = axis;
+    }
+  }
+
+  const centerDelta = { x: polygon.x - circle.x, y: polygon.y - circle.y };
+  if (dot(centerDelta, bestAxis) < 0) {
+    bestAxis = { x: -bestAxis.x, y: -bestAxis.y };
+  }
+
+  return {
+    normal: bestAxis,
+    penetration: smallestOverlap,
+    contact: closestPointOnPolygon(circle, vertices)
+  };
+}
+
+function detectCollision(a, b) {
+  const broadRadius = getBroadRadius(a) + getBroadRadius(b);
+  if (lengthSq({ x: b.x - a.x, y: b.y - a.y }) > broadRadius * broadRadius) {
+    return null;
+  }
+
+  if (a.shape === 'circle' && b.shape === 'circle') {
+    return collideCircles(a, b);
+  }
+
+  if (a.shape === 'circle') {
+    return collideCirclePolygon(a, b);
+  }
+
+  if (b.shape === 'circle') {
+    const collision = collideCirclePolygon(b, a);
+    if (!collision) return null;
+
+    return {
+      normal: { x: -collision.normal.x, y: -collision.normal.y },
+      penetration: collision.penetration,
+      contact: collision.contact
+    };
+  }
+
+  return collidePolygons(a, b);
+}
+
+function velocityAtPoint(body, point) {
+  const radius = { x: point.x - body.x, y: point.y - body.y };
+  return {
+    x: body.vx - body.angularVelocity * radius.y,
+    y: body.vy + body.angularVelocity * radius.x
+  };
+}
+
+function applyImpulse(body, impulse, point) {
+  const radius = { x: point.x - body.x, y: point.y - body.y };
+
+  body.vx += impulse.x * body.invMass;
+  body.vy += impulse.y * body.invMass;
+  body.angularVelocity += cross(radius, impulse) * body.invInertia;
+}
+
+function clampBodyMotion(body) {
+  const speed = Math.hypot(body.vx, body.vy);
+
+  if (speed > MAX_SPEED) {
+    const scale = MAX_SPEED / speed;
+    body.vx *= scale;
+    body.vy *= scale;
+  }
+
+  body.angularVelocity = clamp(body.angularVelocity, -MAX_ANGULAR_SPEED, MAX_ANGULAR_SPEED);
+}
+
+function positionCorrectPair(a, b, normal, penetration) {
+  const invMassTotal = a.invMass + b.invMass;
+  if (invMassTotal <= 0) return;
+
+  const correction = Math.max(penetration - CONTACT_SLOP, 0) / invMassTotal * 0.8;
+  a.x -= normal.x * correction * a.invMass;
+  a.y -= normal.y * correction * a.invMass;
+  b.x += normal.x * correction * b.invMass;
+  b.y += normal.y * correction * b.invMass;
+}
+
+function resolveCollision(a, b, collision) {
+  const normal = collision.normal;
+  const contact = collision.contact;
+
+  positionCorrectPair(a, b, normal, collision.penetration);
+
+  const radiusA = { x: contact.x - a.x, y: contact.y - a.y };
+  const radiusB = { x: contact.x - b.x, y: contact.y - b.y };
+  const velocityA = velocityAtPoint(a, contact);
+  const velocityB = velocityAtPoint(b, contact);
+  const relativeVelocity = {
+    x: velocityB.x - velocityA.x,
+    y: velocityB.y - velocityA.y
+  };
+  const velocityAlongNormal = dot(relativeVelocity, normal);
+
+  if (velocityAlongNormal > 0) return;
+
+  const radiusACrossNormal = cross(radiusA, normal);
+  const radiusBCrossNormal = cross(radiusB, normal);
+  const impulseDenominator =
+    a.invMass +
+    b.invMass +
+    radiusACrossNormal * radiusACrossNormal * a.invInertia +
+    radiusBCrossNormal * radiusBCrossNormal * b.invInertia;
+
+  if (impulseDenominator <= 0) return;
+
+  const impulseStrength = -(1 + RESTITUTION) * velocityAlongNormal / impulseDenominator;
+  const impulse = {
+    x: normal.x * impulseStrength,
+    y: normal.y * impulseStrength
+  };
+
+  applyImpulse(a, { x: -impulse.x, y: -impulse.y }, contact);
+  applyImpulse(b, impulse, contact);
+
+  const nextVelocityA = velocityAtPoint(a, contact);
+  const nextVelocityB = velocityAtPoint(b, contact);
+  const nextRelativeVelocity = {
+    x: nextVelocityB.x - nextVelocityA.x,
+    y: nextVelocityB.y - nextVelocityA.y
+  };
+  const tangentVector = {
+    x: nextRelativeVelocity.x - normal.x * dot(nextRelativeVelocity, normal),
+    y: nextRelativeVelocity.y - normal.y * dot(nextRelativeVelocity, normal)
+  };
+
+  if (lengthSq(tangentVector) > 0.000001) {
+    const tangent = normalize(tangentVector);
+    const radiusACrossTangent = cross(radiusA, tangent);
+    const radiusBCrossTangent = cross(radiusB, tangent);
+    const tangentDenominator =
+      a.invMass +
+      b.invMass +
+      radiusACrossTangent * radiusACrossTangent * a.invInertia +
+      radiusBCrossTangent * radiusBCrossTangent * b.invInertia;
+    const tangentStrength = -dot(nextRelativeVelocity, tangent) / Math.max(tangentDenominator, 0.000001);
+    const frictionStrength = clamp(tangentStrength, -impulseStrength * FRICTION, impulseStrength * FRICTION);
+    const frictionImpulse = {
+      x: tangent.x * frictionStrength,
+      y: tangent.y * frictionStrength
+    };
+
+    applyImpulse(a, { x: -frictionImpulse.x, y: -frictionImpulse.y }, contact);
+    applyImpulse(b, frictionImpulse, contact);
+  }
+
+  clampBodyMotion(a);
+  clampBodyMotion(b);
+}
+
 function resolveCollisions() {
-  for (let i = 0; i < shapes.length; i++) {
-    for (let j = i + 1; j < shapes.length; j++) {
-      const a = shapes[i];
-      const b = shapes[j];
-      const ca = getBoundingCircle(a);
-      const cb = getBoundingCircle(b);
-      const dx = cb.x - ca.x;
-      const dy = cb.y - ca.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const overlap = ca.r + cb.r - dist;
-      if (overlap > 0) {
-        const nx = dist === 0 ? 1 : dx / dist;
-        const ny = dist === 0 ? 0 : dy / dist;
-
-        a.x -= nx * overlap / 2;
-        a.y -= ny * overlap / 2;
-        b.x += nx * overlap / 2;
-        b.y += ny * overlap / 2;
-
-        const dvx = b.vx - a.vx;
-        const dvy = b.vy - a.vy;
-        const impact = dvx * nx + dvy * ny;
-        if (impact > 0) continue;
-
-        const impulse = (1 + 0.7) * impact / 2;
-        a.vx += impulse * nx;
-        a.vy += impulse * ny;
-        b.vx -= impulse * nx;
-        b.vy -= impulse * ny;
+  for (let iteration = 0; iteration < COLLISION_ITERATIONS; iteration++) {
+    for (let i = 0; i < shapes.length; i++) {
+      for (let j = i + 1; j < shapes.length; j++) {
+        const collision = detectCollision(shapes[i], shapes[j]);
+        if (collision) {
+          resolveCollision(shapes[i], shapes[j], collision);
+        }
       }
     }
   }
@@ -278,9 +754,12 @@ const maxSize = 40;
 const growthRate = 0.03;
 
 function clampShapeToCanvas(shape) {
-  const radius = getBoundingCircle(shape).r;
-  shape.x = Math.min(Math.max(shape.x, radius), Math.max(radius, canvas.width - radius));
-  shape.y = Math.min(Math.max(shape.y, radius), Math.max(radius, canvas.height - radius));
+  const bounds = getBounds(shape);
+
+  if (bounds.minX < 0) shape.x += -bounds.minX + CONTACT_SLOP;
+  if (bounds.maxX > canvas.width) shape.x -= bounds.maxX - canvas.width + CONTACT_SLOP;
+  if (bounds.minY < 0) shape.y += -bounds.minY + CONTACT_SLOP;
+  if (bounds.maxY > canvas.height) shape.y -= bounds.maxY - canvas.height + CONTACT_SLOP;
 }
 
 function transformForResize(obj, oldWidth, oldHeight, newWidth, newHeight, rotationDelta) {
@@ -316,6 +795,10 @@ function transformForResize(obj, oldWidth, oldHeight, newWidth, newHeight, rotat
   obj.y = y * (newHeight / rotatedHeight);
   obj.vx = vx * (newWidth / rotatedWidth);
   obj.vy = vy * (newHeight / rotatedHeight);
+
+  if (typeof obj.angle === 'number') {
+    obj.angle += rotationDelta * Math.PI / 180;
+  }
 }
 
 function resizeCanvas() {
@@ -547,7 +1030,9 @@ function finishDrag() {
     const size = Math.min(maxSize, minSize + holdTime * growthRate);
     const shape = shapeSelect.value;
     const color = colorPicker.value;
-    shapes.push(createShape(dragStart.x, dragStart.y, shape, color, size, dx, dy));
+    const newShape = createShape(dragStart.x, dragStart.y, shape, color, size, dx, dy);
+    clampShapeToCanvas(newShape);
+    shapes.push(newShape);
   }
   isDragging = false;
 }
@@ -641,47 +1126,182 @@ if (screenOrientation && typeof screenOrientation.addEventListener === 'function
   });
 }
 
-function loop() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+function averageExtremePoint(vertices, key, target) {
+  const points = vertices.filter((vertex) => Math.abs(vertex[key] - target) < 0.5);
+  return averagePoints(points.length ? points : vertices);
+}
+
+function resolveBoundaryCollision(body, normal, penetration, contact) {
+  if (penetration <= 0) return;
+
+  const radius = { x: contact.x - body.x, y: contact.y - body.y };
+  const contactVelocity = velocityAtPoint(body, contact);
+  const velocityAlongNormal = dot(contactVelocity, normal);
+
+  if (velocityAlongNormal < 0) {
+    const radiusCrossNormal = cross(radius, normal);
+    const impulseDenominator =
+      body.invMass +
+      radiusCrossNormal * radiusCrossNormal * body.invInertia;
+
+    if (impulseDenominator > 0) {
+      const impulseStrength = -(1 + WALL_RESTITUTION) * velocityAlongNormal / impulseDenominator;
+      const impulse = {
+        x: normal.x * impulseStrength,
+        y: normal.y * impulseStrength
+      };
+
+      applyImpulse(body, impulse, contact);
+
+      const nextVelocity = velocityAtPoint(body, contact);
+      const tangentVector = {
+        x: nextVelocity.x - normal.x * dot(nextVelocity, normal),
+        y: nextVelocity.y - normal.y * dot(nextVelocity, normal)
+      };
+
+      if (lengthSq(tangentVector) > 0.000001) {
+        const tangent = normalize(tangentVector);
+        const radiusCrossTangent = cross(radius, tangent);
+        const tangentDenominator =
+          body.invMass +
+          radiusCrossTangent * radiusCrossTangent * body.invInertia;
+        const tangentStrength = -dot(nextVelocity, tangent) / Math.max(tangentDenominator, 0.000001);
+        const frictionStrength = clamp(
+          tangentStrength,
+          -impulseStrength * WALL_FRICTION,
+          impulseStrength * WALL_FRICTION
+        );
+
+        applyImpulse(body, {
+          x: tangent.x * frictionStrength,
+          y: tangent.y * frictionStrength
+        }, contact);
+      }
+    }
+  }
+
+  body.x += normal.x * (penetration + CONTACT_SLOP);
+  body.y += normal.y * (penetration + CONTACT_SLOP);
+  clampBodyMotion(body);
+}
+
+function resolveCircleWalls(body) {
+  if (body.x - body.size < 0) {
+    resolveBoundaryCollision(body, { x: 1, y: 0 }, body.size - body.x, { x: 0, y: body.y });
+  }
+
+  if (body.x + body.size > canvas.width) {
+    resolveBoundaryCollision(body, { x: -1, y: 0 }, body.x + body.size - canvas.width, {
+      x: canvas.width,
+      y: body.y
+    });
+  }
+
+  if (body.y - body.size < 0) {
+    resolveBoundaryCollision(body, { x: 0, y: 1 }, body.size - body.y, { x: body.x, y: 0 });
+  }
+
+  if (body.y + body.size > canvas.height) {
+    resolveBoundaryCollision(body, { x: 0, y: -1 }, body.y + body.size - canvas.height, {
+      x: body.x,
+      y: canvas.height
+    });
+  }
+}
+
+function resolvePolygonWalls(body) {
+  let vertices = getWorldVertices(body);
+  let minX = Math.min(...vertices.map((vertex) => vertex.x));
+  if (minX < 0) {
+    const contact = averageExtremePoint(vertices, 'x', minX);
+    contact.x = 0;
+    resolveBoundaryCollision(body, { x: 1, y: 0 }, -minX, contact);
+  }
+
+  vertices = getWorldVertices(body);
+  let maxX = Math.max(...vertices.map((vertex) => vertex.x));
+  if (maxX > canvas.width) {
+    const contact = averageExtremePoint(vertices, 'x', maxX);
+    contact.x = canvas.width;
+    resolveBoundaryCollision(body, { x: -1, y: 0 }, maxX - canvas.width, contact);
+  }
+
+  vertices = getWorldVertices(body);
+  let minY = Math.min(...vertices.map((vertex) => vertex.y));
+  if (minY < 0) {
+    const contact = averageExtremePoint(vertices, 'y', minY);
+    contact.y = 0;
+    resolveBoundaryCollision(body, { x: 0, y: 1 }, -minY, contact);
+  }
+
+  vertices = getWorldVertices(body);
+  let maxY = Math.max(...vertices.map((vertex) => vertex.y));
+  if (maxY > canvas.height) {
+    const contact = averageExtremePoint(vertices, 'y', maxY);
+    contact.y = canvas.height;
+    resolveBoundaryCollision(body, { x: 0, y: -1 }, maxY - canvas.height, contact);
+  }
+}
+
+function resolveWallCollisions(body) {
+  if (body.shape === 'circle') {
+    resolveCircleWalls(body);
+  } else {
+    resolvePolygonWalls(body);
+  }
+}
+
+function stepPhysics(dt) {
+  const activeGravityX = phoneGravityEnabled ? phoneGravityX : gravityX;
+  const activeGravityY = phoneGravityEnabled ? phoneGravityY : gravityY;
+  const levelDamping = Math.pow(0.96, dt);
+  const linearDamping = Math.pow(LINEAR_DAMPING, dt);
+  const angularDamping = Math.pow(ANGULAR_DAMPING, dt);
+
+  for (const body of shapes) {
+    body.vx += activeGravityX * gravityStrength * dt;
+    body.vy += activeGravityY * gravityStrength * dt;
+
+    if (phoneGravityEnabled && phoneGravityIsLevel) {
+      body.vx *= levelDamping;
+      body.vy *= levelDamping;
+      body.angularVelocity *= levelDamping;
+
+      if (Math.abs(body.vx) < 0.01) body.vx = 0;
+      if (Math.abs(body.vy) < 0.01) body.vy = 0;
+      if (Math.abs(body.angularVelocity) < 0.001) body.angularVelocity = 0;
+    }
+
+    body.vx *= linearDamping;
+    body.vy *= linearDamping;
+    body.angularVelocity *= angularDamping;
+    clampBodyMotion(body);
+
+    body.x += body.vx * dt;
+    body.y += body.vy * dt;
+    body.angle += body.angularVelocity * dt;
+  }
+
+  for (const body of shapes) {
+    resolveWallCollisions(body);
+  }
 
   resolveCollisions();
 
-  const activeGravityX = phoneGravityEnabled ? phoneGravityX : gravityX;
-  const activeGravityY = phoneGravityEnabled ? phoneGravityY : gravityY;
+  for (const body of shapes) {
+    resolveWallCollisions(body);
+  }
+}
 
-  for (let s of shapes) {
-    s.vx += activeGravityX * gravityStrength;
-    s.vy += activeGravityY * gravityStrength;
+function loop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (phoneGravityEnabled && phoneGravityIsLevel) {
-      s.vx *= 0.96;
-      s.vy *= 0.96;
+  for (let i = 0; i < PHYSICS_SUBSTEPS; i++) {
+    stepPhysics(1 / PHYSICS_SUBSTEPS);
+  }
 
-      if (Math.abs(s.vx) < 0.01) s.vx = 0;
-      if (Math.abs(s.vy) < 0.01) s.vy = 0;
-    }
-
-    s.x += s.vx;
-    s.y += s.vy;
-
-    if (s.x - s.size < 0) {
-      s.x = s.size;
-      s.vx *= -0.7;
-    }
-    if (s.x + s.size > canvas.width) {
-      s.x = canvas.width - s.size;
-      s.vx *= -0.7;
-    }
-    if (s.y - s.size < 0) {
-      s.y = s.size;
-      s.vy *= -0.7;
-    }
-    if (s.y + s.size > canvas.height) {
-      s.y = canvas.height - s.size;
-      s.vy *= -0.7;
-    }
-
-    drawShape(s);
+  for (const shape of shapes) {
+    drawShape(shape);
   }
 
   if (isDragging && dragStart && dragEnd) {
@@ -705,11 +1325,7 @@ function loop() {
     ctx.fillStyle = 'lime';
     ctx.fill();
 
-    ctx.beginPath();
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2;
-    ctx.arc(dragStart.x, dragStart.y, size, 0, Math.PI * 2);
-    ctx.stroke();
+    drawShapeOutline(dragStart.x, dragStart.y, shapeSelect.value, size, 'white');
   }
 
   requestAnimationFrame(loop);
