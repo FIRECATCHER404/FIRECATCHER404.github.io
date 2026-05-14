@@ -83,11 +83,13 @@
   <label>Gravity Strength</label>
   <input type="range" id="gstrength" min="0" max="2" step="0.01" value="1">
   <label>Friction / Viscosity</label>
-  <input type="range" id="viscosity" min="0" max="0.18" step="0.005" value="0.035">
+  <input type="range" id="viscosity" min="0" max="0.08" step="0.002" value="0.01">
   <label>Speed (FPS)</label>
   <input type="range" id="fps" min="10" max="120" step="1" value="60">
   <label>Brush Size</label>
   <input type="range" id="brushSize" min="18" max="120" step="2" value="54">
+  <label>Water Limit</label>
+  <input type="range" id="waterLimit" min="1000" max="12000" step="250" value="7000">
   <label>Place</label>
   <select id="toolSelect">
     <option value="water">Water</option>
@@ -112,9 +114,10 @@ canvas.height = window.innerHeight;
 let gravityX = 0;
 let gravityY = 0.2;
 let gravityStrength = 1;
-let viscosity = 0.035;
+let viscosity = 0.01;
 let targetFps = 60;
 let brushSize = 54;
+let waterLimit = 7000;
 
 const gxSlider = document.getElementById('gx');
 const gySlider = document.getElementById('gy');
@@ -122,6 +125,7 @@ const gstrengthSlider = document.getElementById('gstrength');
 const viscositySlider = document.getElementById('viscosity');
 const fpsSlider = document.getElementById('fps');
 const brushSlider = document.getElementById('brushSize');
+const waterLimitSlider = document.getElementById('waterLimit');
 const toolSelect = document.getElementById('toolSelect');
 const clearWaterBtn = document.getElementById('clearWater');
 const clearDrawBtn = document.getElementById('clearDraw');
@@ -132,6 +136,7 @@ gstrengthSlider.addEventListener('input', () => gravityStrength = parseFloat(gst
 viscositySlider.addEventListener('input', () => viscosity = parseFloat(viscositySlider.value));
 fpsSlider.addEventListener('input', () => targetFps = parseFloat(fpsSlider.value));
 brushSlider.addEventListener('input', () => brushSize = parseFloat(brushSlider.value));
+waterLimitSlider.addEventListener('input', () => waterLimit = parseInt(waterLimitSlider.value, 10));
 
 const water = [];
 const walls = [];
@@ -140,10 +145,9 @@ let lastPoint = null;
 let accumulator = 0;
 let lastFrameTime = performance.now();
 
-const particleRadius = 3.2;
-const particleSpacing = particleRadius * 2.15;
-const maxParticles = 1800;
-const collisionRestitution = 0.24;
+const particleRadius = 2.25;
+const particleSpacing = particleRadius * 2.05;
+const collisionRestitution = 0.58;
 const wallRadius = 7;
 const gridSize = particleRadius * 5;
 
@@ -164,11 +168,11 @@ function createWaterParticle(x, y) {
 
 function placeWaterSquare(x, y) {
   const half = brushSize / 2;
-  const jitter = particleSpacing * 0.2;
+  const jitter = particleSpacing * 0.12;
 
   for (let yy = -half; yy <= half; yy += particleSpacing) {
     for (let xx = -half; xx <= half; xx += particleSpacing) {
-      if (water.length >= maxParticles) return;
+      if (water.length >= waterLimit) return;
       water.push(createWaterParticle(
         x + xx + (Math.random() - 0.5) * jitter,
         y + yy + (Math.random() - 0.5) * jitter
@@ -258,7 +262,7 @@ function resolveWaterCollisions() {
               b.vy += ny * impulse;
             }
 
-            const blend = viscosity * 0.7;
+            const blend = viscosity * 0.12;
             const avgX = (a.vx + b.vx) * 0.5;
             const avgY = (a.vy + b.vy) * 0.5;
             a.vx += (avgX - a.vx) * blend;
@@ -301,7 +305,7 @@ function resolveWallCollision(p) {
 }
 
 function stepPhysics() {
-  const damp = 1 - viscosity;
+  const damp = 1 - viscosity * 0.45;
 
   for (const p of water) {
     p.vx += gravityX * gravityStrength;
@@ -336,94 +340,20 @@ function stepPhysics() {
   for (let i = 0; i < 3; i++) {
     resolveWaterCollisions();
   }
+
+  for (const p of water) {
+    resolveWallCollision(p);
+  }
 }
 
 function drawWater() {
-  if (water.length === 0) return;
-
-  const binWidth = 6;
-  const binCount = Math.ceil(canvas.width / binWidth);
-  const top = new Array(binCount).fill(Infinity);
-  const bottom = new Array(binCount).fill(-Infinity);
-  const count = new Array(binCount).fill(0);
-  const renderRadius = particleRadius * 2.2;
-
-  function markBin(index, high, low) {
-    if (index < 0 || index >= binCount) return;
-    top[index] = Math.min(top[index], high);
-    bottom[index] = Math.max(bottom[index], low);
-    count[index]++;
-  }
-
-  // The water is still made of circle particles, but this draws them as joined bodies.
-  for (const p of water) {
-    const start = Math.floor((p.x - renderRadius) / binWidth);
-    const end = Math.ceil((p.x + renderRadius) / binWidth);
-
-    for (let i = start; i <= end; i++) {
-      const x = i * binWidth + binWidth / 2;
-      const dx = x - p.x;
-      if (Math.abs(dx) > renderRadius) continue;
-
-      const edge = Math.sqrt(renderRadius * renderRadius - dx * dx);
-      markBin(i, p.y - edge, p.y + edge);
-    }
-  }
-
-  for (let pass = 0; pass < 2; pass++) {
-    const nextTop = top.slice();
-    const nextBottom = bottom.slice();
-
-    for (let i = 1; i < binCount - 1; i++) {
-      if (!count[i]) continue;
-
-      const neighbors = [i - 1, i, i + 1].filter(index => count[index]);
-      nextTop[i] = neighbors.reduce((sum, index) => sum + top[index], 0) / neighbors.length;
-      nextBottom[i] = neighbors.reduce((sum, index) => sum + bottom[index], 0) / neighbors.length;
-    }
-
-    for (let i = 0; i < binCount; i++) {
-      top[i] = nextTop[i];
-      bottom[i] = nextBottom[i];
-    }
-  }
-
   ctx.save();
-  ctx.fillStyle = 'rgba(0, 145, 235, 0.58)';
-  ctx.strokeStyle = 'rgba(125, 210, 255, 0.72)';
-  ctx.lineWidth = 2;
+  ctx.fillStyle = 'rgba(0, 150, 245, 0.48)';
 
-  let i = 0;
-  while (i < binCount) {
-    while (i < binCount && !count[i]) i++;
-    if (i >= binCount) break;
-
-    const start = i;
-    while (i < binCount && count[i]) i++;
-    const end = i - 1;
-
-    if (end - start < 1) continue;
-
+  for (const p of water) {
     ctx.beginPath();
-    ctx.moveTo(start * binWidth, top[start]);
-
-    for (let j = start + 1; j <= end; j++) {
-      ctx.lineTo(j * binWidth, top[j]);
-    }
-
-    for (let j = end; j >= start; j--) {
-      ctx.lineTo(j * binWidth, bottom[j]);
-    }
-
-    ctx.closePath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
     ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(start * binWidth, top[start]);
-    for (let j = start + 1; j <= end; j++) {
-      ctx.lineTo(j * binWidth, top[j]);
-    }
-    ctx.stroke();
   }
 
   ctx.restore();
