@@ -437,6 +437,44 @@
     padding: 12px;
   }
 
+  .pinned-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+    border-bottom: 1px solid color-mix(in srgb, var(--warning) 32%, var(--line));
+  }
+
+  .pinned-main {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .pinned-label {
+    flex: 0 0 auto;
+    color: var(--warning);
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .pinned-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
   .message-row {
     display: flex;
     gap: 9px;
@@ -458,6 +496,11 @@
     font-size: var(--message-size);
     line-height: 1.42;
     overflow-wrap: anywhere;
+  }
+
+  .message-body.deleted {
+    color: var(--muted);
+    font-style: italic;
   }
 
   .message-row.me .message-bubble {
@@ -488,6 +531,83 @@
     font-weight: 800;
   }
 
+  .message-reply {
+    display: grid;
+    width: 100%;
+    border-left: 3px solid var(--accent);
+    border-top: 0;
+    border-right: 0;
+    border-bottom: 0;
+    background: var(--surface-2);
+    border-radius: 6px;
+    color: var(--muted);
+    padding: 6px 8px;
+    margin-bottom: 7px;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .message-row.me .message-reply {
+    border-left-color: #fff;
+    background: rgba(255, 255, 255, 0.16);
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .message-reply strong,
+  .reply-preview strong {
+    display: block;
+    color: var(--text);
+    font-size: 12px;
+  }
+
+  .message-row.me .message-reply strong {
+    color: #fff;
+  }
+
+  .message-actions,
+  .reaction-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .message-action,
+  .reaction-chip {
+    min-height: 26px;
+    border-radius: 999px;
+    padding: 0 8px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .message-row.me .message-action,
+  .message-row.me .reaction-chip {
+    border-color: rgba(255, 255, 255, 0.42);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+  }
+
+  .reaction-chip.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .message-action.danger-text {
+    color: var(--danger);
+  }
+
+  .message-row.me .reaction-chip.active {
+    border-color: #fff;
+    background: rgba(255, 255, 255, 0.26);
+  }
+
   .mention-token {
     color: var(--accent);
     font-weight: 800;
@@ -503,6 +623,37 @@
     padding: 12px 16px;
     background: var(--surface);
     border-top: 1px solid var(--line);
+  }
+
+  .typing-indicator {
+    min-height: 20px;
+    margin-bottom: 7px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .reply-preview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 9px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+  }
+
+  .reply-preview span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: 13px;
   }
 
   .composer-form {
@@ -611,6 +762,31 @@
   .member-row .small-btn {
     min-height: 30px;
     padding: 0 8px;
+  }
+
+  .member-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .presence-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+  }
+
+  .presence-dot.online {
+    background: var(--success);
+  }
+
+  .mod-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
   }
 
   .status-line {
@@ -776,16 +952,19 @@
     }
 
     .sidebar {
-      max-height: 42vh;
+      max-height: 36vh;
       border-right: 0;
       border-bottom: 1px solid var(--line);
     }
 
     .chat {
-      min-height: 58vh;
+      min-height: 64vh;
     }
 
     .chat-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
       grid-template-columns: 1fr;
       align-items: stretch;
     }
@@ -799,8 +978,53 @@
       width: 100%;
     }
 
+    .toolbar .secondary-btn,
+    .toolbar .danger-btn {
+      flex: 1 1 30%;
+      padding-inline: 8px;
+    }
+
+    .messages {
+      padding: 12px;
+    }
+
     .message-bubble {
-      max-width: 88%;
+      max-width: calc(100vw - 72px);
+    }
+
+    .message-actions,
+    .reaction-row {
+      gap: 5px;
+    }
+
+    .message-action,
+    .reaction-chip {
+      padding: 0 7px;
+    }
+
+    .composer {
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+      padding: 10px 12px;
+    }
+
+    .composer-form {
+      grid-template-columns: 1fr;
+    }
+
+    .composer .primary-btn {
+      min-height: 42px;
+    }
+
+    .modal-backdrop,
+    .auth-screen {
+      align-items: flex-end;
+      padding: 10px;
+    }
+
+    .modal {
+      max-height: calc(100vh - 20px);
     }
   }
 </style>
@@ -860,11 +1084,27 @@
         </div>
       </header>
 
+      <div class="pinned-bar hidden" id="pinnedBar">
+        <button class="pinned-main" id="pinnedJumpBtn" type="button">
+          <span class="pinned-label">Pinned</span>
+          <span class="pinned-text" id="pinnedText"></span>
+        </button>
+        <button class="small-btn hidden" id="unpinBtn" type="button">Unpin</button>
+      </div>
+
       <section class="messages" id="messages">
         <div class="empty-state">No group selected.</div>
       </section>
 
       <footer class="composer">
+        <div class="typing-indicator hidden" id="typingIndicator"></div>
+        <div class="reply-preview hidden" id="replyPreview">
+          <div>
+            <strong>Replying to</strong>
+            <span id="replyPreviewText"></span>
+          </div>
+          <button class="small-btn" id="cancelReplyBtn" type="button">Cancel</button>
+        </div>
         <form class="composer-form" id="messageForm">
           <textarea class="textarea" id="messageInput" placeholder="Message..." maxlength="2000" disabled></textarea>
           <button class="primary-btn" id="sendBtn" type="submit" disabled>Send</button>
@@ -1020,6 +1260,40 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="editMessageModal">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="editMessageTitle">
+      <div class="modal-head">
+        <h2 class="modal-title" id="editMessageTitle">Edit Message</h2>
+        <button class="icon-btn" data-close-modal="editMessageModal" type="button" aria-label="Close">x</button>
+      </div>
+      <div class="modal-body">
+        <label><span>Message</span><textarea class="textarea" id="editMessageInput" maxlength="2000"></textarea></label>
+        <div class="modal-actions">
+          <button class="secondary-btn" data-close-modal="editMessageModal" type="button">Cancel</button>
+          <button class="primary-btn" id="saveEditMessageBtn" type="button">Save</button>
+        </div>
+        <div class="status-line" id="editMessageStatus"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="reportMessageModal">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="reportMessageTitle">
+      <div class="modal-head">
+        <h2 class="modal-title" id="reportMessageTitle">Report Message</h2>
+        <button class="icon-btn" data-close-modal="reportMessageModal" type="button" aria-label="Close">x</button>
+      </div>
+      <div class="modal-body">
+        <label><span>Reason</span><textarea class="textarea" id="reportReasonInput" maxlength="500" placeholder="What should the owner review?"></textarea></label>
+        <div class="modal-actions">
+          <button class="secondary-btn" data-close-modal="reportMessageModal" type="button">Cancel</button>
+          <button class="primary-btn" id="sendReportBtn" type="button">Send Report</button>
+        </div>
+        <div class="status-line" id="reportMessageStatus"></div>
+      </div>
+    </section>
+  </div>
+
   <div class="toast-stack" id="toastStack"></div>
 
 <script type="module">
@@ -1044,6 +1318,8 @@ import {
   remove,
   onValue,
   onChildAdded,
+  onChildChanged,
+  onDisconnect,
   query,
   limitToLast,
   serverTimestamp
@@ -1085,7 +1361,15 @@ const els = {
   chatTitle: document.getElementById("chatTitle"),
   chatSubtitle: document.getElementById("chatSubtitle"),
   currentGroupIcon: document.getElementById("currentGroupIcon"),
+  pinnedBar: document.getElementById("pinnedBar"),
+  pinnedJumpBtn: document.getElementById("pinnedJumpBtn"),
+  pinnedText: document.getElementById("pinnedText"),
+  unpinBtn: document.getElementById("unpinBtn"),
   messages: document.getElementById("messages"),
+  typingIndicator: document.getElementById("typingIndicator"),
+  replyPreview: document.getElementById("replyPreview"),
+  replyPreviewText: document.getElementById("replyPreviewText"),
+  cancelReplyBtn: document.getElementById("cancelReplyBtn"),
   messageForm: document.getElementById("messageForm"),
   messageInput: document.getElementById("messageInput"),
   sendBtn: document.getElementById("sendBtn"),
@@ -1138,6 +1422,14 @@ const els = {
   inviteHandleInput: document.getElementById("inviteHandleInput"),
   sendInviteConfirm: document.getElementById("sendInviteConfirm"),
   inviteUserStatus: document.getElementById("inviteUserStatus"),
+  editMessageModal: document.getElementById("editMessageModal"),
+  editMessageInput: document.getElementById("editMessageInput"),
+  saveEditMessageBtn: document.getElementById("saveEditMessageBtn"),
+  editMessageStatus: document.getElementById("editMessageStatus"),
+  reportMessageModal: document.getElementById("reportMessageModal"),
+  reportReasonInput: document.getElementById("reportReasonInput"),
+  sendReportBtn: document.getElementById("sendReportBtn"),
+  reportMessageStatus: document.getElementById("reportMessageStatus"),
   toastStack: document.getElementById("toastStack")
 };
 
@@ -1153,14 +1445,28 @@ let publicGroupsUnsub = null;
 let membershipsUnsub = null;
 let groupUnsub = null;
 let messagesUnsub = null;
+let messageChangesUnsub = null;
 let notificationsUnsub = null;
 let notificationItemsUnsub = null;
+let typingUnsub = null;
+let presenceUnsub = null;
+let typingTimer = null;
 let pendingInviteCode = readInviteCodeFromUrl();
 let notifications = {};
+let presence = {};
+let typingUsers = {};
+let replyTarget = null;
+let editTarget = null;
+let reportTarget = null;
 let notificationFeedStart = 0;
 const notificationWatchers = new Map();
 const notificationStart = new Map();
 const userProfileCache = new Map();
+const REACTIONS = [
+  ["plus1", "👍"],
+  ["heart", "❤️"],
+  ["laugh", "😂"]
+];
 
 applySettings();
 
@@ -1344,6 +1650,42 @@ function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function currentMember() {
+  return currentGroupData?.members?.[currentUser?.uid] || null;
+}
+
+function isGroupOwner(uid = currentUser?.uid) {
+  return Boolean(uid && currentGroupData?.ownerUid === uid);
+}
+
+function isCurrentUserMuted() {
+  return Boolean(currentUser && currentGroupData?.mutes?.[currentUser.uid]);
+}
+
+function isCurrentUserBanned() {
+  return Boolean(currentUser && currentGroupData?.bans?.[currentUser.uid]);
+}
+
+function canUseGroup() {
+  return Boolean(currentGroupData && currentMember() && !isCurrentUserBanned());
+}
+
+function messageById(id) {
+  return activeMessages.find(msg => msg.id === id) || null;
+}
+
+function sortMessages() {
+  activeMessages.sort((a, b) => Number(a.ts || 0) - Number(b.ts || 0));
+}
+
+function setMessage(msg) {
+  if (!msg?.id) return;
+  const index = activeMessages.findIndex(item => item.id === msg.id);
+  if (index >= 0) activeMessages[index] = msg;
+  else activeMessages.push(msg);
+  sortMessages();
+}
+
 async function register() {
   await authReady;
   const handle = normalizeHandle(els.authHandle.value);
@@ -1407,6 +1749,18 @@ async function login() {
   }
 }
 
+async function logout() {
+  if (currentUser) {
+    cleanupTyping();
+    await update(ref(db, `${PATH}/presence/${currentUser.uid}`), {
+      online: false,
+      lastSeenAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }).catch(() => {});
+  }
+  await signOut(auth);
+}
+
 async function ensureProfile(user) {
   const snap = await get(ref(db, `${PATH}/users/${user.uid}`));
   if (snap.exists()) return snap.val();
@@ -1459,6 +1813,7 @@ onAuthStateChanged(auth, async user => {
     updateProfileChrome();
     els.authScreen.classList.remove("open");
     setStatus("Signed in.");
+    startPresence();
     startGroupListeners();
     await update(ref(db, `${PATH}/users/${user.uid}`), { lastSeenAt: serverTimestamp() });
     if (pendingInviteCode) await applyPendingInvite();
@@ -1470,23 +1825,55 @@ onAuthStateChanged(auth, async user => {
 });
 
 function cleanupRealtime() {
+  cleanupTyping();
   if (publicGroupsUnsub) publicGroupsUnsub();
   if (membershipsUnsub) membershipsUnsub();
   if (groupUnsub) groupUnsub();
   if (messagesUnsub) messagesUnsub();
+  if (messageChangesUnsub) messageChangesUnsub();
   if (notificationsUnsub) notificationsUnsub();
   if (notificationItemsUnsub) notificationItemsUnsub();
+  if (presenceUnsub) presenceUnsub();
   publicGroupsUnsub = null;
   membershipsUnsub = null;
   groupUnsub = null;
   messagesUnsub = null;
+  messageChangesUnsub = null;
   notificationsUnsub = null;
   notificationItemsUnsub = null;
+  presenceUnsub = null;
   notifications = {};
+  presence = {};
+  typingUsers = {};
+  clearReplyTarget();
   renderNotifications();
   notificationWatchers.forEach(unsub => unsub());
   notificationWatchers.clear();
   notificationStart.clear();
+}
+
+function startPresence() {
+  if (!currentUser || !profile) return;
+  const presenceRef = ref(db, `${PATH}/presence/${currentUser.uid}`);
+  const offline = {
+    online: false,
+    uid: currentUser.uid,
+    handle: profile.handle,
+    displayName: profile.displayName,
+    color: profileColor(),
+    lastSeenAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+  onDisconnect(presenceRef).set(offline).catch(() => {});
+  set(presenceRef, {
+    ...offline,
+    online: true,
+    updatedAt: serverTimestamp()
+  }).catch(() => {});
+  presenceUnsub = onValue(ref(db, `${PATH}/presence`), snap => {
+    presence = snap.val() || {};
+    renderMembers();
+  }, error => setStatus(friendlyError(error)));
 }
 
 function startGroupListeners() {
@@ -1782,6 +2169,7 @@ async function openGroup(id, groupSummary) {
 async function joinPublicGroup(groupId, summary) {
   const groupSnap = await get(ref(db, `${PATH}/groups/${groupId}`));
   if (!groupSnap.exists() || groupSnap.val().privacy !== "public") throw new Error("Public group not found.");
+  if (groupSnap.val().bans?.[currentUser.uid]) throw new Error("You are banned from this group.");
   const member = memberPayload("member");
   const updates = {};
   updates[`${PATH}/groups/${groupId}/members/${currentUser.uid}`] = member;
@@ -1797,16 +2185,23 @@ async function joinPublicGroup(groupId, summary) {
 
 function selectGroup(id) {
   saveDraft();
+  cleanupTyping();
+  clearReplyTarget();
   if (groupUnsub) groupUnsub();
   if (messagesUnsub) messagesUnsub();
+  if (messageChangesUnsub) messageChangesUnsub();
   groupUnsub = null;
   messagesUnsub = null;
+  messageChangesUnsub = null;
   currentGroupId = id;
   currentGroupData = null;
   activeMessages = [];
+  typingUsers = {};
   resetCounts(id);
   renderGroups();
   els.messages.innerHTML = '<div class="empty-state">Loading messages...</div>';
+  els.pinnedBar.classList.add("hidden");
+  els.typingIndicator.classList.add("hidden");
   els.messageInput.disabled = true;
   els.sendBtn.disabled = true;
   els.toolbarInviteBtn.classList.add("hidden");
@@ -1829,12 +2224,27 @@ function selectGroup(id) {
       currentGroupData = { members: {} };
     }
     const msg = { id: snap.key, ...snap.val() };
-    activeMessages.push(msg);
+    setMessage(msg);
     if (activeMessages.length === 1) els.messages.innerHTML = "";
     appendMessage(msg);
     applyMessageSearch();
     els.messages.scrollTop = els.messages.scrollHeight;
   }, error => setStatus(friendlyError(error)));
+
+  messageChangesUnsub = onChildChanged(ref(db, `${PATH}/messages/${id}`), snap => {
+    const msg = { id: snap.key, ...snap.val() };
+    setMessage(msg);
+    appendMessage(msg);
+    applyMessageSearch();
+  }, error => setStatus(friendlyError(error)));
+
+  typingUnsub = onValue(ref(db, `${PATH}/typing/${id}`), snap => {
+    typingUsers = snap.val() || {};
+    renderTypingIndicator();
+  }, error => setStatus(friendlyError(error)));
+  if (currentUser) {
+    onDisconnect(ref(db, `${PATH}/typing/${id}/${currentUser.uid}`)).remove().catch(() => {});
+  }
 
   get(ref(db, `${PATH}/messages/${id}`)).then(snap => {
     if (currentGroupId === id && activeMessages.length === 0 && !snap.exists()) {
@@ -1848,6 +2258,7 @@ function resetChat(text = "No group selected.") {
   els.chatSubtitle.textContent = "Private groups only appear to members.";
   els.currentGroupIcon.textContent = "#";
   els.currentGroupIcon.style.background = settings.accent;
+  els.pinnedBar.classList.add("hidden");
   els.messages.innerHTML = `<div class="empty-state">${text}</div>`;
   els.groupDescription.textContent = "Select a group to see details.";
   els.memberList.innerHTML = '<div class="empty-list">No group selected.</div>';
@@ -1856,7 +2267,10 @@ function resetChat(text = "No group selected.") {
   els.rotateInviteBtn.classList.add("hidden");
   els.deleteGroupBtn.classList.add("hidden");
   els.messageInput.disabled = true;
+  els.messageInput.placeholder = "Message...";
   els.sendBtn.disabled = true;
+  els.typingIndicator.classList.add("hidden");
+  clearReplyTarget();
   els.toolbarInviteBtn.classList.add("hidden");
   els.exportBtn.disabled = true;
   els.leaveBtn.disabled = true;
@@ -1873,8 +2287,11 @@ function renderCurrentGroup() {
   els.currentGroupIcon.textContent = groupInitial(group.name);
   els.currentGroupIcon.style.background = group.privacy === "private" ? "#7c3aed" : settings.accent;
   els.groupDescription.textContent = group.description || "No description.";
-  els.messageInput.disabled = false;
-  els.sendBtn.disabled = false;
+  const blocked = isCurrentUserBanned();
+  const muted = isCurrentUserMuted();
+  els.messageInput.disabled = blocked || muted;
+  els.messageInput.placeholder = blocked ? "You are banned from this group." : (muted ? "You are muted in this group." : "Message...");
+  els.sendBtn.disabled = blocked || muted;
   els.exportBtn.disabled = false;
   els.leaveBtn.disabled = false;
   const canInvite = group.privacy === "public" || isOwner;
@@ -1883,11 +2300,32 @@ function renderCurrentGroup() {
   els.copyInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
   els.rotateInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
   els.deleteGroupBtn.classList.toggle("hidden", !isOwner);
+  renderPinnedMessage();
+  renderTypingIndicator();
   restoreDraft();
+  activeMessages.forEach(appendMessage);
+  applyMessageSearch();
   renderMembers();
 }
 
+function renderPinnedMessage() {
+  const pinned = currentGroupData?.pinnedMessage;
+  if (!pinned?.id) {
+    els.pinnedBar.classList.add("hidden");
+    els.pinnedText.textContent = "";
+    return;
+  }
+  const owner = isGroupOwner();
+  els.pinnedText.textContent = `${pinned.senderName || pinned.senderHandle || "Unknown"}: ${preview(pinned.text, 140)}`;
+  els.unpinBtn.classList.toggle("hidden", !owner);
+  els.pinnedBar.classList.remove("hidden");
+}
+
 function renderMembers() {
+  if (!currentGroupData) {
+    els.memberList.innerHTML = '<div class="empty-list">No group selected.</div>';
+    return;
+  }
   const members = currentGroupData?.members || {};
   const isOwner = currentGroupData?.ownerUid === currentUser?.uid;
   els.memberList.innerHTML = "";
@@ -1918,17 +2356,41 @@ function renderMembers() {
     name.textContent = member.displayName || member.handle || "Unknown";
     const meta = document.createElement("div");
     meta.className = "member-meta";
-    meta.textContent = `@${member.handle || "unknown"} - ${member.role || "member"}`;
+    const status = presence[uid] || {};
+    const muted = Boolean(currentGroupData?.mutes?.[uid]);
+    const banned = Boolean(currentGroupData?.bans?.[uid]);
+    const dot = document.createElement("span");
+    dot.className = "presence-dot";
+    dot.classList.toggle("online", Boolean(status.online));
+    const statusText = document.createElement("span");
+    statusText.textContent = `${status.online ? "online" : "offline"}${muted ? " - muted" : ""}${banned ? " - banned" : ""}`;
+    const statusWrap = document.createElement("span");
+    statusWrap.className = "member-status";
+    statusWrap.append(dot, statusText);
+    meta.append(`@${member.handle || "unknown"} - ${member.role || "member"} - `, statusWrap);
     copy.append(name, meta);
     row.append(avatar, copy);
 
     if (isOwner && uid !== currentUser.uid) {
+      const modActions = document.createElement("div");
+      modActions.className = "mod-actions";
+      const muteBtn = document.createElement("button");
+      muteBtn.type = "button";
+      muteBtn.className = "small-btn";
+      muteBtn.textContent = muted ? "Unmute" : "Mute";
+      muteBtn.addEventListener("click", () => toggleMuteMember(uid, member));
+      const banBtn = document.createElement("button");
+      banBtn.type = "button";
+      banBtn.className = "small-btn";
+      banBtn.textContent = "Ban";
+      banBtn.addEventListener("click", () => banMember(uid, member));
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.className = "small-btn";
       removeBtn.textContent = "Remove";
       removeBtn.addEventListener("click", () => removeMember(uid, member));
-      row.appendChild(removeBtn);
+      modActions.append(muteBtn, banBtn, removeBtn);
+      row.appendChild(modActions);
     }
     els.memberList.appendChild(row);
   });
@@ -2049,6 +2511,9 @@ async function joinPrivateGroupByCode(code, statusTarget = els.statusLine) {
   if (!inviteSnap.exists()) throw new Error("Invite code not found.");
 
   const invite = inviteSnap.val();
+  const groupSnap = await get(ref(db, `${PATH}/groups/${invite.groupId}`));
+  if (!groupSnap.exists()) throw new Error("Group not found.");
+  if (groupSnap.val().bans?.[currentUser.uid]) throw new Error("You are banned from this group.");
   const updates = {};
   updates[`${PATH}/groups/${invite.groupId}/members/${currentUser.uid}`] = memberPayload("member", code);
   updates[`${PATH}/memberships/${currentUser.uid}/${invite.groupId}`] = {
@@ -2097,12 +2562,20 @@ function parseMentions(text) {
 async function sendMessage(event) {
   event.preventDefault();
   if (!currentUser || !currentGroupId || !currentGroupData) return;
+  if (!canUseGroup()) {
+    setStatus("You are not a member of this group.");
+    return;
+  }
+  if (isCurrentUserMuted()) {
+    setStatus("You are muted in this group.");
+    return;
+  }
   const text = els.messageInput.value.trim();
   if (!text) return;
   try {
     const msgRef = push(ref(db, `${PATH}/messages/${currentGroupId}`));
     const mentions = parseMentions(text);
-    await set(msgRef, {
+    const payload = {
       senderUid: currentUser.uid,
       senderHandle: profile.handle,
       senderName: profile.displayName,
@@ -2110,7 +2583,16 @@ async function sendMessage(event) {
       text,
       mentions,
       ts: serverTimestamp()
-    });
+    };
+    if (replyTarget) {
+      payload.replyTo = {
+        id: replyTarget.id,
+        senderName: replyTarget.senderName || replyTarget.senderHandle || "Unknown",
+        senderHandle: replyTarget.senderHandle || "",
+        text: preview(replyTarget.text, 180)
+      };
+    }
+    await set(msgRef, payload);
 
     const notificationUpdates = {};
     Object.keys(mentions).forEach(uid => {
@@ -2139,6 +2621,8 @@ async function sendMessage(event) {
       });
     }
     els.messageInput.value = "";
+    clearReplyTarget();
+    clearTyping();
     saveDraft();
   } catch (error) {
     setStatus(friendlyError(error));
@@ -2146,11 +2630,13 @@ async function sendMessage(event) {
 }
 
 function appendMessage(msg) {
-  if (!msg || !msg.text) return;
+  if (!msg) return;
+  const existing = els.messages.querySelector(`[data-message-id="${CSS.escape(msg.id)}"]`);
   const row = document.createElement("article");
   row.className = "message-row";
   row.classList.toggle("me", msg.senderUid === currentUser?.uid);
   row.classList.toggle("mentioned", Boolean(msg.mentions && msg.mentions[currentUser?.uid]));
+  row.dataset.messageId = msg.id || "";
   row.dataset.senderUid = msg.senderUid || "";
   row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${msg.text || ""}`.toLowerCase();
 
@@ -2170,13 +2656,86 @@ function appendMessage(msg) {
   handle.textContent = `@${msg.senderHandle || "unknown"}`;
   const time = document.createElement("span");
   time.textContent = formatTime(msg.ts);
-  meta.append(sender, handle, time);
+  if (msg.editedAt && !msg.deleted) {
+    const edited = document.createElement("span");
+    edited.textContent = "edited";
+    meta.append(sender, handle, time, edited);
+  } else {
+    meta.append(sender, handle, time);
+  }
 
   const body = document.createElement("div");
-  appendHighlightedText(body, msg.text);
-  bubble.append(meta, body);
+  body.className = "message-body";
+  body.classList.toggle("deleted", Boolean(msg.deleted));
+  if (msg.replyTo?.id && !msg.deleted) {
+    const reply = document.createElement("button");
+    reply.type = "button";
+    reply.className = "message-reply";
+    reply.addEventListener("click", () => jumpToMessage(msg.replyTo.id));
+    const replyName = document.createElement("strong");
+    replyName.textContent = msg.replyTo.senderName || msg.replyTo.senderHandle || "Unknown";
+    const replyText = document.createElement("span");
+    replyText.textContent = preview(msg.replyTo.text, 150);
+    reply.append(replyName, replyText);
+    bubble.append(meta, reply);
+  } else {
+    bubble.append(meta);
+  }
+  if (msg.deleted) {
+    body.textContent = "Message deleted";
+  } else {
+    appendHighlightedText(body, msg.text || "");
+  }
+  bubble.appendChild(body);
+  renderReactions(bubble, msg);
+  renderMessageActions(bubble, msg);
   row.append(avatar, bubble);
-  els.messages.appendChild(row);
+  if (existing) existing.replaceWith(row);
+  else els.messages.appendChild(row);
+}
+
+function renderReactions(bubble, msg) {
+  if (msg.deleted) return;
+  const row = document.createElement("div");
+  row.className = "reaction-row";
+  REACTIONS.forEach(([key, label]) => {
+    const users = msg.reactions?.[key] || {};
+    const count = Object.keys(users).length;
+    if (!count && msg.senderUid === currentUser?.uid) return;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "reaction-chip";
+    chip.classList.toggle("active", Boolean(users[currentUser?.uid]));
+    chip.textContent = count ? `${label} ${count}` : label;
+    chip.title = "React";
+    chip.addEventListener("click", () => toggleReaction(msg, key));
+    row.appendChild(chip);
+  });
+  if (row.children.length) bubble.appendChild(row);
+}
+
+function renderMessageActions(bubble, msg) {
+  if (msg.deleted) return;
+  const ownMessage = msg.senderUid === currentUser?.uid;
+  const owner = isGroupOwner();
+  const actions = document.createElement("div");
+  actions.className = "message-actions";
+  const addAction = (label, handler, extraClass = "") => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `message-action ${extraClass}`.trim();
+    btn.textContent = label;
+    btn.addEventListener("click", handler);
+    actions.appendChild(btn);
+  };
+
+  addAction("Reply", () => setReplyTarget(msg));
+  REACTIONS.forEach(([key, label]) => addAction(label, () => toggleReaction(msg, key)));
+  if (ownMessage) addAction("Edit", () => openEditMessage(msg));
+  if (ownMessage || owner) addAction("Delete", () => deleteMessage(msg), "danger-text");
+  if (owner) addAction(currentGroupData?.pinnedMessage?.id === msg.id ? "Pinned" : "Pin", () => pinMessage(msg));
+  if (!ownMessage) addAction("Report", () => openReportMessage(msg));
+  bubble.appendChild(actions);
 }
 
 function appendHighlightedText(container, text) {
@@ -2194,6 +2753,171 @@ function appendHighlightedText(container, text) {
   if (last < text.length) container.appendChild(document.createTextNode(text.slice(last)));
 }
 
+function setReplyTarget(msg) {
+  if (!msg || msg.deleted) return;
+  replyTarget = {
+    id: msg.id,
+    senderName: msg.senderName || msg.senderHandle || "Unknown",
+    senderHandle: msg.senderHandle || "",
+    text: msg.text || ""
+  };
+  els.replyPreviewText.textContent = `${replyTarget.senderName}: ${preview(replyTarget.text, 170)}`;
+  els.replyPreview.classList.remove("hidden");
+  els.messageInput.focus();
+}
+
+function clearReplyTarget() {
+  replyTarget = null;
+  if (els.replyPreview) els.replyPreview.classList.add("hidden");
+  if (els.replyPreviewText) els.replyPreviewText.textContent = "";
+}
+
+function jumpToMessage(id) {
+  if (!id) return;
+  const row = els.messages.querySelector(`[data-message-id="${CSS.escape(id)}"]`);
+  if (!row) return;
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  row.classList.add("mentioned");
+  setTimeout(() => row.classList.remove("mentioned"), 1400);
+}
+
+async function toggleReaction(msg, key) {
+  if (!currentUser || !currentGroupId || msg.deleted || !REACTIONS.some(item => item[0] === key)) return;
+  try {
+    const reactionPath = `${PATH}/messages/${currentGroupId}/${msg.id}/reactions/${key}/${currentUser.uid}`;
+    if (msg.reactions?.[key]?.[currentUser.uid]) await remove(ref(db, reactionPath));
+    else await set(ref(db, reactionPath), true);
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+function openEditMessage(msg) {
+  if (!msg || msg.deleted || msg.senderUid !== currentUser?.uid) return;
+  editTarget = msg;
+  els.editMessageInput.value = msg.text || "";
+  setStatus("", els.editMessageStatus);
+  openModal("editMessageModal");
+  setTimeout(() => els.editMessageInput.focus(), 0);
+}
+
+async function saveEditedMessage() {
+  if (!editTarget || !currentGroupId) return;
+  const text = els.editMessageInput.value.trim();
+  if (!text) {
+    setStatus("Message cannot be empty.", els.editMessageStatus);
+    return;
+  }
+  try {
+    els.saveEditMessageBtn.disabled = true;
+    await update(ref(db, `${PATH}/messages/${currentGroupId}/${editTarget.id}`), {
+      text,
+      mentions: parseMentions(text),
+      editedAt: serverTimestamp(),
+      editedBy: currentUser.uid
+    });
+    editTarget = null;
+    closeModal("editMessageModal");
+  } catch (error) {
+    setStatus(friendlyError(error), els.editMessageStatus);
+  } finally {
+    els.saveEditMessageBtn.disabled = false;
+  }
+}
+
+async function deleteMessage(msg) {
+  if (!msg || msg.deleted || !currentGroupId) return;
+  const owner = isGroupOwner();
+  if (msg.senderUid !== currentUser?.uid && !owner) return;
+  if (!confirm("Delete this message?")) return;
+  try {
+    await update(ref(db, `${PATH}/messages/${currentGroupId}/${msg.id}`), {
+      text: "Message deleted",
+      mentions: null,
+      deleted: true,
+      deletedAt: serverTimestamp(),
+      deletedBy: currentUser.uid,
+      editedAt: serverTimestamp()
+    });
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+async function pinMessage(msg) {
+  if (!msg || msg.deleted || !isGroupOwner()) return;
+  try {
+    await update(ref(db, `${PATH}/groups/${currentGroupId}`), {
+      pinnedMessage: {
+        id: msg.id,
+        text: msg.text || "",
+        senderName: msg.senderName || msg.senderHandle || "Unknown",
+        senderHandle: msg.senderHandle || "",
+        pinnedBy: currentUser.uid,
+        pinnedAt: serverTimestamp()
+      },
+      updatedAt: serverTimestamp()
+    });
+    toast("Message pinned", preview(msg.text, 80));
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+async function unpinMessage() {
+  if (!isGroupOwner() || !currentGroupId) return;
+  try {
+    await update(ref(db, `${PATH}/groups/${currentGroupId}`), {
+      pinnedMessage: null,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+function openReportMessage(msg) {
+  if (!msg || msg.deleted || !currentGroupId) return;
+  reportTarget = msg;
+  els.reportReasonInput.value = "";
+  setStatus("", els.reportMessageStatus);
+  openModal("reportMessageModal");
+  setTimeout(() => els.reportReasonInput.focus(), 0);
+}
+
+async function sendReport() {
+  if (!reportTarget || !currentGroupId || !currentGroupData) return;
+  const reason = els.reportReasonInput.value.trim();
+  if (reason.length < 3) {
+    setStatus("Add a short reason.", els.reportMessageStatus);
+    return;
+  }
+  try {
+    els.sendReportBtn.disabled = true;
+    await set(push(ref(db, `${PATH}/reports`)), {
+      groupId: currentGroupId,
+      groupName: currentGroupData.name || "Unnamed group",
+      messageId: reportTarget.id,
+      messageText: preview(reportTarget.text, 500),
+      senderUid: reportTarget.senderUid || "",
+      senderHandle: reportTarget.senderHandle || "",
+      reporterUid: currentUser.uid,
+      reporterHandle: profile.handle,
+      reason,
+      status: "open",
+      createdAt: serverTimestamp(),
+      createdAtClient: Date.now()
+    });
+    closeModal("reportMessageModal");
+    toast("Report sent", "The group owner can review it.");
+    reportTarget = null;
+  } catch (error) {
+    setStatus(friendlyError(error), els.reportMessageStatus);
+  } finally {
+    els.sendReportBtn.disabled = false;
+  }
+}
+
 function applyMessageSearch() {
   const term = els.messageSearch.value.trim().toLowerCase();
   [...els.messages.querySelectorAll(".message-row")].forEach(row => {
@@ -2206,6 +2930,56 @@ function repaintRenderedAvatars() {
     const avatar = row.querySelector(".avatar");
     if (avatar) paintAvatar(avatar, row.dataset.senderUid);
   });
+}
+
+function renderTypingIndicator() {
+  if (!currentUser || !currentGroupId) {
+    els.typingIndicator.classList.add("hidden");
+    return;
+  }
+  const now = Date.now();
+  const names = Object.entries(typingUsers || {})
+    .filter(([uid, item]) => uid !== currentUser.uid && item && now - Number(item.tsClient || 0) < 7000)
+    .map(([, item]) => item.displayName || item.handle || "Someone")
+    .slice(0, 3);
+  if (!names.length) {
+    els.typingIndicator.classList.add("hidden");
+    els.typingIndicator.textContent = "";
+    return;
+  }
+  const label = names.length === 1 ? `${names[0]} is typing...` : `${names.join(", ")} are typing...`;
+  els.typingIndicator.textContent = label;
+  els.typingIndicator.classList.remove("hidden");
+}
+
+async function markTyping() {
+  if (!currentUser || !profile || !currentGroupId || !canUseGroup() || isCurrentUserMuted()) return;
+  const typingRef = ref(db, `${PATH}/typing/${currentGroupId}/${currentUser.uid}`);
+  await set(typingRef, {
+    uid: currentUser.uid,
+    handle: profile.handle,
+    displayName: profile.displayName,
+    ts: serverTimestamp(),
+    tsClient: Date.now()
+  }).catch(() => {});
+  if (typingTimer) clearTimeout(typingTimer);
+  typingTimer = setTimeout(clearTyping, 3500);
+}
+
+function clearTyping() {
+  if (typingTimer) clearTimeout(typingTimer);
+  typingTimer = null;
+  if (currentUser && currentGroupId) {
+    remove(ref(db, `${PATH}/typing/${currentGroupId}/${currentUser.uid}`)).catch(() => {});
+  }
+}
+
+function cleanupTyping() {
+  clearTyping();
+  if (typingUnsub) typingUnsub();
+  typingUnsub = null;
+  typingUsers = {};
+  if (els.typingIndicator) els.typingIndicator.classList.add("hidden");
 }
 
 function syncMentionWatchers() {
@@ -2331,6 +3105,7 @@ async function sendGroupInvite() {
     const targetUid = usernameSnap.val()?.uid;
     if (!targetUid) throw new Error(`No user named @${handle}.`);
     if (group.members?.[targetUid]) throw new Error(`@${handle} is already in this group.`);
+    if (group.bans?.[targetUid]) throw new Error(`@${handle} is banned from this group.`);
     const userSnap = await get(ref(db, `${PATH}/users/${targetUid}`));
     const targetProfile = userSnap.val() || {};
 
@@ -2405,6 +3180,47 @@ async function removeMember(uid, member) {
     updates[`${PATH}/groups/${currentGroupId}/members/${uid}`] = null;
     updates[`${PATH}/memberships/${uid}/${currentGroupId}`] = null;
     await update(ref(db), updates);
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+async function toggleMuteMember(uid, member) {
+  if (!currentGroupData || currentGroupData.ownerUid !== currentUser.uid || uid === currentUser.uid) return;
+  const muted = Boolean(currentGroupData.mutes?.[uid]);
+  try {
+    const updates = {};
+    updates[`${PATH}/groups/${currentGroupId}/mutes/${uid}`] = muted ? null : {
+      handle: member.handle || "",
+      displayName: member.displayName || member.handle || "",
+      mutedBy: currentUser.uid,
+      mutedAt: serverTimestamp()
+    };
+    updates[`${PATH}/groups/${currentGroupId}/updatedAt`] = serverTimestamp();
+    await update(ref(db), updates);
+    toast(muted ? "Member unmuted" : "Member muted", `@${member.handle || "member"}`);
+  } catch (error) {
+    setStatus(friendlyError(error));
+  }
+}
+
+async function banMember(uid, member) {
+  if (!currentGroupData || currentGroupData.ownerUid !== currentUser.uid || uid === currentUser.uid) return;
+  if (!confirm(`Ban @${member.handle || "member"} from this group? They will be removed and blocked from rejoining.`)) return;
+  try {
+    const updates = {};
+    updates[`${PATH}/groups/${currentGroupId}/bans/${uid}`] = {
+      handle: member.handle || "",
+      displayName: member.displayName || member.handle || "",
+      bannedBy: currentUser.uid,
+      bannedAt: serverTimestamp()
+    };
+    updates[`${PATH}/groups/${currentGroupId}/members/${uid}`] = null;
+    updates[`${PATH}/groups/${currentGroupId}/mutes/${uid}`] = null;
+    updates[`${PATH}/memberships/${uid}/${currentGroupId}`] = null;
+    updates[`${PATH}/groups/${currentGroupId}/updatedAt`] = serverTimestamp();
+    await update(ref(db), updates);
+    toast("Member banned", `@${member.handle || "member"}`);
   } catch (error) {
     setStatus(friendlyError(error));
   }
@@ -2526,6 +3342,13 @@ async function saveSettings() {
       settings,
       updatedAt: serverTimestamp()
     });
+    await update(ref(db, `${PATH}/presence/${currentUser.uid}`), {
+      handle: profile.handle,
+      displayName,
+      color,
+      online: true,
+      updatedAt: serverTimestamp()
+    }).catch(() => {});
     const updates = {};
     Object.keys(memberships || {}).forEach(groupId => {
       const currentMember = currentGroupId === groupId
@@ -2555,7 +3378,7 @@ els.loginBtn.addEventListener("click", login);
 els.authPassword.addEventListener("keydown", event => {
   if (event.key === "Enter") login();
 });
-els.logoutBtn.addEventListener("click", () => signOut(auth));
+els.logoutBtn.addEventListener("click", logout);
 els.newGroupBtn.addEventListener("click", () => openModal("createGroupModal"));
 els.joinGroupBtn.addEventListener("click", () => openModal("joinGroupModal"));
 els.createGroupConfirm.addEventListener("click", createGroup);
@@ -2576,12 +3399,21 @@ els.groupSearch.addEventListener("input", renderGroups);
 els.messageSearch.addEventListener("input", applyMessageSearch);
 els.messageForm.addEventListener("submit", sendMessage);
 els.messageInput.addEventListener("input", saveDraft);
+els.messageInput.addEventListener("input", markTyping);
 els.messageInput.addEventListener("keydown", event => {
   if (event.key === "Enter" && !event.shiftKey && settings.enterToSend) {
     event.preventDefault();
     els.messageForm.requestSubmit();
   }
 });
+els.cancelReplyBtn.addEventListener("click", clearReplyTarget);
+els.pinnedJumpBtn.addEventListener("click", () => jumpToMessage(currentGroupData?.pinnedMessage?.id));
+els.unpinBtn.addEventListener("click", unpinMessage);
+els.saveEditMessageBtn.addEventListener("click", saveEditedMessage);
+els.editMessageInput.addEventListener("keydown", event => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) saveEditedMessage();
+});
+els.sendReportBtn.addEventListener("click", sendReport);
 els.copyInviteBtn.addEventListener("click", copyInvite);
 els.rotateInviteBtn.addEventListener("click", rotateInvite);
 els.leaveBtn.addEventListener("click", leaveGroup);
