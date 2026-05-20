@@ -71,6 +71,15 @@
           ".validate": "!newData.exists() || ($code.matches(/^[A-Z0-9]{10,16}$/) && newData.hasChildren(['groupId','groupName','createdBy','createdAt']) && newData.child('createdBy').val() === auth.uid)"
         }
       },
+      "notifications": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$nid": {
+            ".write": "auth != null && (auth.uid === $uid || (!data.exists() && newData.child('targetUid').val() === $uid && newData.child('fromUid').val() === auth.uid && ((newData.child('type').val() === 'mention' && root.child('secureChat/groups/' + newData.child('groupId').val() + '/members/' + auth.uid).exists() && root.child('secureChat/groups/' + newData.child('groupId').val() + '/members/' + $uid).exists()) || (newData.child('type').val() === 'invite' && ((root.child('secureChat/groups/' + newData.child('groupId').val() + '/privacy').val() === 'public' && root.child('secureChat/groups/' + newData.child('groupId').val() + '/members/' + auth.uid).exists()) || (root.child('secureChat/groups/' + newData.child('groupId').val() + '/privacy').val() === 'private' && root.child('secureChat/groups/' + newData.child('groupId').val() + '/ownerUid').val() === auth.uid))))))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['type','targetUid','groupId','groupName','fromUid','fromHandle','fromName','read','status','createdAt','createdAtClient']) && newData.child('targetUid').val() === $uid && (newData.child('type').val() === 'mention' || newData.child('type').val() === 'invite') && newData.child('groupId').isString() && newData.child('groupName').isString() && newData.child('groupName').val().matches(/^.{1,60}$/) && newData.child('fromUid').isString() && newData.child('fromHandle').isString() && newData.child('fromHandle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('fromName').isString() && newData.child('fromName').val().matches(/^.{1,40}$/) && newData.child('read').isBoolean() && newData.child('status').isString() && newData.child('status').val().matches(/^(new|pending|accepted|declined|dismissed)$/) && newData.child('createdAtClient').isNumber() && (newData.child('type').val() === 'invite' || (newData.child('text').isString() && newData.child('text').val().matches(/^.{1,180}$/))) && (!newData.child('inviteCode').exists() || newData.child('inviteCode').val().matches(/^[A-Z0-9]{10,16}$/)))"
+          }
+        }
+      },
       "groups": {
         "$gid": {
           ".read": "auth != null && (data.child('privacy').val() === 'public' || data.child('members').child(auth.uid).exists())",

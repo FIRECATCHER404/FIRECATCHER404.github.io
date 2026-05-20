@@ -113,6 +113,12 @@
     gap: 10px;
   }
 
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .brand {
     font-size: 20px;
     font-weight: 800;
@@ -143,6 +149,27 @@
     background: var(--surface-2);
     color: var(--text);
     border: 1px solid var(--line);
+  }
+
+  .notification-btn {
+    position: relative;
+  }
+
+  .notification-count {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 900;
+    border: 2px solid var(--surface);
   }
 
   .primary-btn,
@@ -515,6 +542,57 @@
     margin: 12px 0 2px;
   }
 
+  .notification-list {
+    display: grid;
+    gap: 10px;
+    max-height: min(520px, 62vh);
+    overflow: auto;
+  }
+
+  .notification-card {
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    padding: 11px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .notification-card.unread {
+    border-left-color: var(--accent);
+  }
+
+  .notification-title-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .notification-title {
+    font-weight: 800;
+  }
+
+  .notification-time {
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .notification-body {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .notification-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
   .member-list {
     display: grid;
     gap: 8px;
@@ -733,7 +811,13 @@
       <div class="side-head">
         <div class="brand-row">
           <div class="brand">Messager</div>
-          <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings">...</button>
+          <div class="header-actions">
+            <button class="icon-btn notification-btn" id="notificationsBtn" type="button" title="Notifications" aria-label="Notifications">
+              &#128276;
+              <span class="notification-count hidden" id="notificationCount">0</span>
+            </button>
+            <button class="icon-btn" id="settingsBtn" type="button" title="Settings" aria-label="Settings">...</button>
+          </div>
         </div>
         <div class="quick-actions">
           <button class="primary-btn" id="newGroupBtn" type="button">New</button>
@@ -770,6 +854,7 @@
         </div>
         <div class="toolbar">
           <input class="field" id="messageSearch" type="search" placeholder="Search messages" autocomplete="off" />
+          <button class="secondary-btn hidden" id="toolbarInviteBtn" type="button">Invite</button>
           <button class="secondary-btn" id="exportBtn" type="button" disabled>Export</button>
           <button class="danger-btn" id="leaveBtn" type="button" disabled>Leave</button>
         </div>
@@ -795,6 +880,7 @@
         <h2>About</h2>
         <div id="groupDescription" class="muted">Select a group to see details.</div>
         <div class="detail-actions">
+          <button class="secondary-btn hidden" id="inviteUserBtn" type="button">Invite User</button>
           <button class="secondary-btn hidden" id="copyInviteBtn" type="button">Copy Invite</button>
           <button class="secondary-btn hidden" id="rotateInviteBtn" type="button">New Invite Code</button>
           <button class="danger-btn hidden" id="deleteGroupBtn" type="button">Delete Group</button>
@@ -899,6 +985,41 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="inviteUserModal">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="inviteUserTitle">
+      <div class="modal-head">
+        <h2 class="modal-title" id="inviteUserTitle">Invite User</h2>
+        <button class="icon-btn" data-close-modal="inviteUserModal" type="button" aria-label="Close">x</button>
+      </div>
+      <div class="modal-body">
+        <label><span>Username</span><input class="field" id="inviteHandleInput" maxlength="24" autocomplete="off" placeholder="firecatcher404" /></label>
+        <div class="modal-actions">
+          <button class="secondary-btn" data-close-modal="inviteUserModal" type="button">Cancel</button>
+          <button class="primary-btn" id="sendInviteConfirm" type="button">Send Invite</button>
+        </div>
+        <div class="status-line" id="inviteUserStatus"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="notificationsModal">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
+      <div class="modal-head">
+        <h2 class="modal-title" id="notificationsTitle">Notifications</h2>
+        <button class="icon-btn" data-close-modal="notificationsModal" type="button" aria-label="Close">x</button>
+      </div>
+      <div class="modal-body">
+        <div class="notification-list" id="notificationsList">
+          <div class="empty-list">Sign in to see notifications.</div>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-btn" id="markAllNotificationsBtn" type="button">Mark All Read</button>
+        </div>
+        <div class="status-line" id="notificationsStatus"></div>
+      </div>
+    </section>
+  </div>
+
   <div class="toast-stack" id="toastStack"></div>
 
 <script type="module">
@@ -969,6 +1090,7 @@ const els = {
   messageInput: document.getElementById("messageInput"),
   sendBtn: document.getElementById("sendBtn"),
   messageSearch: document.getElementById("messageSearch"),
+  toolbarInviteBtn: document.getElementById("toolbarInviteBtn"),
   exportBtn: document.getElementById("exportBtn"),
   leaveBtn: document.getElementById("leaveBtn"),
   myAvatar: document.getElementById("myAvatar"),
@@ -976,6 +1098,7 @@ const els = {
   myHandle: document.getElementById("myHandle"),
   groupDescription: document.getElementById("groupDescription"),
   memberList: document.getElementById("memberList"),
+  inviteUserBtn: document.getElementById("inviteUserBtn"),
   copyInviteBtn: document.getElementById("copyInviteBtn"),
   rotateInviteBtn: document.getElementById("rotateInviteBtn"),
   deleteGroupBtn: document.getElementById("deleteGroupBtn"),
@@ -990,6 +1113,12 @@ const els = {
   joinInviteConfirm: document.getElementById("joinInviteConfirm"),
   joinGroupStatus: document.getElementById("joinGroupStatus"),
   settingsBtn: document.getElementById("settingsBtn"),
+  notificationsBtn: document.getElementById("notificationsBtn"),
+  notificationCount: document.getElementById("notificationCount"),
+  notificationsModal: document.getElementById("notificationsModal"),
+  notificationsList: document.getElementById("notificationsList"),
+  notificationsStatus: document.getElementById("notificationsStatus"),
+  markAllNotificationsBtn: document.getElementById("markAllNotificationsBtn"),
   settingsModal: document.getElementById("settingsModal"),
   settingsDisplayName: document.getElementById("settingsDisplayName"),
   settingsStatus: document.getElementById("settingsStatus"),
@@ -1005,6 +1134,10 @@ const els = {
   notificationPermissionBtn: document.getElementById("notificationPermissionBtn"),
   saveSettingsBtn: document.getElementById("saveSettingsBtn"),
   settingsStatusLine: document.getElementById("settingsStatusLine"),
+  inviteUserModal: document.getElementById("inviteUserModal"),
+  inviteHandleInput: document.getElementById("inviteHandleInput"),
+  sendInviteConfirm: document.getElementById("sendInviteConfirm"),
+  inviteUserStatus: document.getElementById("inviteUserStatus"),
   toastStack: document.getElementById("toastStack")
 };
 
@@ -1020,7 +1153,11 @@ let publicGroupsUnsub = null;
 let membershipsUnsub = null;
 let groupUnsub = null;
 let messagesUnsub = null;
+let notificationsUnsub = null;
+let notificationItemsUnsub = null;
 let pendingInviteCode = readInviteCodeFromUrl();
+let notifications = {};
+let notificationFeedStart = 0;
 const notificationWatchers = new Map();
 const notificationStart = new Map();
 const userProfileCache = new Map();
@@ -1300,9 +1437,11 @@ onAuthStateChanged(auth, async user => {
     profile = null;
     memberships = {};
     publicGroups = {};
+    notifications = {};
     els.authScreen.classList.add("open");
     setStatus("");
     updateProfileChrome();
+    renderNotifications();
     renderGroups();
     resetChat();
     if (pendingInviteCode) {
@@ -1335,10 +1474,16 @@ function cleanupRealtime() {
   if (membershipsUnsub) membershipsUnsub();
   if (groupUnsub) groupUnsub();
   if (messagesUnsub) messagesUnsub();
+  if (notificationsUnsub) notificationsUnsub();
+  if (notificationItemsUnsub) notificationItemsUnsub();
   publicGroupsUnsub = null;
   membershipsUnsub = null;
   groupUnsub = null;
   messagesUnsub = null;
+  notificationsUnsub = null;
+  notificationItemsUnsub = null;
+  notifications = {};
+  renderNotifications();
   notificationWatchers.forEach(unsub => unsub());
   notificationWatchers.clear();
   notificationStart.clear();
@@ -1354,6 +1499,25 @@ function startGroupListeners() {
     renderGroups();
     syncMentionWatchers();
   });
+  startNotificationListeners();
+}
+
+function startNotificationListeners() {
+  if (!currentUser) return;
+  notificationFeedStart = Date.now();
+  notificationsUnsub = onValue(ref(db, `${PATH}/notifications/${currentUser.uid}`), snap => {
+    notifications = snap.val() || {};
+    renderNotifications();
+  }, error => setStatus(friendlyError(error)));
+
+  const q = query(ref(db, `${PATH}/notifications/${currentUser.uid}`), limitToLast(50));
+  notificationItemsUnsub = onChildAdded(q, snap => {
+    const note = { id: snap.key, ...snap.val() };
+    if (!note || note.fromUid === currentUser.uid) return;
+    const createdAt = Number(note.createdAtClient || Date.now());
+    if (createdAt < notificationFeedStart - 3000) return;
+    notifyAppNotification(note);
+  }, error => setStatus(friendlyError(error)));
 }
 
 function renderGroups() {
@@ -1429,6 +1593,180 @@ function makeBadge(value, extraClass) {
   return badge;
 }
 
+function notificationAlertCount() {
+  return Object.values(notifications || {}).filter(note => {
+    if (!note) return false;
+    return !note.read;
+  }).length;
+}
+
+function updateNotificationBadge() {
+  const count = notificationAlertCount();
+  els.notificationCount.textContent = count > 99 ? "99+" : String(count);
+  els.notificationCount.classList.toggle("hidden", count === 0);
+}
+
+function renderNotifications() {
+  updateNotificationBadge();
+  els.notificationsList.innerHTML = "";
+  els.markAllNotificationsBtn.disabled = true;
+  if (!currentUser) {
+    els.notificationsList.innerHTML = '<div class="empty-list">Sign in to see notifications.</div>';
+    return;
+  }
+
+  const items = Object.entries(notifications || {})
+    .map(([id, note]) => ({ id, ...note }))
+    .sort((a, b) => Number(b.createdAtClient || 0) - Number(a.createdAtClient || 0));
+
+  if (!items.length) {
+    els.notificationsList.innerHTML = '<div class="empty-list">No notifications yet.</div>';
+    return;
+  }
+  els.markAllNotificationsBtn.disabled = !items.some(note => !note.read);
+
+  items.forEach(note => {
+    const card = document.createElement("article");
+    card.className = "notification-card";
+    card.classList.toggle("unread", !note.read);
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "notification-title-row";
+    const title = document.createElement("div");
+    title.className = "notification-title";
+    title.textContent = note.type === "invite" ? "Group invite" : "Mention";
+    const time = document.createElement("div");
+    time.className = "notification-time";
+    time.textContent = formatNotificationTime(note);
+    titleRow.append(title, time);
+
+    const body = document.createElement("div");
+    body.className = "notification-body";
+    const from = note.fromHandle ? `@${note.fromHandle}` : (note.fromName || "Someone");
+    if (note.type === "invite") {
+      const state = note.status && note.status !== "pending" ? ` (${note.status})` : "";
+      body.textContent = `${from} invited you to ${note.groupName || "a group"}${state}.`;
+    } else {
+      body.textContent = `${from} mentioned you in ${note.groupName || "a group"}: ${preview(note.text, 120)}`;
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "notification-actions";
+    if (note.type === "invite" && note.status === "pending") {
+      const joinBtn = document.createElement("button");
+      joinBtn.className = "primary-btn";
+      joinBtn.type = "button";
+      joinBtn.textContent = "Join";
+      joinBtn.addEventListener("click", () => acceptInviteNotification(note));
+      const declineBtn = document.createElement("button");
+      declineBtn.className = "secondary-btn";
+      declineBtn.type = "button";
+      declineBtn.textContent = "Decline";
+      declineBtn.addEventListener("click", () => dismissNotification(note, "declined"));
+      actions.append(joinBtn, declineBtn);
+    } else {
+      const openBtn = document.createElement("button");
+      openBtn.className = "primary-btn";
+      openBtn.type = "button";
+      openBtn.textContent = note.groupId ? "Open" : "Read";
+      openBtn.addEventListener("click", () => openNotification(note));
+      actions.append(openBtn);
+    }
+
+    if (!note.read) {
+      const readBtn = document.createElement("button");
+      readBtn.className = "secondary-btn";
+      readBtn.type = "button";
+      readBtn.textContent = "Mark Read";
+      readBtn.addEventListener("click", () => markNotificationRead(note.id));
+      actions.append(readBtn);
+    }
+
+    card.append(titleRow, body, actions);
+    els.notificationsList.appendChild(card);
+  });
+}
+
+function formatNotificationTime(note) {
+  const stamp = Number(note.createdAtClient || note.createdAt || 0);
+  if (!stamp) return "";
+  return new Date(stamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+async function updateNotification(id, changes) {
+  if (!currentUser || !id) return;
+  await update(ref(db, `${PATH}/notifications/${currentUser.uid}/${id}`), {
+    ...changes,
+    updatedAt: serverTimestamp()
+  });
+}
+
+async function markNotificationRead(id) {
+  try {
+    await updateNotification(id, { read: true });
+  } catch (error) {
+    setStatus(friendlyError(error), els.notificationsStatus);
+  }
+}
+
+async function markAllNotificationsRead() {
+  if (!currentUser) return;
+  const updates = {};
+  Object.entries(notifications || {}).forEach(([id, note]) => {
+    if (!note?.read) {
+      updates[`${PATH}/notifications/${currentUser.uid}/${id}/read`] = true;
+      updates[`${PATH}/notifications/${currentUser.uid}/${id}/updatedAt`] = serverTimestamp();
+    }
+  });
+  if (!Object.keys(updates).length) return;
+  try {
+    await update(ref(db), updates);
+  } catch (error) {
+    setStatus(friendlyError(error), els.notificationsStatus);
+  }
+}
+
+async function openNotification(note) {
+  try {
+    await updateNotification(note.id, { read: true });
+    closeModal("notificationsModal");
+    if (note.groupId && (memberships[note.groupId] || publicGroups[note.groupId])) {
+      selectGroup(note.groupId);
+    }
+  } catch (error) {
+    setStatus(friendlyError(error), els.notificationsStatus);
+  }
+}
+
+async function dismissNotification(note, status = "dismissed") {
+  try {
+    await updateNotification(note.id, { read: true, status });
+  } catch (error) {
+    setStatus(friendlyError(error), els.notificationsStatus);
+  }
+}
+
+async function acceptInviteNotification(note) {
+  try {
+    setStatus("", els.notificationsStatus);
+    if (memberships[note.groupId]) {
+      selectGroup(note.groupId);
+    } else if (note.inviteCode) {
+      await joinPrivateGroupByCode(note.inviteCode, els.notificationsStatus);
+    } else {
+      const groupSnap = await get(ref(db, `${PATH}/groups/${note.groupId}`));
+      if (!groupSnap.exists() || groupSnap.val().privacy !== "public") throw new Error("Group invite is no longer valid.");
+      await joinPublicGroup(note.groupId, groupSnap.val());
+      selectGroup(note.groupId);
+    }
+    await updateNotification(note.id, { read: true, status: "accepted" });
+    closeModal("notificationsModal");
+    toast("Joined group", note.groupName || "Group");
+  } catch (error) {
+    setStatus(friendlyError(error), els.notificationsStatus);
+  }
+}
+
 async function openGroup(id, groupSummary) {
   if (!currentUser) return;
   try {
@@ -1471,6 +1809,7 @@ function selectGroup(id) {
   els.messages.innerHTML = '<div class="empty-state">Loading messages...</div>';
   els.messageInput.disabled = true;
   els.sendBtn.disabled = true;
+  els.toolbarInviteBtn.classList.add("hidden");
   els.exportBtn.disabled = true;
   els.leaveBtn.disabled = true;
 
@@ -1512,11 +1851,13 @@ function resetChat(text = "No group selected.") {
   els.messages.innerHTML = `<div class="empty-state">${text}</div>`;
   els.groupDescription.textContent = "Select a group to see details.";
   els.memberList.innerHTML = '<div class="empty-list">No group selected.</div>';
+  els.inviteUserBtn.classList.add("hidden");
   els.copyInviteBtn.classList.add("hidden");
   els.rotateInviteBtn.classList.add("hidden");
   els.deleteGroupBtn.classList.add("hidden");
   els.messageInput.disabled = true;
   els.sendBtn.disabled = true;
+  els.toolbarInviteBtn.classList.add("hidden");
   els.exportBtn.disabled = true;
   els.leaveBtn.disabled = true;
 }
@@ -1536,6 +1877,9 @@ function renderCurrentGroup() {
   els.sendBtn.disabled = false;
   els.exportBtn.disabled = false;
   els.leaveBtn.disabled = false;
+  const canInvite = group.privacy === "public" || isOwner;
+  els.toolbarInviteBtn.classList.toggle("hidden", !canInvite);
+  els.inviteUserBtn.classList.toggle("hidden", !canInvite);
   els.copyInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
   els.rotateInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
   els.deleteGroupBtn.classList.toggle("hidden", !isOwner);
@@ -1757,15 +2101,43 @@ async function sendMessage(event) {
   if (!text) return;
   try {
     const msgRef = push(ref(db, `${PATH}/messages/${currentGroupId}`));
+    const mentions = parseMentions(text);
     await set(msgRef, {
       senderUid: currentUser.uid,
       senderHandle: profile.handle,
       senderName: profile.displayName,
       senderColor: profileColor(),
       text,
-      mentions: parseMentions(text),
+      mentions,
       ts: serverTimestamp()
     });
+
+    const notificationUpdates = {};
+    Object.keys(mentions).forEach(uid => {
+      if (uid === currentUser.uid) return;
+      const notificationRef = push(ref(db, `${PATH}/notifications/${uid}`));
+      notificationUpdates[`${PATH}/notifications/${uid}/${notificationRef.key}`] = {
+        type: "mention",
+        targetUid: uid,
+        groupId: currentGroupId,
+        groupName: currentGroupData.name || "Unnamed group",
+        messageId: msgRef.key,
+        fromUid: currentUser.uid,
+        fromHandle: profile.handle,
+        fromName: profile.displayName,
+        text: preview(text, 180),
+        read: false,
+        status: "new",
+        createdAt: serverTimestamp(),
+        createdAtClient: Date.now()
+      };
+    });
+    if (Object.keys(notificationUpdates).length) {
+      update(ref(db), notificationUpdates).catch(error => {
+        console.warn("Mention notification write failed:", error);
+        setStatus("Message sent, but mention notifications need updated database rules.");
+      });
+    }
     els.messageInput.value = "";
     saveDraft();
   } catch (error) {
@@ -1858,7 +2230,6 @@ function syncMentionWatchers() {
       if (id !== currentGroupId) incrementCount("unread", id);
       if (msg.mentions && msg.mentions[currentUser.uid]) {
         if (id !== currentGroupId || document.hidden) incrementCount("mentions", id);
-        notifyMention(id, msg);
       }
       renderGroups();
     });
@@ -1866,10 +2237,14 @@ function syncMentionWatchers() {
   });
 }
 
-function notifyMention(groupId, msg) {
-  const group = memberships[groupId] || publicGroups[groupId] || {};
-  const title = `${msg.senderName || msg.senderHandle || "Someone"} mentioned you`;
-  const body = `${group.name || "A group"}: ${preview(msg.text, 100)}`;
+function notifyAppNotification(note) {
+  if (note.type === "invite") {
+    toast("Group invite", `${note.fromHandle ? "@" + note.fromHandle : note.fromName || "Someone"} invited you to ${note.groupName || "a group"}.`);
+    return;
+  }
+
+  const title = `${note.fromName || note.fromHandle || "Someone"} mentioned you`;
+  const body = `${note.groupName || "A group"}: ${preview(note.text, 100)}`;
   toast(title, body);
   if (settings.soundMentions) playMentionSound();
   if (
@@ -1878,11 +2253,12 @@ function notifyMention(groupId, msg) {
     Notification.permission === "granted" &&
     document.hidden
   ) {
-    const note = new Notification(title, { body, tag: `mention-${groupId}` });
-    note.onclick = () => {
+    const desktopNote = new Notification(title, { body, tag: `mention-${note.groupId}` });
+    desktopNote.onclick = () => {
       window.focus();
-      selectGroup(groupId);
-      note.close();
+      if (note.groupId) selectGroup(note.groupId);
+      if (note.id) updateNotification(note.id, { read: true }).catch(() => {});
+      desktopNote.close();
     };
   }
 }
@@ -1915,6 +2291,73 @@ function playMentionSound() {
     osc.stop(ctx.currentTime + 0.18);
   } catch {
     // Sound is best-effort because browsers can block audio before user interaction.
+  }
+}
+
+function openInviteUserModal() {
+  if (!currentGroupData || !currentUser) return;
+  els.inviteHandleInput.value = "";
+  setStatus("", els.inviteUserStatus);
+  openModal("inviteUserModal");
+  setTimeout(() => els.inviteHandleInput.focus(), 0);
+}
+
+async function sendGroupInvite() {
+  if (!currentUser || !profile || !currentGroupId || !currentGroupData) return;
+  const group = currentGroupData;
+  const handle = normalizeHandle(els.inviteHandleInput.value);
+  setStatus("", els.inviteUserStatus);
+  if (!isValidHandle(handle)) {
+    setStatus("Enter a valid username.", els.inviteUserStatus);
+    return;
+  }
+  if (handle === profile.handle) {
+    setStatus("You cannot invite yourself.", els.inviteUserStatus);
+    return;
+  }
+  if (group.privacy === "private" && group.ownerUid !== currentUser.uid) {
+    setStatus("Only the owner can invite people to a private group.", els.inviteUserStatus);
+    return;
+  }
+  if (group.privacy === "private" && !group.inviteCode) {
+    setStatus("This private group needs a fresh invite code first.", els.inviteUserStatus);
+    return;
+  }
+
+  try {
+    els.sendInviteConfirm.disabled = true;
+    const usernameSnap = await get(ref(db, `${PATH}/usernames/${handle}`));
+    if (!usernameSnap.exists()) throw new Error(`No user named @${handle}.`);
+    const targetUid = usernameSnap.val()?.uid;
+    if (!targetUid) throw new Error(`No user named @${handle}.`);
+    if (group.members?.[targetUid]) throw new Error(`@${handle} is already in this group.`);
+    const userSnap = await get(ref(db, `${PATH}/users/${targetUid}`));
+    const targetProfile = userSnap.val() || {};
+
+    const inviteRef = push(ref(db, `${PATH}/notifications/${targetUid}`));
+    const invite = {
+      type: "invite",
+      targetUid,
+      targetHandle: targetProfile.handle || handle,
+      groupId: currentGroupId,
+      groupName: group.name || "Unnamed group",
+      groupPrivacy: group.privacy || "private",
+      fromUid: currentUser.uid,
+      fromHandle: profile.handle,
+      fromName: profile.displayName,
+      read: false,
+      status: "pending",
+      createdAt: serverTimestamp(),
+      createdAtClient: Date.now()
+    };
+    if (group.privacy === "private") invite.inviteCode = group.inviteCode;
+    await set(inviteRef, invite);
+    closeModal("inviteUserModal");
+    toast("Invite sent", `@${handle}`);
+  } catch (error) {
+    setStatus(friendlyError(error), els.inviteUserStatus);
+  } finally {
+    els.sendInviteConfirm.disabled = false;
   }
 }
 
@@ -2117,6 +2560,18 @@ els.newGroupBtn.addEventListener("click", () => openModal("createGroupModal"));
 els.joinGroupBtn.addEventListener("click", () => openModal("joinGroupModal"));
 els.createGroupConfirm.addEventListener("click", createGroup);
 els.joinInviteConfirm.addEventListener("click", joinPrivateGroup);
+els.inviteUserBtn.addEventListener("click", openInviteUserModal);
+els.toolbarInviteBtn.addEventListener("click", openInviteUserModal);
+els.sendInviteConfirm.addEventListener("click", sendGroupInvite);
+els.inviteHandleInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") sendGroupInvite();
+});
+els.notificationsBtn.addEventListener("click", () => {
+  setStatus("", els.notificationsStatus);
+  renderNotifications();
+  openModal("notificationsModal");
+});
+els.markAllNotificationsBtn.addEventListener("click", markAllNotificationsRead);
 els.groupSearch.addEventListener("input", renderGroups);
 els.messageSearch.addEventListener("input", applyMessageSearch);
 els.messageForm.addEventListener("submit", sendMessage);
