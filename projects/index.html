@@ -54,14 +54,49 @@
       max-width: 1200px;
       margin: 0 auto;
       padding: 18px 22px 40px;
+    }
+
+    .category {
+      margin: 0 0 34px;
+    }
+
+    .category-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 0 0 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .category h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      letter-spacing: 0.2px;
+    }
+
+    .category p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .category-count {
+      color: var(--muted);
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
+    .category-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: 1fr;
       gap: 18px;
     }
 
     .card {
       background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)), var(--card);
-      border-radius: 16px;
+      border-radius: 8px;
       padding: 18px 18px 20px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.35);
       border: 1px solid rgba(255,255,255,0.06);
@@ -95,26 +130,9 @@
     }
 
     .card p {
-      margin: 0 0 14px;
+      margin: 0;
       color: var(--muted);
       font-size: 0.95rem;
-    }
-
-    .card button {
-      appearance: none;
-      border: 1px solid rgba(77,255,136,0.55);
-      background: rgba(77,255,136,0.14);
-      color: var(--text);
-      border-radius: 999px;
-      padding: 8px 14px;
-      cursor: pointer;
-      transition: background .12s ease, transform .12s ease, box-shadow .12s ease;
-    }
-
-    .card button:hover {
-      background: rgba(77,255,136,0.26);
-      box-shadow: 0 0 0 6px rgba(77,255,136,0.14);
-      transform: translateY(-1px);
     }
 
     footer {
@@ -125,16 +143,27 @@
       font-size: 0.85rem;
     }
 
-    .tag {
-      display: inline-block;
-      margin-left: 8px;
-      font-size: 0.7rem;
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: rgba(77,255,136,0.2);
-      border: 1px solid rgba(77,255,136,0.45);
-      color: var(--text);
-      vertical-align: middle;
+    @media (max-width: 640px) {
+      .category-head {
+        display: block;
+      }
+
+      .category-count {
+        display: block;
+        margin-top: 6px;
+      }
+    }
+
+    @media (min-width: 760px) {
+      .category-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (min-width: 1040px) {
+      .category-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }
 
     #bg-field {
@@ -168,75 +197,152 @@
   </header>
 
   <main>
-    <div class="card" data-link="../index.html">
-      <h2>Main Menu</h2>
-      <p>Back to the home page</p>
-    </div>
+    <section class="category">
+      <div class="category-head">
+        <div>
+          <h2>Site</h2>
+          <p>Navigation and main pages.</p>
+        </div>
+        <span class="category-count">1 project</span>
+      </div>
+      <div class="category-grid">
+        <div class="card" data-link="../index.html">
+          <h2>Main Menu</h2>
+          <p>Back to the home page.</p>
+        </div>
+      </div>
+    </section>
 
-    <div class="card" data-link="gameCR/">
-      <h2>gameCR <span class="tag">new</span></h2>
-      <p>Make a 2D platform game, draw pixel art, wire logic, test it, and export it.</p>
-    </div>
+    <section class="category">
+      <div class="category-head">
+        <div>
+          <h2>Game Making</h2>
+          <p>Tools for building and exporting games.</p>
+        </div>
+        <span class="category-count">1 project</span>
+      </div>
+      <div class="category-grid">
+        <div class="card" data-link="gameCR/">
+          <h2>gameCR</h2>
+          <p>Make a 2D platform game, draw pixel art, wire logic, test it, and export it.</p>
+        </div>
+      </div>
+    </section>
 
-    <div class="card" data-link="gamecr-gallery.html">
-      <h2>gameCR Gallery <span class="tag">sharing</span></h2>
-      <p>Publish gameCR level cards, import share codes, and trade playable level files.</p>
-    </div>
+    <section class="category">
+      <div class="category-head">
+        <div>
+          <h2>Social</h2>
+          <p>Sharing, chat, and community-style tools.</p>
+        </div>
+        <span class="category-count">2 projects</span>
+      </div>
+      <div class="category-grid">
+        <div class="card" data-link="gamecr-gallery.html">
+          <h2>gameCR Gallery</h2>
+          <p>Publish gameCR level cards, import share codes, and trade playable level files.</p>
+        </div>
 
-    <div class="card" data-link="shader-lab.html">
-      <h2>Shader Lab <span class="tag">visualizer</span></h2>
-      <p>Edit live WebGL shaders with presets, mouse input, and animated uniforms.</p>
-    </div>
+        <div class="card" data-link="../message.html">
+          <h2>Chat</h2>
+          <p>Real-time chat room where you can make groups, join them, and customize what it looks like.</p>
+        </div>
+      </div>
+    </section>
 
-    <div class="card" data-link="baselen.html">
-      <h2>Baselen Encryptor <span class="tag">crypto</span></h2>
-      <p>Encrypt and decrypt text, integers, and bytes with password-based Baselen output formats.</p>
-    </div>
+    <section class="category">
+      <div class="category-head">
+        <div>
+          <h2>Encryption</h2>
+          <p>Password tools and file encoders.</p>
+        </div>
+        <span class="category-count">2 projects</span>
+      </div>
+      <div class="category-grid">
+        <div class="card" data-link="baselen.html">
+          <h2>Baselen Encryptor</h2>
+          <p>Encrypt and decrypt text, integers, and bytes with password-based Baselen output formats.</p>
+        </div>
 
-    <div class="card" data-link="sandbox.html">
-      <h2>Particle Playground <span class="tag">First thing i made</span></h2>
-      <p>Mess with way too many little colored pixels that do way too many things</p>
-    </div>
+        <div class="card" data-link="dt.html">
+          <h2>DT_E File Encryptor</h2>
+          <p>A client-side file encryptor that uses XOR and reverse to encode or decode files with a .dt_e extension.</p>
+        </div>
+      </div>
+    </section>
 
-    <div class="card" data-link="music/">
-      <h2>Music Maker <span class="tag">audio</span></h2>
-      <p>Create different tunes using the different instrument pages</p>
-    </div>
+    <section class="category">
+      <div class="category-head">
+        <div>
+          <h2>Sandboxes</h2>
+          <p>Physics, particles, and small interactive experiments.</p>
+        </div>
+        <span class="category-count">4 projects</span>
+      </div>
+      <div class="category-grid">
+        <div class="card" data-link="gravity.html?v=phone-gravity-5">
+          <h2>Gravity Lab</h2>
+          <p>Throw around circles, cubes, and triangles with physics.</p>
+        </div>
 
-    <div class="card" data-link="../message.html">
-      <h2>Chat<span class="tag">:P</span></h2>
-      <p>Real-time chat room where you can make groups, join them, and customize what it looks like</p>
-    </div>
+        <div class="card" data-link="sandbox.html">
+          <h2>Particle Playground</h2>
+          <p>Mess with way too many little colored pixels that do way too many things.</p>
+        </div>
 
-    <div class="card" data-link="anim.html">
-      <h2>Bouncing Ball Thing</h2>
-      <p>Just a ball bouncing around in a shape. nothing to see here.</p>
-    </div>
+        <div class="card" data-link="anim.html">
+          <h2>Bouncing Ball Thing</h2>
+          <p>Just a ball bouncing around in a shape. Nothing to see here.</p>
+        </div>
 
-    <div class="card" data-link="voidspace.html">
-      <h2>Voidspace <span class="tag">satisfying</span></h2>
-      <p>Make yourself a desktop background</p>
-    </div>
+        <div class="card" data-link="../button.html">
+          <h2>Clickable Button</h2>
+          <p>It does something. Probably.</p>
+        </div>
+      </div>
+    </section>
 
-    <div class="card" data-link="../button.html">
-      <h2>Clickable Button</h2>
-      <p>It does something. Probably.</p>
-    </div>
+    <section class="category">
+      <div class="category-head">
+        <div>
+          <h2>Creative Tools</h2>
+          <p>Music, visuals, shaders, and desktop background makers.</p>
+        </div>
+        <span class="category-count">3 projects</span>
+      </div>
+      <div class="category-grid">
+        <div class="card" data-link="shader-lab.html">
+          <h2>Shader Lab</h2>
+          <p>Edit live WebGL shaders with presets, mouse input, and animated uniforms.</p>
+        </div>
 
-    <div class="card" data-link="ticktacktoe.html">
-      <h2>Tick Tack Toe</h2>
-      <p>Play Tick Tack Toe online or with an ai</p>
-    </div>
+        <div class="card" data-link="music/">
+          <h2>Music Maker</h2>
+          <p>Create different tunes using the different instrument pages.</p>
+        </div>
 
-    <div class="card" data-link="dt.html">
-      <h2>File Encryptor / Encoder</h2>
-      <p>A simple, client-side file encryptor that uses XOR and reverse to encode or decode files with a .dt_e extension.</p>
-    </div>
+        <div class="card" data-link="voidspace.html">
+          <h2>Voidspace</h2>
+          <p>Make yourself a desktop background.</p>
+        </div>
+      </div>
+    </section>
 
-    <div class="card" data-link="gravity.html?v=phone-gravity-5">
-      <h2>Gravity Lab</h2>
-      <p>Throw around circles, cubes, and triangles with physics</p>
-    </div>
+    <section class="category">
+      <div class="category-head">
+        <div>
+          <h2>Games</h2>
+          <p>Playable games and AI opponents.</p>
+        </div>
+        <span class="category-count">1 project</span>
+      </div>
+      <div class="category-grid">
+        <div class="card" data-link="ticktacktoe.html">
+          <h2>Tick Tack Toe</h2>
+          <p>Play Tick Tack Toe online or with an AI.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer>
