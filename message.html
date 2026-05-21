@@ -763,6 +763,14 @@
     margin: 12px 0 2px;
   }
 
+  .e2e-panel {
+    display: grid;
+    gap: 9px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
   .notification-list {
     display: grid;
     gap: 10px;
@@ -1212,6 +1220,15 @@
           <button class="secondary-btn hidden" id="rotateInviteBtn" type="button">New Invite Code</button>
           <button class="danger-btn hidden" id="deleteGroupBtn" type="button">Delete Group</button>
         </div>
+        <div class="e2e-panel hidden" id="e2ePanel">
+          <label class="switch-row"><span>E2E encrypted send</span><input id="e2eToggle" type="checkbox" /></label>
+          <label><span>Passphrase</span><input class="field" id="e2ePassphrase" type="password" autocomplete="off" placeholder="Local only" /></label>
+          <div class="modal-actions">
+            <button class="secondary-btn" id="e2eClearBtn" type="button">Clear</button>
+            <button class="primary-btn" id="e2eApplyBtn" type="button">Set</button>
+          </div>
+          <div class="status-line" id="e2eStatus"></div>
+        </div>
 
         <h2>Members</h2>
         <div class="member-list" id="memberList">
@@ -1505,6 +1522,12 @@ const els = {
   notificationPermissionBtn: document.getElementById("notificationPermissionBtn"),
   saveSettingsBtn: document.getElementById("saveSettingsBtn"),
   settingsStatusLine: document.getElementById("settingsStatusLine"),
+  e2ePanel: document.getElementById("e2ePanel"),
+  e2eToggle: document.getElementById("e2eToggle"),
+  e2ePassphrase: document.getElementById("e2ePassphrase"),
+  e2eApplyBtn: document.getElementById("e2eApplyBtn"),
+  e2eClearBtn: document.getElementById("e2eClearBtn"),
+  e2eStatus: document.getElementById("e2eStatus"),
   inviteUserModal: document.getElementById("inviteUserModal"),
   inviteHandleInput: document.getElementById("inviteHandleInput"),
   sendInviteConfirm: document.getElementById("sendInviteConfirm"),
@@ -1545,10 +1568,12 @@ let typingUsers = {};
 let replyTarget = null;
 let editTarget = null;
 let reportTarget = null;
+let notificationSeenTimer = null;
 let notificationFeedStart = 0;
 const notificationWatchers = new Map();
 const notificationStart = new Map();
 const userProfileCache = new Map();
+const groupCryptoKeys = new Map();
 const REACTIONS = [
   ["plus1", "👍"],
   ["heart", "❤️"],
@@ -1719,6 +1744,10 @@ function closeModal(id) {
   document.getElementById(id)?.classList.remove("open");
 }
 
+function isModalOpen(id) {
+  return Boolean(document.getElementById(id)?.classList.contains("open"));
+}
+
 function formatTime(ts) {
   const time = typeof ts === "number" ? ts : Date.now();
   const d = new Date(time);
@@ -1735,6 +1764,84 @@ function preview(text, max = 120) {
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  bytes.forEach(byte => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(String(value || ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function e2eStorageKey(groupId = currentGroupId) {
+  return `messager:e2e-enabled:${currentUser?.uid || "anon"}:${groupId || "none"}`;
+}
+
+function isE2EEnabled() {
+  return Boolean(currentGroupId && localStorage.getItem(e2eStorageKey()) === "1");
+}
+
+function hasE2EKey(groupId = currentGroupId) {
+  return Boolean(groupId && groupCryptoKeys.has(groupId));
+}
+
+async function deriveGroupCryptoKey(passphrase, groupId) {
+  const baseKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(passphrase),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: new TextEncoder().encode(`secureChat:${groupId}:e2e:v1`),
+      iterations: 200000,
+      hash: "SHA-256"
+    },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encryptForGroup(plainText, groupId = currentGroupId) {
+  const key = groupCryptoKeys.get(groupId);
+  if (!key) throw new Error("Set the E2E passphrase first.");
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = new TextEncoder().encode(plainText);
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data);
+  return {
+    encrypted: true,
+    cryptoVersion: 1,
+    cryptoAlg: "AES-GCM",
+    ciphertext: bytesToBase64(new Uint8Array(encrypted)),
+    iv: bytesToBase64(iv)
+  };
+}
+
+async function decryptForGroup(msg, groupId = currentGroupId) {
+  const key = groupCryptoKeys.get(groupId);
+  if (!key) throw new Error("Missing E2E key.");
+  const iv = base64ToBytes(msg.iv);
+  const ciphertext = base64ToBytes(msg.ciphertext);
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+  return new TextDecoder().decode(decrypted);
+}
+
+function messageTextForDisplay(msg) {
+  if (!msg?.encrypted) return msg?.text || "";
+  return msg.decryptedText || "Encrypted message";
 }
 
 function currentMember() {
@@ -1768,7 +1875,13 @@ function sortMessages() {
 function setMessage(msg) {
   if (!msg?.id) return;
   const index = activeMessages.findIndex(item => item.id === msg.id);
-  if (index >= 0) activeMessages[index] = msg;
+  if (index >= 0) {
+    const existing = activeMessages[index];
+    if (msg.encrypted && existing.decryptedText && existing.ciphertext === msg.ciphertext) {
+      msg.decryptedText = existing.decryptedText;
+    }
+    activeMessages[index] = msg;
+  }
   else activeMessages.push(msg);
   sortMessages();
 }
@@ -1913,6 +2026,7 @@ onAuthStateChanged(auth, async user => {
 
 function cleanupRealtime() {
   cleanupTyping();
+  if (notificationSeenTimer) clearTimeout(notificationSeenTimer);
   if (publicGroupsUnsub) publicGroupsUnsub();
   if (membershipsUnsub) membershipsUnsub();
   if (groupUnsub) groupUnsub();
@@ -1929,6 +2043,7 @@ function cleanupRealtime() {
   notificationsUnsub = null;
   notificationItemsUnsub = null;
   presenceUnsub = null;
+  notificationSeenTimer = null;
   notifications = {};
   presence = {};
   typingUsers = {};
@@ -1937,6 +2052,7 @@ function cleanupRealtime() {
   notificationWatchers.forEach(unsub => unsub());
   notificationWatchers.clear();
   notificationStart.clear();
+  groupCryptoKeys.clear();
 }
 
 function startPresence() {
@@ -2083,6 +2199,7 @@ function updateNotificationBadge() {
 function renderNotifications() {
   updateNotificationBadge();
   els.notificationsList.innerHTML = "";
+  els.markAllNotificationsBtn.classList.add("hidden");
   els.markAllNotificationsBtn.disabled = true;
   if (!currentUser) {
     els.notificationsList.innerHTML = '<div class="empty-list">Sign in to see notifications.</div>';
@@ -2097,7 +2214,7 @@ function renderNotifications() {
     els.notificationsList.innerHTML = '<div class="empty-list">No notifications yet.</div>';
     return;
   }
-  els.markAllNotificationsBtn.disabled = !items.some(note => !note.read);
+  if (isModalOpen("notificationsModal")) queueNotificationsSeen();
 
   items.forEach(note => {
     const card = document.createElement("article");
@@ -2147,15 +2264,6 @@ function renderNotifications() {
       actions.append(openBtn);
     }
 
-    if (!note.read) {
-      const readBtn = document.createElement("button");
-      readBtn.className = "secondary-btn";
-      readBtn.type = "button";
-      readBtn.textContent = "Mark Read";
-      readBtn.addEventListener("click", () => markNotificationRead(note.id));
-      actions.append(readBtn);
-    }
-
     card.append(titleRow, body, actions);
     els.notificationsList.appendChild(card);
   });
@@ -2185,6 +2293,29 @@ async function markNotificationRead(id) {
 
 async function markAllNotificationsRead() {
   if (!currentUser) return;
+  const updates = {};
+  Object.entries(notifications || {}).forEach(([id, note]) => {
+    if (!note?.read) {
+      updates[`${PATH}/notifications/${currentUser.uid}/${id}/read`] = true;
+      updates[`${PATH}/notifications/${currentUser.uid}/${id}/updatedAt`] = serverTimestamp();
+    }
+  });
+  if (!Object.keys(updates).length) return;
+  try {
+    await update(ref(db), updates);
+  } catch (error) {
+    setStatus(friendlyError(error), els.notificationsStatus);
+  }
+}
+
+function queueNotificationsSeen() {
+  if (notificationSeenTimer) clearTimeout(notificationSeenTimer);
+  notificationSeenTimer = setTimeout(markVisibleNotificationsRead, 500);
+}
+
+async function markVisibleNotificationsRead() {
+  notificationSeenTimer = null;
+  if (!currentUser || !isModalOpen("notificationsModal")) return;
   const updates = {};
   Object.entries(notifications || {}).forEach(([id, note]) => {
     if (!note?.read) {
@@ -2349,6 +2480,9 @@ function resetChat(text = "No group selected.") {
   els.messages.innerHTML = `<div class="empty-state">${text}</div>`;
   els.groupDescription.textContent = "Select a group to see details.";
   els.memberList.innerHTML = '<div class="empty-list">No group selected.</div>';
+  els.e2ePanel.classList.add("hidden");
+  els.e2ePassphrase.value = "";
+  setStatus("", els.e2eStatus);
   els.inviteUserBtn.classList.add("hidden");
   els.copyInviteBtn.classList.add("hidden");
   els.rotateInviteBtn.classList.add("hidden");
@@ -2376,9 +2510,12 @@ function renderCurrentGroup() {
   els.groupDescription.textContent = group.description || "No description.";
   const blocked = isCurrentUserBanned();
   const muted = isCurrentUserMuted();
-  els.messageInput.disabled = blocked || muted;
-  els.messageInput.placeholder = blocked ? "You are banned from this group." : (muted ? "You are muted in this group." : "Message...");
-  els.sendBtn.disabled = blocked || muted;
+  const encryptedBlocked = isE2EEnabled() && !hasE2EKey();
+  els.messageInput.disabled = blocked || muted || encryptedBlocked;
+  els.messageInput.placeholder = blocked
+    ? "You are banned from this group."
+    : (muted ? "You are muted in this group." : (encryptedBlocked ? "Set E2E passphrase in Group Details." : "Message..."));
+  els.sendBtn.disabled = blocked || muted || encryptedBlocked;
   els.exportBtn.disabled = false;
   els.leaveBtn.disabled = false;
   const canInvite = group.privacy === "public" || isOwner;
@@ -2387,6 +2524,7 @@ function renderCurrentGroup() {
   els.copyInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
   els.rotateInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
   els.deleteGroupBtn.classList.toggle("hidden", !isOwner);
+  renderE2EControls();
   renderPinnedMessage();
   renderTypingIndicator();
   restoreDraft();
@@ -2406,6 +2544,62 @@ function renderPinnedMessage() {
   els.pinnedText.textContent = `${pinned.senderName || pinned.senderHandle || "Unknown"}: ${preview(pinned.text, 140)}`;
   els.unpinBtn.classList.toggle("hidden", !owner);
   els.pinnedBar.classList.remove("hidden");
+}
+
+function renderE2EControls() {
+  if (!currentGroupId || !currentGroupData) {
+    els.e2ePanel.classList.add("hidden");
+    return;
+  }
+  const enabled = isE2EEnabled();
+  els.e2ePanel.classList.remove("hidden");
+  els.e2eToggle.checked = enabled;
+  els.e2ePassphrase.placeholder = hasE2EKey() ? "Passphrase set for this tab" : "Local only";
+  els.e2eStatus.textContent = enabled
+    ? (hasE2EKey() ? "Encrypted send is on." : "Set passphrase to send and read encrypted messages.")
+    : "Encrypted send is off.";
+}
+
+async function applyE2EPassphrase() {
+  if (!currentGroupId) return;
+  const passphrase = els.e2ePassphrase.value;
+  if (passphrase.length < 8) {
+    setStatus("Use at least 8 characters.", els.e2eStatus);
+    return;
+  }
+  try {
+    els.e2eApplyBtn.disabled = true;
+    const key = await deriveGroupCryptoKey(passphrase, currentGroupId);
+    groupCryptoKeys.set(currentGroupId, key);
+    localStorage.setItem(e2eStorageKey(), "1");
+    els.e2ePassphrase.value = "";
+    renderE2EControls();
+    renderCurrentGroup();
+    activeMessages.forEach(appendMessage);
+    setStatus("E2E passphrase set.", els.e2eStatus);
+  } catch (error) {
+    setStatus(error?.message || "Could not set passphrase.", els.e2eStatus);
+  } finally {
+    els.e2eApplyBtn.disabled = false;
+  }
+}
+
+function toggleE2EEnabled() {
+  if (!currentGroupId) return;
+  if (els.e2eToggle.checked) localStorage.setItem(e2eStorageKey(), "1");
+  else localStorage.removeItem(e2eStorageKey());
+  renderCurrentGroup();
+}
+
+function clearE2EKey() {
+  if (!currentGroupId) return;
+  groupCryptoKeys.delete(currentGroupId);
+  localStorage.removeItem(e2eStorageKey());
+  els.e2ePassphrase.value = "";
+  activeMessages.forEach(msg => {
+    if (msg.encrypted) delete msg.decryptedText;
+  });
+  renderCurrentGroup();
 }
 
 function renderMembers() {
@@ -2658,6 +2852,11 @@ async function sendMessage(event) {
     setStatus("You are muted in this group.");
     return;
   }
+  if (isE2EEnabled() && !hasE2EKey()) {
+    setStatus("Set the E2E passphrase before sending.");
+    renderCurrentGroup();
+    return;
+  }
   const text = els.messageInput.value.trim();
   if (!text) return;
   try {
@@ -2672,12 +2871,16 @@ async function sendMessage(event) {
       mentions,
       ts: serverTimestamp()
     };
+    if (isE2EEnabled()) {
+      Object.assign(payload, await encryptForGroup(text));
+      payload.text = "Encrypted message";
+    }
     if (replyTarget) {
       payload.replyTo = {
         id: replyTarget.id,
         senderName: replyTarget.senderName || replyTarget.senderHandle || "Unknown",
         senderHandle: replyTarget.senderHandle || "",
-        text: preview(replyTarget.text, 180)
+        text: isE2EEnabled() ? "Encrypted reply" : preview(replyTarget.text, 180)
       };
     }
     await set(msgRef, payload);
@@ -2695,7 +2898,7 @@ async function sendMessage(event) {
         fromUid: currentUser.uid,
         fromHandle: profile.handle,
         fromName: profile.displayName,
-        text: preview(text, 180),
+        text: isE2EEnabled() ? "Encrypted message" : preview(text, 180),
         read: false,
         status: "new",
         createdAt: serverTimestamp(),
@@ -2726,7 +2929,7 @@ function appendMessage(msg) {
   row.classList.toggle("mentioned", Boolean(msg.mentions && msg.mentions[currentUser?.uid]));
   row.dataset.messageId = msg.id || "";
   row.dataset.senderUid = msg.senderUid || "";
-  row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${msg.text || ""}`.toLowerCase();
+  row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${messageTextForDisplay(msg)}`.toLowerCase();
 
   const avatar = document.createElement("div");
   avatar.className = "avatar";
@@ -2771,6 +2974,8 @@ function appendMessage(msg) {
   }
   if (msg.deleted) {
     body.textContent = "Message deleted";
+  } else if (msg.encrypted) {
+    renderEncryptedMessageBody(body, row, msg);
   } else {
     appendHighlightedText(body, msg.text || "");
   }
@@ -2780,6 +2985,27 @@ function appendMessage(msg) {
   row.append(avatar, bubble);
   if (existing) existing.replaceWith(row);
   else els.messages.appendChild(row);
+}
+
+async function renderEncryptedMessageBody(body, row, msg) {
+  if (msg.decryptedText) {
+    appendHighlightedText(body, msg.decryptedText);
+    return;
+  }
+  if (!hasE2EKey(currentGroupId)) {
+    body.textContent = "Encrypted message. Set the group passphrase to read it.";
+    return;
+  }
+  body.textContent = "Decrypting...";
+  try {
+    const plainText = await decryptForGroup(msg);
+    msg.decryptedText = plainText;
+    body.textContent = "";
+    appendHighlightedText(body, plainText);
+    row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${plainText}`.toLowerCase();
+  } catch {
+    body.textContent = "Encrypted message. Wrong passphrase or damaged message.";
+  }
 }
 
 function renderReactions(bubble, msg) {
@@ -2900,7 +3126,7 @@ function setReplyTarget(msg) {
     id: msg.id,
     senderName: msg.senderName || msg.senderHandle || "Unknown",
     senderHandle: msg.senderHandle || "",
-    text: msg.text || ""
+    text: messageTextForDisplay(msg)
   };
   els.replyPreviewText.textContent = `${replyTarget.senderName}: ${preview(replyTarget.text, 170)}`;
   els.replyPreview.classList.remove("hidden");
@@ -2935,8 +3161,12 @@ async function toggleReaction(msg, key) {
 
 function openEditMessage(msg) {
   if (!msg || msg.deleted || msg.senderUid !== currentUser?.uid) return;
+  if (msg.encrypted && !msg.decryptedText) {
+    setStatus("Set the E2E passphrase before editing that message.");
+    return;
+  }
   editTarget = msg;
-  els.editMessageInput.value = msg.text || "";
+  els.editMessageInput.value = msg.encrypted ? (msg.decryptedText || "") : (msg.text || "");
   setStatus("", els.editMessageStatus);
   openModal("editMessageModal");
   setTimeout(() => els.editMessageInput.focus(), 0);
@@ -2951,12 +3181,18 @@ async function saveEditedMessage() {
   }
   try {
     els.saveEditMessageBtn.disabled = true;
-    await update(ref(db, `${PATH}/messages/${currentGroupId}/${editTarget.id}`), {
+    const changes = {
       text,
       mentions: parseMentions(text),
       editedAt: serverTimestamp(),
       editedBy: currentUser.uid
-    });
+    };
+    if (editTarget.encrypted) {
+      if (!hasE2EKey()) throw new Error("Set the E2E passphrase first.");
+      Object.assign(changes, await encryptForGroup(text));
+      changes.text = "Encrypted message";
+    }
+    await update(ref(db, `${PATH}/messages/${currentGroupId}/${editTarget.id}`), changes);
     editTarget = null;
     closeModal("editMessageModal");
   } catch (error) {
@@ -2991,7 +3227,7 @@ async function pinMessage(msg) {
     await update(ref(db, `${PATH}/groups/${currentGroupId}`), {
       pinnedMessage: {
         id: msg.id,
-        text: msg.text || "",
+        text: msg.encrypted ? "Encrypted message" : (msg.text || ""),
         senderName: msg.senderName || msg.senderHandle || "Unknown",
         senderHandle: msg.senderHandle || "",
         pinnedBy: currentUser.uid,
@@ -2999,7 +3235,7 @@ async function pinMessage(msg) {
       },
       updatedAt: serverTimestamp()
     });
-    toast("Message pinned", preview(msg.text, 80));
+    toast("Message pinned", preview(messageTextForDisplay(msg), 80));
   } catch (error) {
     setStatus(friendlyError(error));
   }
@@ -3039,7 +3275,7 @@ async function sendReport() {
       groupId: currentGroupId,
       groupName: currentGroupData.name || "Unnamed group",
       messageId: reportTarget.id,
-      messageText: preview(reportTarget.text, 500),
+      messageText: preview(messageTextForDisplay(reportTarget), 500),
       senderUid: reportTarget.senderUid || "",
       senderHandle: reportTarget.senderHandle || "",
       reporterUid: currentUser.uid,
@@ -3423,7 +3659,7 @@ function exportMessages() {
   if (!currentGroupData || !activeMessages.length) return;
   const lines = activeMessages.map(msg => {
     const date = new Date(typeof msg.ts === "number" ? msg.ts : Date.now()).toISOString();
-    return `[${date}] ${msg.senderName || msg.senderHandle}: ${msg.text}`;
+    return `[${date}] ${msg.senderName || msg.senderHandle}: ${messageTextForDisplay(msg)}`;
   });
   const blob = new Blob([lines.join("\n")], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
@@ -3530,10 +3766,11 @@ els.sendInviteConfirm.addEventListener("click", sendGroupInvite);
 els.inviteHandleInput.addEventListener("keydown", event => {
   if (event.key === "Enter") sendGroupInvite();
 });
-els.notificationsBtn.addEventListener("click", () => {
+  els.notificationsBtn.addEventListener("click", () => {
   setStatus("", els.notificationsStatus);
-  renderNotifications();
   openModal("notificationsModal");
+  renderNotifications();
+  queueNotificationsSeen();
 });
 els.markAllNotificationsBtn.addEventListener("click", markAllNotificationsRead);
 els.groupSearch.addEventListener("input", renderGroups);
@@ -3566,6 +3803,12 @@ els.settingsBtn.addEventListener("click", () => {
   openModal("settingsModal");
 });
 els.saveSettingsBtn.addEventListener("click", saveSettings);
+els.e2eToggle.addEventListener("change", toggleE2EEnabled);
+els.e2eApplyBtn.addEventListener("click", applyE2EPassphrase);
+els.e2eClearBtn.addEventListener("click", clearE2EKey);
+els.e2ePassphrase.addEventListener("keydown", event => {
+  if (event.key === "Enter") applyE2EPassphrase();
+});
 els.notificationPermissionBtn.addEventListener("click", async () => {
   if (!("Notification" in window)) {
     setStatus("This browser does not support desktop notifications.", els.settingsStatusLine);
