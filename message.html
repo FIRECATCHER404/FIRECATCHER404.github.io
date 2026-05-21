@@ -486,11 +486,12 @@
   }
 
   .message-bubble {
+    position: relative;
     max-width: min(680px, 72%);
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    padding: 9px 11px;
+    padding: 9px 42px 9px 11px;
     box-shadow: 0 4px 14px rgba(20, 26, 34, 0.04);
     color: var(--text);
     font-size: var(--message-size);
@@ -565,7 +566,6 @@
     color: #fff;
   }
 
-  .message-actions,
   .reaction-row {
     display: flex;
     align-items: center;
@@ -574,7 +574,6 @@
     margin-top: 8px;
   }
 
-  .message-action,
   .reaction-chip {
     min-height: 26px;
     border-radius: 999px;
@@ -587,7 +586,6 @@
     cursor: pointer;
   }
 
-  .message-row.me .message-action,
   .message-row.me .reaction-chip {
     border-color: rgba(255, 255, 255, 0.42);
     background: rgba(255, 255, 255, 0.16);
@@ -599,13 +597,85 @@
     background: var(--accent-soft);
   }
 
-  .message-action.danger-text {
-    color: var(--danger);
-  }
-
   .message-row.me .reaction-chip.active {
     border-color: #fff;
     background: rgba(255, 255, 255, 0.26);
+  }
+
+  .message-options-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    min-height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  .message-options-btn:hover,
+  .message-options-btn[aria-expanded="true"] {
+    color: var(--text);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .message-row.me .message-options-btn {
+    border-color: rgba(255, 255, 255, 0.36);
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+  }
+
+  .message-menu {
+    position: absolute;
+    top: 38px;
+    right: 6px;
+    z-index: 20;
+    min-width: 154px;
+    display: grid;
+    gap: 4px;
+    padding: 7px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow);
+  }
+
+  .message-menu-reactions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 3px;
+  }
+
+  .message-menu-item {
+    min-height: 30px;
+    border-radius: 6px;
+    padding: 0 9px;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .message-menu-reactions .message-menu-item {
+    text-align: center;
+  }
+
+  .message-menu-item:hover {
+    background: var(--accent-soft);
+  }
+
+  .message-menu-item.danger-text {
+    color: var(--danger);
   }
 
   .mention-token {
@@ -1007,14 +1077,16 @@
       max-width: calc(100vw - 72px);
     }
 
-    .message-actions,
     .reaction-row {
       gap: 5px;
     }
 
-    .message-action,
     .reaction-chip {
       padding: 0 7px;
+    }
+
+    .message-menu {
+      max-width: calc(100vw - 96px);
     }
 
     .composer {
@@ -2720,7 +2792,7 @@ function renderReactions(bubble, msg) {
   REACTIONS.forEach(([key, label]) => {
     const users = msg.reactions?.[key] || {};
     const count = Object.keys(users).length;
-    if (!count && msg.senderUid === currentUser?.uid) return;
+    if (!count) return;
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "reaction-chip";
@@ -2737,24 +2809,77 @@ function renderMessageActions(bubble, msg) {
   if (msg.deleted) return;
   const ownMessage = msg.senderUid === currentUser?.uid;
   const owner = isGroupOwner();
-  const actions = document.createElement("div");
-  actions.className = "message-actions";
+  const menuId = `message-menu-${msg.id}`;
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "message-options-btn";
+  toggle.textContent = "...";
+  toggle.setAttribute("aria-label", "Message options");
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-controls", menuId);
+
+  const menu = document.createElement("div");
+  menu.className = "message-menu hidden";
+  menu.id = menuId;
+  menu.dataset.messageMenu = msg.id;
+
+  const reactionRow = document.createElement("div");
+  reactionRow.className = "message-menu-reactions";
+  REACTIONS.forEach(([key, label]) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "message-menu-item";
+    btn.textContent = label;
+    btn.title = "React";
+    btn.addEventListener("click", event => {
+      event.stopPropagation();
+      closeMessageMenus();
+      toggleReaction(msg, key);
+    });
+    reactionRow.appendChild(btn);
+  });
+  menu.appendChild(reactionRow);
+
   const addAction = (label, handler, extraClass = "") => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `message-action ${extraClass}`.trim();
+    btn.className = `message-menu-item ${extraClass}`.trim();
     btn.textContent = label;
-    btn.addEventListener("click", handler);
-    actions.appendChild(btn);
+    btn.addEventListener("click", event => {
+      event.stopPropagation();
+      closeMessageMenus();
+      handler();
+    });
+    menu.appendChild(btn);
   };
 
   addAction("Reply", () => setReplyTarget(msg));
-  REACTIONS.forEach(([key, label]) => addAction(label, () => toggleReaction(msg, key)));
   if (ownMessage) addAction("Edit", () => openEditMessage(msg));
   if (ownMessage || owner) addAction("Delete", () => deleteMessage(msg), "danger-text");
-  if (owner) addAction(currentGroupData?.pinnedMessage?.id === msg.id ? "Pinned" : "Pin", () => pinMessage(msg));
+  if (owner) {
+    const pinned = currentGroupData?.pinnedMessage?.id === msg.id;
+    addAction(pinned ? "Unpin" : "Pin", () => pinned ? unpinMessage() : pinMessage(msg));
+  }
   if (!ownMessage) addAction("Report", () => openReportMessage(msg));
-  bubble.appendChild(actions);
+
+  toggle.addEventListener("click", event => {
+    event.stopPropagation();
+    const willOpen = menu.classList.contains("hidden");
+    closeMessageMenus(msg.id);
+    menu.classList.toggle("hidden", !willOpen);
+    toggle.setAttribute("aria-expanded", String(willOpen));
+  });
+
+  bubble.append(toggle, menu);
+}
+
+function closeMessageMenus(exceptId = "") {
+  document.querySelectorAll(".message-menu").forEach(menu => {
+    if (exceptId && menu.dataset.messageMenu === exceptId && !menu.classList.contains("hidden")) return;
+    menu.classList.add("hidden");
+    const button = menu.parentElement?.querySelector(".message-options-btn");
+    if (button) button.setAttribute("aria-expanded", "false");
+  });
 }
 
 function appendHighlightedText(container, text) {
@@ -3471,6 +3596,10 @@ document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
   backdrop.addEventListener("click", event => {
     if (event.target === backdrop) backdrop.classList.remove("open");
   });
+});
+document.addEventListener("click", () => closeMessageMenus());
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") closeMessageMenus();
 });
 if (window.matchMedia) {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applySettings);
