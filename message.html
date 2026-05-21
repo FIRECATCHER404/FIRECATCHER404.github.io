@@ -746,17 +746,29 @@
 
   .member-list {
     display: grid;
-    gap: 8px;
+    gap: 12px;
   }
 
   .member-row {
-    gap: 9px;
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-items: start;
+    gap: 8px 9px;
     min-width: 0;
   }
 
   .member-copy {
     min-width: 0;
-    flex: 1;
+  }
+
+  .member-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    line-height: 1.35;
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   .member-row .small-btn {
@@ -768,6 +780,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
+    white-space: nowrap;
   }
 
   .presence-dot {
@@ -783,10 +796,12 @@
   }
 
   .mod-actions {
+    grid-column: 2;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    min-width: 0;
   }
 
   .status-line {
@@ -2367,7 +2382,11 @@ function renderMembers() {
     const statusWrap = document.createElement("span");
     statusWrap.className = "member-status";
     statusWrap.append(dot, statusText);
-    meta.append(`@${member.handle || "unknown"} - ${member.role || "member"} - `, statusWrap);
+    const handle = document.createElement("span");
+    handle.textContent = `@${member.handle || "unknown"}`;
+    const role = document.createElement("span");
+    role.textContent = member.role || "member";
+    meta.append(handle, document.createTextNode("-"), role, document.createTextNode("-"), statusWrap);
     copy.append(name, meta);
     row.append(avatar, copy);
 
