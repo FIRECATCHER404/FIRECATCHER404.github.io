@@ -2602,9 +2602,6 @@ async function joinPrivateGroupByCode(code, statusTarget = els.statusLine) {
   if (!inviteSnap.exists()) throw new Error("Invite code not found.");
 
   const invite = inviteSnap.val();
-  const groupSnap = await get(ref(db, `${PATH}/groups/${invite.groupId}`));
-  if (!groupSnap.exists()) throw new Error("Group not found.");
-  if (groupSnap.val().bans?.[currentUser.uid]) throw new Error("You are banned from this group.");
   const updates = {};
   updates[`${PATH}/groups/${invite.groupId}/members/${currentUser.uid}`] = memberPayload("member", code);
   updates[`${PATH}/memberships/${currentUser.uid}/${invite.groupId}`] = {
