@@ -551,11 +551,23 @@
         return;
       }
 
-      let base = Math.trunc(Number(baseAmount.value));
-      if (!Number.isFinite(base)) base = selectedChars.length || 10;
-      base = Math.max(2, Math.min(chars.length, base));
-      baseAmount.value = String(base);
       baseAmount.max = String(chars.length);
+      const rawBase = baseAmount.value.trim();
+      const numericBase = Number(rawBase);
+      if (rawBase === "" || !Number.isFinite(numericBase) || numericBase < 2) {
+        renderAlphabet(chars);
+        updatePlaceholder();
+        setStatus(`Enter a base amount from 2 to ${chars.length}.`);
+        return;
+      }
+
+      let base = Math.trunc(numericBase);
+      if (base > chars.length) {
+        base = chars.length;
+        baseAmount.value = String(base);
+      } else if (numericBase !== base) {
+        baseAmount.value = String(base);
+      }
 
       const currentSelectionValid =
         selectedChars.length === base &&
