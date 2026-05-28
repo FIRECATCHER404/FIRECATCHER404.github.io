@@ -138,11 +138,11 @@ function decodeBytes(value, alphabet) {
 
 function encodeFixedWidthBytes(bytes, chars) {
   const width = getByteWidth(chars.length);
-  let out = "";
+  const groups = [];
   for (const byte of bytes) {
-    out += encodeIntegerMagnitude(BigInt(byte), chars).padStart(width, chars[0]);
+    groups.push(encodeIntegerMagnitude(BigInt(byte), chars).padStart(width, chars[0]));
   }
-  return out;
+  return groups.join(" ");
 }
 
 function decodeFixedWidthBytes(value, chars) {
