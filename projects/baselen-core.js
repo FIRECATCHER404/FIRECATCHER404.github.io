@@ -1,12 +1,12 @@
 const HEX = "0123456789abcdef";
-const POWER_BASE_BITS = new Map([
-  [2, 1],
-  [4, 2],
-  [16, 4],
+const STANDARD_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+const STANDARD_EXTENDED_DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const STANDARD_BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const STANDARD_BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const STANDARD_BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const RFC_BASE_BITS = new Map([
   [32, 5],
-  [64, 6],
-  [128, 7],
-  [256, 8]
+  [64, 6]
 ]);
 
 const textEncoder = new TextEncoder();
@@ -14,6 +14,37 @@ const textDecoder = new TextDecoder("utf-8", { fatal: true });
 const asciiDecoder = new TextDecoder("ascii", { fatal: true });
 
 export const DEFAULT_ALPHABET = makeDefaultAlphabet();
+
+export function getPreferredAlphabet(base, sourceAlphabet = DEFAULT_ALPHABET) {
+  const normalizedBase = Math.trunc(Number(base));
+  const sourceChars = validateAlphabet(sourceAlphabet);
+  if (!Number.isInteger(normalizedBase) || normalizedBase < 2) {
+    throw new Error("Base amount must be a number of at least 2.");
+  }
+  if (normalizedBase > sourceChars.length) {
+    throw new Error("Base amount cannot be larger than the alphabet.");
+  }
+
+  const standards = new Map([
+    [32, STANDARD_BASE32],
+    [58, STANDARD_BASE58],
+    [64, STANDARD_BASE64]
+  ]);
+  const standard = standards.get(normalizedBase);
+  if (standard && alphabetCanUse(sourceChars, standard)) return standard;
+
+  if (normalizedBase <= STANDARD_DIGITS.length) {
+    const digits = STANDARD_DIGITS.slice(0, normalizedBase);
+    if (alphabetCanUse(sourceChars, digits)) return digits;
+  }
+
+  if (normalizedBase <= STANDARD_EXTENDED_DIGITS.length) {
+    const digits = STANDARD_EXTENDED_DIGITS.slice(0, normalizedBase);
+    if (alphabetCanUse(sourceChars, digits)) return digits;
+  }
+
+  return sourceChars.slice(0, normalizedBase).join("");
+}
 
 export async function encryptText(value, alphabet = DEFAULT_ALPHABET) {
   return encodeBytes(textEncoder.encode(value), alphabet);
@@ -86,9 +117,51 @@ function encodeBytes(bytes, alphabet) {
   const chars = validateAlphabet(alphabet);
   if (bytes.length === 0) return "";
 
-  const bitsPerChar = POWER_BASE_BITS.get(chars.length);
+  const bitsPerChar = RFC_BASE_BITS.get(chars.length);
   if (bitsPerChar) return encodeBits(bytes, chars, bitsPerChar);
+  if (chars.length === 58) return encodeIntegerBytes(bytes, chars);
 
+  return encodeFixedWidthBytes(bytes, chars);
+}
+
+function decodeBytes(value, alphabet) {
+  const chars = validateAlphabet(alphabet);
+  let input = String(value);
+  if (input.length === 0) return new Uint8Array();
+
+  const bitsPerChar = RFC_BASE_BITS.get(chars.length);
+  if (bitsPerChar) return decodeBits(input, chars, bitsPerChar);
+  if (chars.length === 58) return decodeIntegerBytes(input, chars);
+
+  return decodeFixedWidthBytes(input, chars);
+}
+
+function encodeFixedWidthBytes(bytes, chars) {
+  const width = getByteWidth(chars.length);
+  let out = "";
+  for (const byte of bytes) {
+    out += encodeIntegerMagnitude(BigInt(byte), chars).padStart(width, chars[0]);
+  }
+  return out;
+}
+
+function decodeFixedWidthBytes(value, chars) {
+  const input = String(value).replace(/\s+/gu, "");
+  const width = getByteWidth(chars.length);
+  if (input.length % width !== 0) {
+    throw new Error(`Encoded input length must be a multiple of ${width} for base${chars.length}.`);
+  }
+
+  const out = new Uint8Array(input.length / width);
+  for (let offset = 0; offset < input.length; offset += width) {
+    const value = decodeIntegerMagnitude(input.slice(offset, offset + width), chars);
+    if (value > 255n) throw new Error("Encoded byte group is outside the byte range.");
+    out[offset / width] = Number(value);
+  }
+  return out;
+}
+
+function encodeIntegerBytes(bytes, chars) {
   const zeroChar = chars[0];
   let leadingZeroes = 0;
   while (leadingZeroes < bytes.length && bytes[leadingZeroes] === 0) leadingZeroes += 1;
@@ -97,14 +170,8 @@ function encodeBytes(bytes, alphabet) {
   return zeroChar.repeat(leadingZeroes) + body;
 }
 
-function decodeBytes(value, alphabet) {
-  const chars = validateAlphabet(alphabet);
-  let input = String(value);
-  if (input.length === 0) return new Uint8Array();
-
-  const bitsPerChar = POWER_BASE_BITS.get(chars.length);
-  if (bitsPerChar) return decodeBits(input, chars, bitsPerChar);
-
+function decodeIntegerBytes(value, chars) {
+  const input = String(value).replace(/\s+/gu, "");
   const zeroChar = chars[0];
   let leadingZeroes = 0;
   while (leadingZeroes < input.length && input[leadingZeroes] === zeroChar) leadingZeroes += 1;
@@ -114,6 +181,16 @@ function decodeBytes(value, alphabet) {
   const out = new Uint8Array(leadingZeroes + bodyBytes.length);
   out.set(bodyBytes, leadingZeroes);
   return out;
+}
+
+function getByteWidth(base) {
+  let width = 1;
+  let capacity = BigInt(base);
+  while (capacity < 256n) {
+    width += 1;
+    capacity *= BigInt(base);
+  }
+  return width;
 }
 
 function encodeBits(bytes, chars, bitsPerChar) {
@@ -134,11 +211,13 @@ function encodeBits(bytes, chars, bitsPerChar) {
   }
 
   if (bitCount > 0) out += chars[(buffer << (bitsPerChar - bitCount)) & mask];
+  if (chars.length === 32) return padOutput(out, 8);
+  if (chars.length === 64) return padOutput(out, 4);
   return out;
 }
 
 function decodeBits(value, chars, bitsPerChar) {
-  let input = String(value);
+  let input = String(value).replace(/\s+/gu, "");
   if (!chars.includes("=")) input = input.replace(/=+$/u, "");
   if (input.length === 0) return new Uint8Array();
   if (input.length * bitsPerChar < 8) throw new Error("Encoded input is too short.");
@@ -196,6 +275,15 @@ function makeIndexMap(chars) {
   const indexes = new Map();
   chars.forEach((char, index) => indexes.set(char, index));
   return indexes;
+}
+
+function padOutput(value, groupSize) {
+  const remainder = value.length % groupSize;
+  return remainder === 0 ? value : value + "=".repeat(groupSize - remainder);
+}
+
+function alphabetCanUse(sourceChars, alphabet) {
+  return [...alphabet].every((char) => sourceChars.includes(char));
 }
 
 function bytesToBigInt(bytes) {

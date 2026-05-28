@@ -453,7 +453,7 @@
                 <button id="pasteBtn" type="button">Paste</button>
               </div>
             </div>
-            <textarea id="input" spellcheck="false" placeholder="Type text to encrypt"></textarea>
+            <textarea id="input" spellcheck="false" placeholder="Type text to encode"></textarea>
           </div>
 
           <div class="pane">
@@ -483,6 +483,7 @@
       encryptBytes,
       encryptInteger,
       encryptText,
+      getPreferredAlphabet,
       hexToBytes,
       validateAlphabet
     } from "./baselen-core.js";
@@ -535,7 +536,7 @@
       } else if (type === "bytes") {
         input.placeholder = "Type bytes as hex, for example: 48656c6c6f";
       } else {
-        input.placeholder = "Type text to encrypt";
+        input.placeholder = "Type text to encode";
       }
     }
 
@@ -556,19 +557,14 @@
       baseAmount.value = String(base);
       baseAmount.max = String(chars.length);
 
-      const nextSelected = [];
-      for (const char of selectedChars) {
-        if (chars.includes(char) && !nextSelected.includes(char) && nextSelected.length < base) {
-          nextSelected.push(char);
-        }
-      }
-      for (const char of chars) {
-        if (!nextSelected.includes(char) && nextSelected.length < base) {
-          nextSelected.push(char);
-        }
-      }
+      const currentSelectionValid =
+        selectedChars.length === base &&
+        selectedChars.every((char) => chars.includes(char)) &&
+        new Set(selectedChars).size === selectedChars.length;
 
-      selectedChars = nextSelected;
+      selectedChars = currentSelectionValid
+        ? selectedChars
+        : [...getPreferredAlphabet(base, alphabetInput.value)];
       if (pendingSlot !== null && pendingSlot >= selectedChars.length) pendingSlot = null;
       renderAlphabet(chars);
       updatePlaceholder();
