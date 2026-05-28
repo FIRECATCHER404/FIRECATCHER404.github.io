@@ -15,6 +15,17 @@ const asciiDecoder = new TextDecoder("ascii", { fatal: true });
 
 export const DEFAULT_ALPHABET = makeDefaultAlphabet();
 
+export function getDefaultSpacingForBase(base) {
+  const normalizedBase = Math.trunc(Number(base));
+  if (!Number.isInteger(normalizedBase) || normalizedBase < 2) {
+    throw new Error("Base amount must be a number of at least 2.");
+  }
+  if (normalizedBase === 32) return 8;
+  if (normalizedBase === 64) return 4;
+  if (normalizedBase === 58) return 0;
+  return getByteWidth(normalizedBase);
+}
+
 export function getPreferredAlphabet(base, sourceAlphabet = DEFAULT_ALPHABET) {
   const normalizedBase = Math.trunc(Number(base));
   const sourceChars = validateAlphabet(sourceAlphabet);
@@ -46,17 +57,17 @@ export function getPreferredAlphabet(base, sourceAlphabet = DEFAULT_ALPHABET) {
   return sourceChars.slice(0, normalizedBase).join("");
 }
 
-export async function encryptText(value, alphabet = DEFAULT_ALPHABET) {
-  return encodeBytes(textEncoder.encode(value), alphabet);
+export async function encryptText(value, alphabet = DEFAULT_ALPHABET, spacing) {
+  return encodeBytes(textEncoder.encode(value), alphabet, spacing);
 }
 
 export async function decryptText(value, alphabet = DEFAULT_ALPHABET) {
   return textDecoder.decode(decodeBytes(value, alphabet));
 }
 
-export async function encryptInteger(value, alphabet = DEFAULT_ALPHABET) {
+export async function encryptInteger(value, alphabet = DEFAULT_ALPHABET, spacing) {
   const normalized = BigInt(String(value).trim()).toString();
-  return encodeBytes(asciiBytes(normalized), alphabet);
+  return encodeBytes(asciiBytes(normalized), alphabet, spacing);
 }
 
 export async function decryptInteger(value, alphabet = DEFAULT_ALPHABET) {
@@ -64,8 +75,8 @@ export async function decryptInteger(value, alphabet = DEFAULT_ALPHABET) {
   return BigInt(decoded).toString();
 }
 
-export async function encryptBytes(value, alphabet = DEFAULT_ALPHABET) {
-  return encodeBytes(value, alphabet);
+export async function encryptBytes(value, alphabet = DEFAULT_ALPHABET, spacing) {
+  return encodeBytes(value, alphabet, spacing);
 }
 
 export async function decryptBytes(value, alphabet = DEFAULT_ALPHABET) {
@@ -113,15 +124,18 @@ export function validateAlphabet(alphabet) {
   return chars;
 }
 
-function encodeBytes(bytes, alphabet) {
+function encodeBytes(bytes, alphabet, spacing) {
   const chars = validateAlphabet(alphabet);
   if (bytes.length === 0) return "";
+  const blockSize = normalizeSpacing(spacing, getDefaultSpacingForBase(chars.length));
+  let encoded;
 
   const bitsPerChar = RFC_BASE_BITS.get(chars.length);
-  if (bitsPerChar) return encodeBits(bytes, chars, bitsPerChar);
-  if (chars.length === 58) return encodeIntegerBytes(bytes, chars);
+  if (bitsPerChar) encoded = encodeBits(bytes, chars, bitsPerChar);
+  else if (chars.length === 58) encoded = encodeIntegerBytes(bytes, chars);
+  else encoded = encodeFixedWidthBytes(bytes, chars);
 
-  return encodeFixedWidthBytes(bytes, chars);
+  return applySpacing(encoded, blockSize);
 }
 
 function decodeBytes(value, alphabet) {
@@ -138,11 +152,11 @@ function decodeBytes(value, alphabet) {
 
 function encodeFixedWidthBytes(bytes, chars) {
   const width = getByteWidth(chars.length);
-  const groups = [];
+  let out = "";
   for (const byte of bytes) {
-    groups.push(encodeIntegerMagnitude(BigInt(byte), chars).padStart(width, chars[0]));
+    out += encodeIntegerMagnitude(BigInt(byte), chars).padStart(width, chars[0]);
   }
-  return groups.join(" ");
+  return out;
 }
 
 function decodeFixedWidthBytes(value, chars) {
@@ -280,6 +294,25 @@ function makeIndexMap(chars) {
 function padOutput(value, groupSize) {
   const remainder = value.length % groupSize;
   return remainder === 0 ? value : value + "=".repeat(groupSize - remainder);
+}
+
+function applySpacing(value, blockSize) {
+  if (blockSize <= 0) return value;
+  const chars = [...value];
+  const blocks = [];
+  for (let index = 0; index < chars.length; index += blockSize) {
+    blocks.push(chars.slice(index, index + blockSize).join(""));
+  }
+  return blocks.join(" ");
+}
+
+function normalizeSpacing(spacing, defaultSpacing) {
+  if (spacing === undefined || spacing === null || spacing === "") return defaultSpacing;
+  const value = Number(spacing);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error("Spacing must be 0 or more characters per block.");
+  }
+  return Math.trunc(value);
 }
 
 function alphabetCanUse(sourceChars, alphabet) {

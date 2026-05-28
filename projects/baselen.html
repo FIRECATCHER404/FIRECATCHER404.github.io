@@ -428,6 +428,11 @@
         </div>
 
         <div class="row">
+          <label for="spacingAmount">Spacing characters per block</label>
+          <input id="spacingAmount" type="number" min="0" step="1" value="3" inputmode="numeric" />
+        </div>
+
+        <div class="row">
           <label for="alphabetInput">Alphabet</label>
           <textarea id="alphabetInput" class="alphabet-input" spellcheck="false">0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!#$%&amp;()*+,-./:;&lt;=&gt;?@[]^_{|}~¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩΪΫάέήίΰαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώАБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхц</textarea>
           <div class="alphabet-tools">
@@ -483,6 +488,7 @@
       encryptBytes,
       encryptInteger,
       encryptText,
+      getDefaultSpacingForBase,
       getPreferredAlphabet,
       hexToBytes,
       validateAlphabet
@@ -492,6 +498,7 @@
     const decryptMode = document.getElementById("decryptMode");
     const payloadType = document.getElementById("payloadType");
     const baseAmount = document.getElementById("baseAmount");
+    const spacingAmount = document.getElementById("spacingAmount");
     const alphabetInput = document.getElementById("alphabetInput");
     const alphabetCount = document.getElementById("alphabetCount");
     const charGrid = document.getElementById("charGrid");
@@ -511,6 +518,7 @@
     let mode = "encrypt";
     let selectedChars = [];
     let pendingSlot = null;
+    let lastSpacingBase = null;
 
     function setMode(nextMode) {
       mode = nextMode;
@@ -567,6 +575,10 @@
         baseAmount.value = String(base);
       } else if (numericBase !== base) {
         baseAmount.value = String(base);
+      }
+      if (base !== lastSpacingBase) {
+        spacingAmount.value = String(getDefaultSpacingForBase(base));
+        lastSpacingBase = base;
       }
 
       const currentSelectionValid =
@@ -641,6 +653,18 @@
       return active.join("");
     }
 
+    function getSpacingAmount() {
+      const rawSpacing = spacingAmount.value.trim();
+      if (rawSpacing === "") throw new Error("Spacing must be 0 or more characters per block.");
+      const numericSpacing = Number(rawSpacing);
+      if (!Number.isFinite(numericSpacing) || numericSpacing < 0) {
+        throw new Error("Spacing must be 0 or more characters per block.");
+      }
+      const spacing = Math.trunc(numericSpacing);
+      if (numericSpacing !== spacing) spacingAmount.value = String(spacing);
+      return spacing;
+    }
+
     async function run() {
       runBtn.disabled = true;
       setStatus(mode === "encrypt" ? "Encoding..." : "Decoding...");
@@ -648,13 +672,14 @@
       try {
         const type = payloadType.value;
         const selectedAlphabet = getSelectedAlphabet();
+        const selectedSpacing = getSpacingAmount();
         const value = input.value;
         let result;
 
         if (mode === "encrypt") {
-          if (type === "text") result = await encryptText(value, selectedAlphabet);
-          if (type === "int") result = await encryptInteger(value, selectedAlphabet);
-          if (type === "bytes") result = await encryptBytes(hexToBytes(value), selectedAlphabet);
+          if (type === "text") result = await encryptText(value, selectedAlphabet, selectedSpacing);
+          if (type === "int") result = await encryptInteger(value, selectedAlphabet, selectedSpacing);
+          if (type === "bytes") result = await encryptBytes(hexToBytes(value), selectedAlphabet, selectedSpacing);
         } else {
           if (type === "text") result = await decryptText(value, selectedAlphabet);
           if (type === "int") result = await decryptInteger(value, selectedAlphabet);
@@ -662,7 +687,7 @@
         }
 
         output.value = result;
-        setStatus(`Done. Used base${selectedAlphabet.length}.`, "good");
+        setStatus(`Done. Used base${selectedAlphabet.length} with ${selectedSpacing}-character blocks.`, "good");
       } catch (error) {
         setStatus(error.message || String(error), "bad");
       } finally {
@@ -694,10 +719,24 @@
     decryptMode.addEventListener("click", () => setMode("decrypt"));
     payloadType.addEventListener("change", updatePlaceholder);
     baseAmount.addEventListener("input", syncAlphabet);
+    spacingAmount.addEventListener("input", () => {
+      if (spacingAmount.value.trim() === "") {
+        setStatus("Enter 0 for no spacing, or a block size.");
+        return;
+      }
+      try {
+        getSpacingAmount();
+        setStatus(`Ready. Using ${spacingAmount.value}-character blocks.`);
+      } catch (error) {
+        setStatus(error.message || String(error), "bad");
+      }
+    });
     alphabetInput.addEventListener("input", syncAlphabet);
     resetAlphabetBtn.addEventListener("click", () => {
       alphabetInput.value = DEFAULT_ALPHABET;
       baseAmount.value = "10";
+      spacingAmount.value = "3";
+      lastSpacingBase = 10;
       selectedChars = [];
       pendingSlot = null;
       syncAlphabet();
