@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Conway Time Stack</title>
+  <style>
+    :root {
+      --sidebar-open: 340px;
+      --sidebar-closed: 64px;
+      --sidebar-width: var(--sidebar-open);
+      --panel: rgba(8, 13, 18, 0.88);
+      --panel-solid: #091018;
+      --panel-soft: rgba(255, 255, 255, 0.055);
+      --line: rgba(255, 255, 255, 0.13);
+      --text: #f1f7fb;
+      --muted: #9fb2be;
+      --blue: #8ee8ff;
+      --blue-strong: #34c6ee;
+      --yellow: #ffe06a;
+      --yellow-strong: #f0bd39;
+      --danger: #ff6f86;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: #05080d;
+      color: var(--text);
+    }
+
+    button,
+    input,
+    select {
+      color: inherit;
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .app {
+      width: 100%;
+      height: 100%;
+      min-height: 100dvh;
+      display: grid;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        #05080d;
+      background-size: 86px 86px;
+      transition: grid-template-columns 0.32s ease;
+    }
+
+    .app[data-sidebar="closed"] {
+      --sidebar-width: var(--sidebar-closed);
+    }
+
+    .sidebar {
+      position: relative;
+      z-index: 5;
+      min-width: 0;
+      height: 100%;
+      min-height: 100dvh;
+      overflow: hidden;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      box-shadow: 16px 0 46px rgba(0, 0, 0, 0.32);
+    }
+
+    .sidebar::before,
+    .sidebar::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .sidebar::before {
+      background:
+        linear-gradient(90deg, rgba(142, 232, 255, 0.10) 1px, transparent 1px),
+        linear-gradient(rgba(255, 224, 106, 0.08) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(180deg, #000, transparent 68%);
+      animation: gridDrift 18s linear infinite;
+      opacity: 0.58;
+    }
+
+    .sidebar::after {
+      background:
+        repeating-linear-gradient(
+          0deg,
+          transparent 0 36px,
+          rgba(255, 255, 255, 0.045) 36px 37px
+        );
+      opacity: 0.4;
+      animation: scanLines 6s ease-in-out infinite alternate;
+    }
+
+    @keyframes gridDrift {
+      from { background-position: 0 0; }
+      to { background-position: 112px 84px; }
+    }
+
+    @keyframes scanLines {
+      from { transform: translateY(-18px); opacity: 0.25; }
+      to { transform: translateY(18px); opacity: 0.48; }
+    }
+
+    .sidebar-inner {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr;
+      gap: 14px;
+      padding: 16px;
+      padding:
+        calc(16px + env(safe-area-inset-top))
+        16px
+        calc(16px + env(safe-area-inset-bottom));
+      transition: opacity 0.24s ease, transform 0.32s ease;
+    }
+
+    .app[data-sidebar="closed"] .sidebar-inner {
+      opacity: 0;
+      transform: translateX(-16px);
+      pointer-events: none;
+    }
+
+    .rail-button {
+      position: absolute;
+      z-index: 2;
+      top: 16px;
+      top: calc(16px + env(safe-area-inset-top));
+      right: 12px;
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.24s ease;
+    }
+
+    .rail-button:hover {
+      border-color: rgba(142, 232, 255, 0.7);
+      background: rgba(142, 232, 255, 0.15);
+    }
+
+    .app[data-sidebar="closed"] .rail-button {
+      right: 13px;
+      background: rgba(8, 13, 18, 0.9);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+      padding-right: 46px;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background:
+        linear-gradient(90deg, transparent 47%, rgba(255, 255, 255, 0.82) 47% 53%, transparent 53%),
+        linear-gradient(0deg, transparent 47%, rgba(255, 255, 255, 0.82) 47% 53%, transparent 53%),
+        conic-gradient(from 180deg, var(--blue), var(--yellow), var(--blue));
+      box-shadow: 0 0 22px rgba(142, 232, 255, 0.28);
+      flex: 0 0 auto;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: 0.03em;
+      line-height: 1.1;
+    }
+
+    .brand p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.79rem;
+      line-height: 1.25;
+    }
+
+    .mode-toggle {
+      position: relative;
+      height: 46px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.07);
+      overflow: hidden;
+      box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.24);
+    }
+
+    .mode-pill {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: calc(50% - 4px);
+      height: calc(100% - 8px);
+      border-radius: 999px;
+      background: var(--blue);
+      box-shadow: 0 0 26px rgba(142, 232, 255, 0.35);
+      transition:
+        transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 0.42s ease,
+        box-shadow 0.42s ease;
+    }
+
+    .app[data-mode="3d"] .mode-pill {
+      transform: translateX(100%);
+      background: var(--yellow);
+      box-shadow: 0 0 26px rgba(255, 224, 106, 0.35);
+    }
+
+    .mode-button {
+      position: relative;
+      z-index: 1;
+      height: 38px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.07em;
+      text-align: center;
+      transition: color 0.18s ease;
+    }
+
+    .app[data-mode="2d"] .mode-button[data-mode="2d"],
+    .app[data-mode="3d"] .mode-button[data-mode="3d"] {
+      color: #071017;
+    }
+
+    .playback {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .playback button,
+    .ghost-button,
+    select {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.075);
+      color: var(--text);
+      transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+    }
+
+    .playback button:hover,
+    .ghost-button:hover,
+    select:hover {
+      border-color: rgba(142, 232, 255, 0.68);
+      background: rgba(142, 232, 255, 0.12);
+    }
+
+    .playback button:active,
+    .ghost-button:active {
+      transform: translateY(1px);
+    }
+
+    .playback .active {
+      border-color: rgba(142, 232, 255, 0.88);
+      background: rgba(142, 232, 255, 0.18);
+      color: var(--blue);
+    }
+
+    .options-shell {
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.055);
+    }
+
+    .option-pane {
+      height: 100%;
+      overflow-y: auto;
+      padding: 14px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(142, 232, 255, 0.42) transparent;
+      transition: filter 0.26s ease, opacity 0.26s ease, transform 0.26s ease;
+    }
+
+    .option-pane.is-switching {
+      filter: blur(20px);
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+      pointer-events: none;
+    }
+
+    .control-section {
+      padding: 0 0 15px;
+      margin: 0 0 15px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .control-section:last-child {
+      margin-bottom: 0;
+      padding-bottom: 2px;
+      border-bottom: 0;
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      color: var(--text);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .control {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 13px;
+    }
+
+    .control:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.83rem;
+      line-height: 1.2;
+    }
+
+    output {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--blue);
+    }
+
+    .option-pane[data-panel-mode="3d"] input[type="range"] {
+      accent-color: var(--yellow);
+    }
+
+    .color-row,
+    .select-row,
+    .check-row {
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+    }
+
+    input[type="color"] {
+      width: 48px;
+      height: 34px;
+      padding: 2px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--blue);
+    }
+
+    .option-pane[data-panel-mode="3d"] input[type="checkbox"] {
+      accent-color: var(--yellow);
+    }
+
+    select {
+      width: 122px;
+      padding: 7px 8px;
+      background: #0d1620;
+    }
+
+    .stage {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      background: #05080d;
+    }
+
+    #life2d,
+    #threeMount {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease;
+    }
+
+    #life2d {
+      display: block;
+      touch-action: none;
+    }
+
+    #threeMount canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .app[data-mode="2d"] #life2d,
+    .app[data-mode="3d"] #threeMount {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .three-message {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: var(--muted);
+      text-align: center;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        #05080d;
+      background-size: 64px 64px;
+    }
+
+    .hud {
+      position: absolute;
+      right: 16px;
+      top: 16px;
+      z-index: 3;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      max-width: min(560px, calc(100% - 32px));
+      pointer-events: none;
+    }
+
+    .hud span {
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 6px 10px;
+      background: rgba(5, 8, 13, 0.72);
+      color: var(--muted);
+      backdrop-filter: blur(12px);
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hint {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      z-index: 3;
+      max-width: min(620px, calc(100% - 32px));
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: rgba(5, 8, 13, 0.68);
+      color: var(--muted);
+      backdrop-filter: blur(12px);
+      font-size: 0.82rem;
+      line-height: 1.35;
+      pointer-events: none;
+    }
+
+    .hud.is-hidden,
+    .hint.is-hidden {
+      display: none;
+    }
+
+    @media (max-width: 780px) {
+      .app {
+        --sidebar-closed: 58px;
+        display: block;
+        min-height: 100dvh;
+      }
+
+      .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: min(340px, 88vw);
+        height: 100dvh;
+        min-height: 100dvh;
+        transition: transform 0.32s ease;
+      }
+
+      .app[data-sidebar="closed"] .sidebar {
+        transform: translateX(calc(-100% + var(--sidebar-closed)));
+      }
+
+      .stage {
+        width: 100%;
+        height: 100dvh;
+        transition: margin-left 0.32s ease, width 0.32s ease;
+      }
+
+      .app[data-sidebar="closed"] .stage {
+        width: calc(100% - var(--sidebar-closed));
+        margin-left: var(--sidebar-closed);
+      }
+
+      .hud {
+        left: 72px;
+        right: 10px;
+        top: 10px;
+      }
+
+      .hint {
+        left: 72px;
+        right: 10px;
+        bottom: 10px;
+        max-width: none;
+      }
+    }
+
+    @media (max-height: 680px) {
+      .brand p,
+      .hint {
+        display: none;
+      }
+
+      .sidebar-inner {
+        gap: 10px;
+        padding: 12px;
+        padding:
+          calc(12px + env(safe-area-inset-top))
+          12px
+          calc(12px + env(safe-area-inset-bottom));
+      }
+    }
+
+    @media (pointer: coarse) {
+      .mode-toggle {
+        height: 50px;
+      }
+
+      .mode-button,
+      .playback button,
+      .ghost-button,
+      select {
+        min-height: 44px;
+      }
+
+      input[type="range"] {
+        min-height: 30px;
+      }
+
+      input[type="checkbox"] {
+        width: 24px;
+        height: 24px;
+      }
+
+      input[type="color"] {
+        width: 52px;
+        height: 40px;
+      }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+      }
+    }
+  </script>
+  <script src="/analytics.js"></script>
+</head>
+<body>
+  <div class="app" id="app" data-mode="2d" data-sidebar="open">
+    <aside class="sidebar" aria-label="Conway controls">
+      <button class="rail-button" id="collapseBtn" type="button" aria-label="Collapse sidebar" title="Collapse sidebar">&lt;</button>
+      <div class="sidebar-inner">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div>
+            <h1>Conway Time Stack</h1>
+            <p>Paint cells, run life, and swap between a flat board and a time-built cube stack.</p>
+          </div>
+        </div>
+
+        <div class="mode-toggle" role="tablist" aria-label="Render mode">
+          <div class="mode-pill" aria-hidden="true"></div>
+          <button class="mode-button" type="button" role="tab" data-mode="2d" aria-selected="true">2D</button>
+          <button class="mode-button" type="button" role="tab" data-mode="3d" aria-selected="false">3D</button>
+        </div>
+
+        <div class="playback" aria-label="Simulation controls">
+          <button id="playBtn" type="button">Play</button>
+          <button id="pauseBtn" type="button">Pause</button>
+          <button id="resetBtn" type="button">Reset</button>
+        </div>
+
+        <div class="options-shell">
+          <div class="option-pane" id="optionPane" data-panel-mode="2d"></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="stage" id="stage">
+      <canvas id="life2d" aria-label="2D Conway board"></canvas>
+      <div id="threeMount" aria-label="3D Conway time stack">
+        <div class="three-message" id="threeMessage">Loading Three.js 3D renderer...</div>
+      </div>
+      <div class="hud is-hidden" aria-live="polite">
+        <span id="modeHud">2D</span>
+        <span id="stateHud">Paused</span>
+        <span id="genHud">Gen 0</span>
+        <span id="aliveHud">0 alive</span>
+        <span id="sliceHud">Flat board</span>
+      </div>
+      <div class="hint is-hidden" id="hintText">2D: left click or drag to draw, right click to erase. 3D: click the top grid to edit, shift-drag to paint, drag normally to orbit.</div>
+    </main>
+  </div>
+
+  <script type="module">
+    const app = document.getElementById('app');
+    const stage = document.getElementById('stage');
+    const canvas2d = document.getElementById('life2d');
+    const ctx = canvas2d.getContext('2d');
+    const mount3d = document.getElementById('threeMount');
+    const threeMessage = document.getElementById('threeMessage');
+    const optionPane = document.getElementById('optionPane');
+    const collapseBtn = document.getElementById('collapseBtn');
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const modeHud = document.getElementById('modeHud');
+    const stateHud = document.getElementById('stateHud');
+    const genHud = document.getElementById('genHud');
+    const aliveHud = document.getElementById('aliveHud');
+    const sliceHud = document.getElementById('sliceHud');
+    const hintText = document.getElementById('hintText');
+    const mobileLayout = window.matchMedia('(max-width: 780px)');
+
+    const state = {
+      mode: '2d',
+      sidebarOpen: true,
+      running: false,
+      lastStepAt: performance.now(),
+      generations: { '2d': 0, '3d': 0 },
+      grids: { '2d': null, '3d': null },
+      history3d: [],
+      pointer2d: { active: false, action: 'draw', seen: new Set() },
+      pointer3d: { painting: false, startX: 0, startY: 0, overNet: false, seen: new Set() },
+      cfg: {
+        grid2d: 48,
+        squareSize2d: 14,
+        squareSpacing2d: 1,
+        speed2d: 8,
+        density2d: 22,
+        brush2d: 'draw',
+        wrap2d: true,
+        bg2d: '#071018',
+        cell2d: '#8ee8ff',
+        shape2d: 'square',
+        gridLine2d: '#18313b',
+
+        grid3d: 32,
+        cubeSize3d: 0.82,
+        cubeSpacing3d: 0.14,
+        cubeHeight3d: 0.42,
+        maxSlices3d: 26,
+        speed3d: 4,
+        density3d: 18,
+        brush3d: 'toggle',
+        topNet3d: false,
+        wrap3d: true,
+        bg3d: '#05080d',
+        cube3d: '#ffe06a',
+        trail3d: '#42d6ff',
+        light3d: '#ffffff',
+        showStats: false,
+        showHints: false
+      }
+    };
+
+    const controls = {
+      '2d': [
+        { section: 'Grid' },
+        { key: 'grid2d', label: 'Grid size', type: 'range', min: 16, max: 96, step: 1, unit: ' cells' },
+        { key: 'squareSize2d', label: 'Square size', type: 'range', min: 4, max: 28, step: 1, unit: ' px' },
+        { key: 'squareSpacing2d', label: 'Square spacing', type: 'range', min: 0, max: 6, step: 1, unit: ' px' },
+        { key: 'speed2d', label: 'Update speed', type: 'range', min: 1, max: 60, step: 1, unit: ' ticks/s' },
+        { key: 'density2d', label: 'Reset density', type: 'range', min: 0, max: 70, step: 1, unit: '%' },
+        { key: 'brush2d', label: 'Brush mode', type: 'select', options: [['draw', 'Draw'], ['erase', 'Erase'], ['toggle', 'Toggle']] },
+        { key: 'wrap2d', label: 'Wrap edges', type: 'checkbox' },
+        { section: 'Appearance' },
+        { key: 'bg2d', label: 'Background color', type: 'color' },
+        { key: 'cell2d', label: 'Cell color', type: 'color' },
+        { key: 'shape2d', label: 'Cell shape', type: 'select', options: [['square', 'Square'], ['circle', 'Circle'], ['triangle', 'Triangle'], ['diamond', 'Diamond'], ['hexagon', 'Hexagon']] },
+        { key: 'gridLine2d', label: 'Grid color', type: 'color' },
+        { section: 'Interface' },
+        { key: 'showStats', label: 'Show stats bubbles', type: 'checkbox' },
+        { key: 'showHints', label: 'Show control hint', type: 'checkbox' }
+      ],
+      '3d': [
+        { section: 'Grid' },
+        { key: 'grid3d', label: 'Grid size', type: 'range', min: 12, max: 56, step: 1, unit: ' cells' },
+        { key: 'cubeSize3d', label: 'Cube size', type: 'range', min: 0.3, max: 1.45, step: 0.01, unit: '' },
+        { key: 'cubeSpacing3d', label: 'Cube spacing', type: 'range', min: 0, max: 0.55, step: 0.01, unit: '' },
+        { key: 'cubeHeight3d', label: 'Cube height', type: 'range', min: 0.12, max: 1.2, step: 0.01, unit: '' },
+        { key: 'maxSlices3d', label: 'Max time slices', type: 'range', min: 6, max: 100, step: 1, unit: ' slices' },
+        { key: 'speed3d', label: 'Update speed', type: 'range', min: 1, max: 60, step: 1, unit: ' ticks/s' },
+        { key: 'density3d', label: 'Reset density', type: 'range', min: 0, max: 70, step: 1, unit: '%' },
+        { key: 'brush3d', label: 'Brush mode', type: 'select', options: [['toggle', 'Toggle'], ['draw', 'Draw'], ['erase', 'Erase']] },
+        { key: 'topNet3d', label: 'Top net draw mode', type: 'checkbox' },
+        { key: 'wrap3d', label: 'Wrap edges', type: 'checkbox' },
+        { section: 'Appearance' },
+        { key: 'bg3d', label: 'Background color', type: 'color' },
+        { key: 'cube3d', label: 'Current cell color', type: 'color' },
+        { key: 'trail3d', label: 'Older cell color', type: 'color' },
+        { key: 'light3d', label: 'Light color', type: 'color' },
+        { section: 'Interface' },
+        { key: 'showStats', label: 'Show stats bubbles', type: 'checkbox' },
+        { key: 'showHints', label: 'Show control hint', type: 'checkbox' }
+      ]
+    };
+
+    const render2d = {
+      dpr: 1,
+      offsetX: 0,
+      offsetY: 0,
+      cell: 1,
+      spacing: 0,
+      step: 1,
+      board: 1
+    };
+
+    let THREE = null;
+    let OrbitControls = null;
+    let threeReady = false;
+    let threeLoadError = '';
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let orbit = null;
+    let ambientLight = null;
+    let keyLight = null;
+    let fillLight = null;
+    let raycaster = null;
+    let pointerNdc = null;
+    let paintPlane = null;
+    let topNet = null;
+    let topNetKey = '';
+    let sliceGeometry = null;
+    let sliceGeometryKey = '';
+    let sliceMeshes = [];
+    let needs3dLayout = true;
+
+    function setSidebarOpen(open, scheduleResize = true) {
+      state.sidebarOpen = open;
+      app.dataset.sidebar = state.sidebarOpen ? 'open' : 'closed';
+      collapseBtn.textContent = state.sidebarOpen ? '<' : '>';
+      collapseBtn.setAttribute('aria-label', state.sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar');
+      collapseBtn.title = state.sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar';
+      if (scheduleResize) window.setTimeout(resizeViews, 340);
+    }
+
+    function syncResponsiveSidebar(query) {
+      setSidebarOpen(!query.matches);
+    }
+
+    function randomGrid(size, density) {
+      const grid = new Uint8Array(size * size);
+      const threshold = density / 100;
+      for (let i = 0; i < grid.length; i += 1) {
+        grid[i] = Math.random() < threshold ? 1 : 0;
+      }
+      return grid;
+    }
+
+    function countAlive(grid) {
+      if (!grid) return 0;
+      let alive = 0;
+      for (let i = 0; i < grid.length; i += 1) alive += grid[i];
+      return alive;
+    }
+
+    function stepLife(grid, size, wrap) {
+      const next = new Uint8Array(size * size);
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          let neighbors = 0;
+          for (let dy = -1; dy <= 1; dy += 1) {
+            for (let dx = -1; dx <= 1; dx += 1) {
+              if (dx === 0 && dy === 0) continue;
+              let nx = x + dx;
+              let ny = y + dy;
+              if (wrap) {
+                nx = (nx + size) % size;
+                ny = (ny + size) % size;
+              } else if (nx < 0 || nx >= size || ny < 0 || ny >= size) {
+                continue;
+              }
+              neighbors += grid[ny * size + nx];
+            }
+          }
+
+          const index = y * size + x;
+          next[index] = neighbors === 3 || (grid[index] && neighbors === 2) ? 1 : 0;
+        }
+      }
+      return next;
+    }
+
+    function resetMode(mode) {
+      if (mode === '2d') {
+        state.grids['2d'] = randomGrid(state.cfg.grid2d, state.cfg.density2d);
+      } else {
+        state.grids['3d'] = randomGrid(state.cfg.grid3d, state.cfg.density3d);
+        state.history3d = [state.grids['3d']];
+        needs3dLayout = true;
+        render3DHistory();
+      }
+      state.generations[mode] = 0;
+      draw2D();
+      updateHud();
+    }
+
+    function tickMode(mode) {
+      if (mode === '2d') {
+        state.grids['2d'] = stepLife(state.grids['2d'], state.cfg.grid2d, state.cfg.wrap2d);
+      } else {
+        const next = stepLife(state.grids['3d'], state.cfg.grid3d, state.cfg.wrap3d);
+        state.grids['3d'] = next;
+        state.history3d.push(next);
+        while (state.history3d.length > state.cfg.maxSlices3d) state.history3d.shift();
+        render3DHistory();
+      }
+      state.generations[mode] += 1;
+      updateHud();
+    }
+
+    function valueText(def) {
+      const value = state.cfg[def.key];
+      if (def.type === 'checkbox') return value ? 'On' : 'Off';
+      if (def.type === 'select') {
+        return def.options.find(([optionValue]) => optionValue === value)?.[1] || value;
+      }
+      if (def.type === 'color') return String(value).toUpperCase();
+      const decimals = String(def.step).includes('.') ? String(def.step).split('.')[1].length : 0;
+      return `${Number(value).toFixed(decimals)}${def.unit || ''}`;
+    }
+
+    function renderControlPanel() {
+      optionPane.replaceChildren();
+      let section = null;
+      controls[state.mode].forEach((def) => {
+        if (def.section) {
+          section = document.createElement('section');
+          section.className = 'control-section';
+          const title = document.createElement('h2');
+          title.className = 'section-title';
+          title.textContent = def.section;
+          section.append(title);
+          optionPane.append(section);
+          return;
+        }
+
+        const row = document.createElement('label');
+        row.className = `control ${def.type}-row`;
+        const label = document.createElement('span');
+        label.textContent = def.label;
+
+        if (def.type === 'range') {
+          const top = document.createElement('div');
+          top.className = 'control-label';
+          const output = document.createElement('output');
+          output.textContent = valueText(def);
+          top.append(label, output);
+
+          const input = document.createElement('input');
+          input.type = 'range';
+          input.min = def.min;
+          input.max = def.max;
+          input.step = def.step;
+          input.value = state.cfg[def.key];
+          input.addEventListener('input', () => {
+            state.cfg[def.key] = Number(input.value);
+            output.textContent = valueText(def);
+            handleConfigChange(def.key);
+          });
+
+          row.append(top, input);
+        } else if (def.type === 'color') {
+          const input = document.createElement('input');
+          input.type = 'color';
+          input.value = state.cfg[def.key];
+          input.addEventListener('input', () => {
+            state.cfg[def.key] = input.value;
+            handleConfigChange(def.key);
+          });
+          row.append(label, input);
+        } else if (def.type === 'checkbox') {
+          const input = document.createElement('input');
+          input.type = 'checkbox';
+          input.checked = state.cfg[def.key];
+          input.addEventListener('change', () => {
+            state.cfg[def.key] = input.checked;
+            handleConfigChange(def.key);
+          });
+          row.append(label, input);
+        } else if (def.type === 'select') {
+          const input = document.createElement('select');
+          def.options.forEach(([value, name]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = name;
+            input.append(option);
+          });
+          input.value = state.cfg[def.key];
+          input.addEventListener('change', () => {
+            state.cfg[def.key] = input.value;
+            handleConfigChange(def.key);
+          });
+          row.append(label, input);
+        }
+
+        section.append(row);
+      });
+    }
+
+    function handleConfigChange(key) {
+      if (key === 'grid2d') {
+        resetMode('2d');
+        return;
+      }
+
+      if (key === 'grid3d') {
+        resetMode('3d');
+        return;
+      }
+
+      if (key === 'cubeSize3d' || key === 'cubeSpacing3d' || key === 'cubeHeight3d') {
+        needs3dLayout = true;
+        render3DHistory();
+      }
+
+      if (key === 'maxSlices3d') {
+        while (state.history3d.length > state.cfg.maxSlices3d) state.history3d.shift();
+        render3DHistory();
+      }
+
+      if (key === 'bg3d') {
+        apply3DBackground();
+      }
+
+      if (key === 'light3d') {
+        apply3DLightColor();
+      }
+
+      if (key === 'cube3d' || key === 'trail3d') {
+        render3DHistory();
+        updateTopNet();
+      }
+
+      if (key === 'topNet3d') {
+        updateTopNet();
+        syncOrbitEnabled();
+      }
+
+      draw2D();
+      updateHud();
+    }
+
+    function setMode(mode) {
+      if (state.mode === mode) return;
+      state.mode = mode;
+      app.dataset.mode = mode;
+      document.querySelectorAll('.mode-button').forEach((button) => {
+        button.setAttribute('aria-selected', String(button.dataset.mode === mode));
+      });
+      syncOrbitEnabled();
+
+      optionPane.classList.add('is-switching');
+      window.setTimeout(() => {
+        optionPane.dataset.panelMode = mode;
+        renderControlPanel();
+      }, 280);
+      window.setTimeout(() => {
+        optionPane.classList.remove('is-switching');
+        resizeViews();
+        updateHud();
+      }, 330);
+    }
+
+    function updatePlaybackButtons() {
+      playBtn.classList.toggle('active', state.running);
+      pauseBtn.classList.toggle('active', !state.running);
+      stateHud.textContent = state.running ? 'Running' : 'Paused';
+    }
+
+    function updateHud() {
+      const mode = state.mode;
+      const grid = state.grids[mode];
+      modeHud.textContent = mode.toUpperCase();
+      genHud.textContent = `Gen ${state.generations[mode]}`;
+      aliveHud.textContent = `${countAlive(grid)} alive`;
+      sliceHud.textContent = mode === '3d'
+        ? `${state.history3d.length}/${state.cfg.maxSlices3d} slices`
+        : 'Flat board';
+      hintText.textContent = mode === '3d'
+        ? (state.cfg.topNet3d
+          ? '3D top net: drag on the net to draw, drag away from it to orbit, scroll anywhere to zoom.'
+          : '3D: click the top layer to edit, shift-drag to paint, drag normally to orbit, scroll to zoom.')
+        : '2D: left click or drag to draw, right click to erase. The board remains editable while running.';
+      document.querySelector('.hud').classList.toggle('is-hidden', !state.cfg.showStats);
+      hintText.classList.toggle('is-hidden', !state.cfg.showHints);
+      updatePlaybackButtons();
+    }
+
+    function resizeViews() {
+      const rect = stage.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      render2d.dpr = dpr;
+      canvas2d.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas2d.height = Math.max(1, Math.floor(rect.height * dpr));
+      canvas2d.style.width = `${rect.width}px`;
+      canvas2d.style.height = `${rect.height}px`;
+
+      if (renderer && camera) {
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(rect.width, rect.height, false);
+        camera.aspect = Math.max(1, rect.width) / Math.max(1, rect.height);
+        camera.updateProjectionMatrix();
+      }
+
+      draw2D();
+      render3DOnce();
+    }
+
+    function draw2D() {
+      if (!ctx || !state.grids['2d']) return;
+      const cfg = state.cfg;
+      const width = canvas2d.width / render2d.dpr;
+      const height = canvas2d.height / render2d.dpr;
+      const size = cfg.grid2d;
+      const targetCell = cfg.squareSize2d;
+      const targetSpacing = cfg.squareSpacing2d;
+      const targetBoard = size * targetCell + (size - 1) * targetSpacing;
+      const fitScale = Math.min(1, (width - 48) / targetBoard, (height - 48) / targetBoard);
+      const scale = Number.isFinite(fitScale) && fitScale > 0 ? fitScale : 1;
+      const cell = Math.max(1, targetCell * scale);
+      const spacing = Math.max(0, targetSpacing * scale);
+      const step = cell + spacing;
+      const board = size * cell + (size - 1) * spacing;
+      const offsetX = (width - board) / 2;
+      const offsetY = (height - board) / 2;
+
+      render2d.offsetX = offsetX;
+      render2d.offsetY = offsetY;
+      render2d.cell = cell;
+      render2d.spacing = spacing;
+      render2d.step = step;
+      render2d.board = board;
+
+      ctx.setTransform(render2d.dpr, 0, 0, render2d.dpr, 0, 0);
+      ctx.fillStyle = cfg.bg2d;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.shadowColor = cfg.cell2d;
+      ctx.shadowBlur = Math.max(0, 12 * scale);
+      ctx.fillStyle = cfg.gridLine2d;
+      ctx.fillRect(offsetX - 1, offsetY - 1, board + 2, board + 2);
+
+      ctx.shadowBlur = Math.max(0, 16 * scale);
+      ctx.fillStyle = cfg.cell2d;
+      const grid = state.grids['2d'];
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          if (!grid[y * size + x]) continue;
+          const px = offsetX + x * step;
+          const py = offsetY + y * step;
+          draw2DCellShape(px, py, cell);
+        }
+      }
+      ctx.restore();
+    }
+
+    function draw2DCellShape(x, y, size) {
+      const shape = state.cfg.shape2d;
+      const cx = x + size / 2;
+      const cy = y + size / 2;
+      const radius = size / 2;
+
+      if (shape === 'circle') {
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+
+      if (shape === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo(cx, y);
+        ctx.lineTo(x + size, y + size);
+        ctx.lineTo(x, y + size);
+        ctx.closePath();
+        ctx.fill();
+        return;
+      }
+
+      if (shape === 'diamond') {
+        ctx.beginPath();
+        ctx.moveTo(cx, y);
+        ctx.lineTo(x + size, cy);
+        ctx.lineTo(cx, y + size);
+        ctx.lineTo(x, cy);
+        ctx.closePath();
+        ctx.fill();
+        return;
+      }
+
+      if (shape === 'hexagon') {
+        ctx.beginPath();
+        for (let i = 0; i < 6; i += 1) {
+          const angle = Math.PI / 6 + i * Math.PI / 3;
+          const px = cx + Math.cos(angle) * radius;
+          const py = cy + Math.sin(angle) * radius;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        return;
+      }
+
+      const corner = size > 8 ? Math.min(4, size * 0.22) : 0;
+      if (corner && ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(x, y, size, size, corner);
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, y, size, size);
+      }
+    }
+
+    function cellFrom2D(event) {
+      const rect = canvas2d.getBoundingClientRect();
+      const x = event.clientX - rect.left - render2d.offsetX;
+      const y = event.clientY - rect.top - render2d.offsetY;
+      if (x < 0 || y < 0 || x > render2d.board || y > render2d.board) return null;
+      const col = Math.floor(x / render2d.step);
+      const row = Math.floor(y / render2d.step);
+      if (col < 0 || row < 0 || col >= state.cfg.grid2d || row >= state.cfg.grid2d) return null;
+      return { col, row };
+    }
+
+    function applyBrush2D(event) {
+      const cell = cellFrom2D(event);
+      if (!cell) return;
+      const index = cell.row * state.cfg.grid2d + cell.col;
+      const key = `${cell.col},${cell.row}`;
+      const grid = state.grids['2d'];
+      const action = state.pointer2d.action;
+      if (action === 'toggle') {
+        if (state.pointer2d.seen.has(key)) return;
+        grid[index] = grid[index] ? 0 : 1;
+        state.pointer2d.seen.add(key);
+      } else {
+        grid[index] = action === 'draw' ? 1 : 0;
+      }
+      draw2D();
+      updateHud();
+    }
+
+    canvas2d.addEventListener('contextmenu', (event) => event.preventDefault());
+    canvas2d.addEventListener('pointerdown', (event) => {
+      if (state.mode !== '2d') return;
+      event.preventDefault();
+      canvas2d.setPointerCapture(event.pointerId);
+      state.pointer2d.active = true;
+      state.pointer2d.seen.clear();
+      state.pointer2d.action = event.button === 2 ? 'erase' : state.cfg.brush2d;
+      applyBrush2D(event);
+    });
+
+    canvas2d.addEventListener('pointermove', (event) => {
+      if (!state.pointer2d.active || state.mode !== '2d') return;
+      applyBrush2D(event);
+    });
+
+    function end2DPaint(event) {
+      if (!state.pointer2d.active) return;
+      state.pointer2d.active = false;
+      state.pointer2d.seen.clear();
+      if (canvas2d.hasPointerCapture(event.pointerId)) canvas2d.releasePointerCapture(event.pointerId);
+    }
+
+    canvas2d.addEventListener('pointerup', end2DPaint);
+    canvas2d.addEventListener('pointercancel', end2DPaint);
+
+    async function loadThree() {
+      try {
+        const threeModule = await import('three');
+        const controlsModule = await import('three/addons/controls/OrbitControls.js');
+        THREE = threeModule;
+        OrbitControls = controlsModule.OrbitControls;
+        init3D();
+      } catch (error) {
+        threeLoadError = error instanceof Error ? error.message : String(error);
+        threeMessage.textContent = '3D renderer could not load. The 2D board still works.';
+        updateHud();
+      }
+    }
+
+    function init3D() {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.35;
+      renderer.shadowMap.enabled = true;
+      mount3d.append(renderer.domElement);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(52, 1, 0.1, 1200);
+      camera.position.set(18, 22, 24);
+
+      orbit = new OrbitControls(camera, renderer.domElement);
+      orbit.enableDamping = true;
+      orbit.dampingFactor = 0.08;
+      orbit.screenSpacePanning = true;
+      orbit.minDistance = 5;
+      orbit.maxDistance = 180;
+      orbit.target.set(0, 5, 0);
+
+      ambientLight = new THREE.HemisphereLight(0xffffff, 0x202020, 1.15);
+      scene.add(ambientLight);
+
+      keyLight = new THREE.DirectionalLight(state.cfg.light3d, 3.4);
+      keyLight.position.set(14, 28, 18);
+      keyLight.castShadow = true;
+      scene.add(keyLight);
+
+      fillLight = new THREE.DirectionalLight(state.cfg.light3d, 0.7);
+      fillLight.position.set(-18, 12, -10);
+      scene.add(fillLight);
+
+      raycaster = new THREE.Raycaster();
+      pointerNdc = new THREE.Vector2();
+      paintPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide })
+      );
+      paintPlane.rotation.x = -Math.PI / 2;
+      scene.add(paintPlane);
+
+      renderer.domElement.addEventListener('contextmenu', (event) => event.preventDefault());
+      renderer.domElement.addEventListener('pointerdown', start3DPointer, true);
+      renderer.domElement.addEventListener('pointermove', move3DPointer, true);
+      renderer.domElement.addEventListener('pointerup', end3DPointer, true);
+      renderer.domElement.addEventListener('pointercancel', end3DPointer, true);
+      renderer.domElement.addEventListener('pointerleave', leave3DPointer);
+
+      threeReady = true;
+      threeMessage.remove();
+      apply3DBackground();
+      needs3dLayout = true;
+      render3DHistory();
+      resizeViews();
+      updateHud();
+    }
+
+    function apply3DBackground() {
+      if (!renderer || !scene || !THREE) return;
+      renderer.setClearColor(state.cfg.bg3d, 1);
+      scene.background = new THREE.Color(state.cfg.bg3d);
+      render3DOnce();
+    }
+
+    function apply3DLightColor() {
+      if (!THREE) return;
+      const color = new THREE.Color(state.cfg.light3d);
+      if (keyLight) keyLight.color.copy(color);
+      if (fillLight) fillLight.color.copy(color);
+      render3DOnce();
+    }
+
+    function board3DMetrics() {
+      const cfg = state.cfg;
+      const step = cfg.cubeSize3d + cfg.cubeSpacing3d;
+      const size = (cfg.grid3d - 1) * step + cfg.cubeSize3d;
+      const verticalStep = cfg.cubeHeight3d + cfg.cubeSpacing3d;
+      const stackHeight = Math.max(cfg.cubeHeight3d, state.history3d.length * verticalStep);
+      return { step, size, verticalStep, stackHeight };
+    }
+
+    function update3DLayout(forceCamera = false) {
+      if (!threeReady) return;
+      const metrics = board3DMetrics();
+      paintPlane.geometry.dispose();
+      paintPlane.geometry = new THREE.PlaneGeometry(metrics.size, metrics.size);
+
+      if (forceCamera || needs3dLayout) {
+        const distance = Math.max(12, metrics.size * 1.3);
+        camera.position.set(distance * 0.58, metrics.stackHeight + distance * 0.76, distance * 0.9);
+        orbit.target.set(0, metrics.stackHeight * 0.42, 0);
+        orbit.update();
+      }
+
+      camera.near = 0.08;
+      camera.far = Math.max(300, metrics.size * 16 + metrics.stackHeight * 12);
+      camera.updateProjectionMatrix();
+      needs3dLayout = false;
+    }
+
+    function update3DTopPlane() {
+      if (!threeReady || !paintPlane) return;
+      const metrics = board3DMetrics();
+      const topY = (state.history3d.length - 1) * metrics.verticalStep + state.cfg.cubeHeight3d + 0.006;
+      paintPlane.position.y = topY;
+      updateTopNet(topY);
+      orbit.target.y += ((topY * 0.5) - orbit.target.y) * 0.08;
+    }
+
+    function removeTopNet() {
+      if (!topNet || !scene) return;
+      scene.remove(topNet);
+      topNet.geometry.dispose();
+      topNet.material.dispose();
+      topNet = null;
+      topNetKey = '';
+    }
+
+    function updateTopNet(topY = null) {
+      if (!threeReady || !THREE) return;
+      if (!state.cfg.topNet3d) {
+        removeTopNet();
+        return;
+      }
+
+      const metrics = board3DMetrics();
+      const netY = topY ?? ((state.history3d.length - 1) * metrics.verticalStep + state.cfg.cubeHeight3d + 0.006);
+      const key = `${state.cfg.grid3d}|${metrics.step}|${state.cfg.cube3d}`;
+
+      if (!topNet || topNetKey !== key) {
+        removeTopNet();
+        const positions = [];
+        const netSize = state.cfg.grid3d * metrics.step;
+        const min = -netSize / 2;
+        const max = netSize / 2;
+
+        for (let i = 0; i <= state.cfg.grid3d; i += 1) {
+          const p = min + i * metrics.step;
+          positions.push(p, 0, min, p, 0, max);
+          positions.push(min, 0, p, max, 0, p);
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        const material = new THREE.LineBasicMaterial({
+          color: state.cfg.cube3d,
+          transparent: true,
+          opacity: 0.46,
+          depthTest: true,
+          depthWrite: false
+        });
+        topNet = new THREE.LineSegments(geometry, material);
+        topNet.renderOrder = 20;
+        scene.add(topNet);
+        topNetKey = key;
+      }
+
+      topNet.position.y = netY + 0.002;
+      render3DOnce();
+    }
+
+    function syncOrbitEnabled() {
+      if (!orbit) return;
+      orbit.enabled = state.mode === '3d' && !state.pointer3d.painting;
+    }
+
+    function disposeSliceMeshes() {
+      sliceMeshes.forEach((entry) => {
+        if (!entry) return;
+        scene.remove(entry.mesh);
+        entry.material.dispose();
+      });
+      sliceMeshes = [];
+    }
+
+    function ensureSliceGeometry() {
+      const cfg = state.cfg;
+      const shapeKey = `${cfg.cubeSize3d}|${cfg.cubeHeight3d}`;
+      if (sliceGeometry && sliceGeometryKey === shapeKey) return;
+
+      disposeSliceMeshes();
+      if (sliceGeometry) {
+        sliceGeometry.dispose();
+      }
+
+      sliceGeometry = new THREE.BoxGeometry(cfg.cubeSize3d, cfg.cubeHeight3d, cfg.cubeSize3d);
+      sliceGeometry.computeVertexNormals();
+      sliceGeometryKey = shapeKey;
+    }
+
+    function removeSliceMesh(index) {
+      const entry = sliceMeshes[index];
+      if (!entry) return;
+      scene.remove(entry.mesh);
+      entry.material.dispose();
+      sliceMeshes[index] = null;
+    }
+
+    function ensureSliceMesh(index, total, color) {
+      ensureSliceGeometry();
+      let entry = sliceMeshes[index];
+      if (entry && entry.capacity >= total) {
+        entry.material.color.copy(color);
+        entry.material.emissive.copy(color).multiplyScalar(0.16);
+        entry.material.needsUpdate = true;
+        return entry.mesh;
+      }
+
+      removeSliceMesh(index);
+      const capacity = Math.max(1, total);
+      const material = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color.clone().multiplyScalar(0.16),
+        roughness: 0.62,
+        metalness: 0.02,
+        flatShading: true
+      });
+      const mesh = new THREE.InstancedMesh(sliceGeometry, material, capacity);
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.frustumCulled = false;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      scene.add(mesh);
+      sliceMeshes[index] = { mesh, material, capacity };
+      return mesh;
+    }
+
+    function render3DHistory() {
+      if (!threeReady || !state.grids['3d']) return;
+      if (needs3dLayout) update3DLayout(true);
+
+      const cfg = state.cfg;
+      const metrics = board3DMetrics();
+      const matrix = new THREE.Matrix4();
+      const currentColor = new THREE.Color(cfg.cube3d);
+      const oldColor = new THREE.Color(cfg.trail3d);
+      const mixed = new THREE.Color();
+      const half = (cfg.grid3d - 1) / 2;
+      const aliveCounts = state.history3d.map((grid) => countAlive(grid));
+
+      for (let i = state.history3d.length; i < sliceMeshes.length; i += 1) {
+        removeSliceMesh(i);
+      }
+      sliceMeshes.length = state.history3d.length;
+
+      for (let slice = 0; slice < state.history3d.length; slice += 1) {
+        const grid = state.history3d[slice];
+        const age = state.history3d.length <= 1 ? 1 : slice / (state.history3d.length - 1);
+        mixed.lerpColors(oldColor, currentColor, age);
+        const mesh = ensureSliceMesh(slice, aliveCounts[slice], mixed);
+        const y = slice * metrics.verticalStep + cfg.cubeHeight3d / 2;
+        let instance = 0;
+
+        for (let row = 0; row < cfg.grid3d; row += 1) {
+          for (let col = 0; col < cfg.grid3d; col += 1) {
+            if (!grid[row * cfg.grid3d + col]) continue;
+            const x = (col - half) * metrics.step;
+            const z = (row - half) * metrics.step;
+            matrix.makeTranslation(x, y, z);
+            mesh.setMatrixAt(instance, matrix);
+            instance += 1;
+          }
+        }
+
+        mesh.count = instance;
+        mesh.instanceMatrix.needsUpdate = true;
+      }
+      update3DTopPlane();
+      render3DOnce();
+    }
+
+    function render3DOnce() {
+      if (renderer && scene && camera) renderer.render(scene, camera);
+    }
+
+    function cellFrom3D(event) {
+      if (!threeReady || !paintPlane) return null;
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointerNdc.x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+      pointerNdc.y = -(((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1);
+      raycaster.setFromCamera(pointerNdc, camera);
+      const hit = raycaster.intersectObject(paintPlane, false)[0];
+      if (!hit) return null;
+
+      const cfg = state.cfg;
+      const metrics = board3DMetrics();
+      const half = (cfg.grid3d - 1) / 2;
+      const col = Math.round(hit.point.x / metrics.step + half);
+      const row = Math.round(hit.point.z / metrics.step + half);
+      if (col < 0 || row < 0 || col >= cfg.grid3d || row >= cfg.grid3d) return null;
+      return { col, row };
+    }
+
+    function applyBrush3D(event) {
+      const cell = cellFrom3D(event);
+      if (!cell) return;
+      const index = cell.row * state.cfg.grid3d + cell.col;
+      const key = `${cell.col},${cell.row}`;
+      const grid = state.grids['3d'];
+      const action = state.cfg.brush3d;
+      if (action === 'toggle') {
+        if (state.pointer3d.seen.has(key)) return;
+        grid[index] = grid[index] ? 0 : 1;
+        state.pointer3d.seen.add(key);
+      } else {
+        grid[index] = action === 'draw' ? 1 : 0;
+      }
+      state.history3d[state.history3d.length - 1] = grid;
+      render3DHistory();
+      updateHud();
+    }
+
+    function isOverTopNet(event) {
+      return state.cfg.topNet3d && cellFrom3D(event) !== null;
+    }
+
+    function start3DPointer(event) {
+      if (state.mode !== '3d' || event.button !== 0) return;
+      state.pointer3d.startX = event.clientX;
+      state.pointer3d.startY = event.clientY;
+      state.pointer3d.seen.clear();
+      state.pointer3d.overNet = isOverTopNet(event);
+      state.pointer3d.painting = event.shiftKey || state.pointer3d.overNet;
+      if (state.pointer3d.painting) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        renderer.domElement.setPointerCapture(event.pointerId);
+        syncOrbitEnabled();
+        applyBrush3D(event);
+      } else {
+        syncOrbitEnabled();
+      }
+    }
+
+    function move3DPointer(event) {
+      if (state.mode !== '3d') return;
+      if (state.pointer3d.painting) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        applyBrush3D(event);
+        return;
+      }
+
+      state.pointer3d.overNet = isOverTopNet(event);
+      syncOrbitEnabled();
+    }
+
+    function end3DPointer(event) {
+      if (state.mode !== '3d') return;
+      if (state.pointer3d.painting) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        state.pointer3d.painting = false;
+        state.pointer3d.seen.clear();
+        state.pointer3d.overNet = isOverTopNet(event);
+        syncOrbitEnabled();
+        if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
+        return;
+      }
+
+      if (event.button !== 0) return;
+      const dx = event.clientX - state.pointer3d.startX;
+      const dy = event.clientY - state.pointer3d.startY;
+      if (Math.hypot(dx, dy) < 6) applyBrush3D(event);
+      state.pointer3d.seen.clear();
+      state.pointer3d.overNet = isOverTopNet(event);
+      syncOrbitEnabled();
+    }
+
+    function leave3DPointer() {
+      state.pointer3d.overNet = false;
+      if (!state.pointer3d.painting) syncOrbitEnabled();
+    }
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const mode = state.mode;
+      const speed = mode === '2d' ? state.cfg.speed2d : state.cfg.speed3d;
+      const interval = 1000 / Math.max(1, speed);
+
+      if (state.running) {
+        let steps = 0;
+        while (now - state.lastStepAt >= interval && steps < 4) {
+          tickMode(mode);
+          state.lastStepAt += interval;
+          steps += 1;
+        }
+      } else {
+        state.lastStepAt = now;
+      }
+
+      if (mode === '2d') {
+        draw2D();
+      }
+
+      if (threeReady && orbit && renderer) {
+        orbit.update();
+        if (mode === '3d') render3DOnce();
+      }
+    }
+
+    document.querySelectorAll('.mode-button').forEach((button) => {
+      button.addEventListener('click', () => setMode(button.dataset.mode));
+    });
+
+    collapseBtn.addEventListener('click', () => {
+      setSidebarOpen(!state.sidebarOpen);
+    });
+
+    playBtn.addEventListener('click', () => {
+      state.running = true;
+      state.lastStepAt = performance.now();
+      updateHud();
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      state.running = false;
+      updateHud();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      resetMode(state.mode);
+    });
+
+    window.addEventListener('resize', resizeViews);
+
+    if (mobileLayout.addEventListener) {
+      mobileLayout.addEventListener('change', syncResponsiveSidebar);
+    } else {
+      mobileLayout.addListener(syncResponsiveSidebar);
+    }
+
+    if ('ResizeObserver' in window) {
+      const observer = new ResizeObserver(resizeViews);
+      observer.observe(stage);
+    }
+
+    setSidebarOpen(!mobileLayout.matches, false);
+    resetMode('2d');
+    resetMode('3d');
+    renderControlPanel();
+    updateHud();
+    resizeViews();
+    loadThree();
+    requestAnimationFrame(animate);
+
+    window.conwayTimeStack = {
+      state,
+      reset: () => resetMode(state.mode),
+      play: () => {
+        state.running = true;
+        updateHud();
+      },
+      pause: () => {
+        state.running = false;
+        updateHud();
+      },
+      threeStatus: () => threeReady ? 'ready' : threeLoadError || 'loading'
+    };
+  </script>
+</body>
+</html>
