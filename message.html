@@ -795,6 +795,118 @@
     margin-top: 8px;
   }
 
+  .message-attachments {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 220px));
+    gap: 8px;
+    margin-top: 9px;
+  }
+
+  .attachment-card {
+    min-width: 0;
+    min-height: 54px;
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface-2);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .message-row.me .attachment-card {
+    border-color: rgba(255, 255, 255, 0.36);
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+  }
+
+  .attachment-card.image-card {
+    position: relative;
+    grid-template-columns: 1fr;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .attachment-image {
+    width: 100%;
+    max-height: 260px;
+    display: block;
+    object-fit: cover;
+    background: var(--surface-3);
+    aspect-ratio: 4 / 3;
+  }
+
+  .attachment-image-label {
+    position: absolute;
+    right: 7px;
+    bottom: 7px;
+    left: 7px;
+    overflow: hidden;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(8, 12, 19, 0.72);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    backdrop-filter: blur(5px);
+  }
+
+  .attachment-file-icon {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .message-row.me .attachment-file-icon {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+  }
+
+  .attachment-copy {
+    min-width: 0;
+  }
+
+  .attachment-name {
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .attachment-meta {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .message-row.me .attachment-meta {
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .attachment-download {
+    font-size: 16px;
+  }
+
+  .attachment-error {
+    grid-column: 1 / -1;
+    color: var(--danger);
+    font-size: 11px;
+  }
+
   .reaction-chip {
     min-height: 26px;
     border-radius: 999px;
@@ -949,7 +1061,7 @@
 
   .composer-form {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 10px;
     align-items: end;
     padding: 5px;
@@ -959,7 +1071,8 @@
     transition: border-color 0.14s ease, box-shadow 0.14s ease;
   }
 
-  .composer-form:focus-within {
+  .composer-form:focus-within,
+  .composer-form.dragging {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
@@ -979,6 +1092,74 @@
     min-width: 78px;
     min-height: 40px;
     border-radius: 12px;
+  }
+
+  .attach-btn {
+    align-self: end;
+    margin: 2px 0 2px 1px;
+  }
+
+  .attachment-tray {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    overflow-x: auto;
+    padding: 2px 2px 5px;
+    scrollbar-width: thin;
+  }
+
+  .pending-attachment {
+    position: relative;
+    width: 150px;
+    min-width: 150px;
+    min-height: 56px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 7px 30px 7px 7px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface-2);
+  }
+
+  .pending-thumbnail {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 9px;
+    background: var(--surface-3);
+    object-fit: cover;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .pending-remove {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 22px;
+    min-height: 22px;
+    display: grid;
+    place-items: center;
+    border-radius: 7px;
+    background: var(--surface-3);
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .upload-status {
+    color: var(--accent-strong);
+    font-weight: 750;
+  }
+
+  .upload-status:not(:empty)::before {
+    margin: 0 6px;
+    color: var(--muted);
+    content: "·";
   }
 
   .composer-meta {
@@ -1475,7 +1656,11 @@
     }
 
     .composer-form {
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .message-attachments {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .composer .primary-btn {
@@ -1634,12 +1819,17 @@
           </div>
           <button class="small-btn" id="cancelReplyBtn" type="button">Cancel</button>
         </div>
+        <div class="attachment-tray hidden" id="attachmentTray" role="list" aria-label="Attachments ready to send"></div>
         <form class="composer-form" id="messageForm">
+          <input class="hidden" id="attachmentInput" type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,text/plain,application/pdf,application/json,application/zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
+          <button class="icon-btn attach-btn" id="attachmentBtn" type="button" title="Attach files (up to 3 files, 10 MB each)" aria-label="Attach files" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m20.5 11.5-8.9 8.9a6 6 0 0 1-8.5-8.5l9.6-9.6a4 4 0 0 1 5.7 5.7l-9.6 9.6a2 2 0 1 1-2.8-2.8l8.9-8.9"/></svg>
+          </button>
           <textarea class="textarea" id="messageInput" rows="1" placeholder="Write a message…" aria-label="Message" aria-describedby="composerHint characterCount" maxlength="2000" spellcheck="true" disabled></textarea>
           <button class="primary-btn" id="sendBtn" type="submit" disabled>Send</button>
         </form>
         <div class="composer-meta">
-          <span class="composer-hint" id="composerHint">Enter to send · Shift+Enter for a new line</span>
+          <span><span class="composer-hint" id="composerHint">Enter to send · Shift+Enter for a new line</span><span class="upload-status" id="uploadStatus" role="status" aria-live="polite"></span></span>
           <span class="character-count" id="characterCount">0 / 2000</span>
         </div>
       </footer>
@@ -1874,11 +2064,56 @@ import {
   onDisconnect,
   query,
   limitToLast,
+  orderByKey,
+  startAfter,
+  runTransaction,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+import {
+  getStorage,
+  ref as storageRef,
+  uploadBytesResumable,
+  getBlob,
+  deleteObject
+} from "https://www.gstatic.com/firebasejs/10.1.0/firebase-storage.js";
 import { firebaseConfig } from "./message-firebase-config.js";
 
 const PATH = "secureChat";
+const MAX_ATTACHMENTS = 3;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "text/plain",
+  "application/pdf",
+  "application/json",
+  "application/zip",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+]);
+const ATTACHMENT_TYPE_BY_EXTENSION = Object.freeze({
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  txt: "text/plain",
+  pdf: "application/pdf",
+  json: "application/json",
+  zip: "application/zip",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+});
 const DEFAULT_SETTINGS = {
   theme: "system",
   accent: "#0b84ff",
@@ -1894,6 +2129,7 @@ const DEFAULT_SETTINGS = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
+const storage = getStorage(app);
 const authReady = setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 const els = {
@@ -1935,6 +2171,10 @@ const els = {
   messageForm: document.getElementById("messageForm"),
   messageInput: document.getElementById("messageInput"),
   sendBtn: document.getElementById("sendBtn"),
+  attachmentBtn: document.getElementById("attachmentBtn"),
+  attachmentInput: document.getElementById("attachmentInput"),
+  attachmentTray: document.getElementById("attachmentTray"),
+  uploadStatus: document.getElementById("uploadStatus"),
   composerHint: document.getElementById("composerHint"),
   characterCount: document.getElementById("characterCount"),
   messageSearch: document.getElementById("messageSearch"),
@@ -2007,6 +2247,7 @@ let activeMessages = [];
 let settings = loadLocalSettings();
 let publicGroupsUnsub = null;
 let membershipsUnsub = null;
+let readStatesUnsub = null;
 let groupUnsub = null;
 let messagesUnsub = null;
 let messageChangesUnsub = null;
@@ -2030,8 +2271,14 @@ let unseenMessageCount = 0;
 let loadingMessageHistory = false;
 let messageHistoryTimer = null;
 let authBusy = false;
-const notificationWatchers = new Map();
-const notificationStart = new Map();
+let readStates = {};
+let pendingAttachments = [];
+let readMarkerTimer = null;
+const unreadWatchers = new Map();
+const unreadByGroup = new Map();
+const attachmentObjectUrls = new Map();
+const attachmentLoadPromises = new Map();
+let attachmentCacheGeneration = 0;
 const userProfileCache = new Map();
 const groupCryptoKeys = new Map();
 const REACTIONS = [
@@ -2201,25 +2448,42 @@ function clearInviteFromUrl() {
   history.replaceState(null, "", url.pathname + url.search + url.hash);
 }
 
-function countKey(type, groupId) {
-  return `messager:${type}:${currentUser?.uid || "anon"}:${groupId}`;
+function getUnreadCounts(groupId) {
+  return unreadByGroup.get(groupId) || { unread: 0, mentions: 0 };
 }
 
-function getCount(type, groupId) {
-  return Number(localStorage.getItem(countKey(type, groupId)) || 0);
+function latestActiveMessageId() {
+  return activeMessages.reduce((latest, message) => String(message.id || "") > latest ? String(message.id) : latest, "");
 }
 
-function setCount(type, groupId, value) {
-  localStorage.setItem(countKey(type, groupId), String(Math.max(0, value)));
+function queueCurrentGroupRead(delay = 420) {
+  if (readMarkerTimer) clearTimeout(readMarkerTimer);
+  if (!currentUser || !currentGroupId || document.hidden || !isNearMessageBottom()) return;
+  const groupId = currentGroupId;
+  const messageId = latestActiveMessageId();
+  if (!messageId) return;
+  readMarkerTimer = setTimeout(() => {
+    readMarkerTimer = null;
+    if (currentGroupId !== groupId || document.hidden || !isNearMessageBottom()) return;
+    markGroupRead(groupId, messageId);
+  }, delay);
 }
 
-function incrementCount(type, groupId) {
-  setCount(type, groupId, getCount(type, groupId) + 1);
-}
-
-function resetCounts(groupId) {
-  setCount("unread", groupId, 0);
-  setCount("mentions", groupId, 0);
+async function markGroupRead(groupId, messageId) {
+  if (!currentUser || !groupId || !messageId) return;
+  try {
+    await runTransaction(ref(db, `${PATH}/readStates/${currentUser.uid}/${groupId}`), current => {
+      const existingId = String(current?.lastReadMessageId || "");
+      if (existingId && existingId >= messageId) return;
+      return {
+        lastReadMessageId: messageId,
+        lastReadAt: serverTimestamp(),
+        updatedAtClient: Date.now()
+      };
+    }, { applyLocally: true });
+  } catch (error) {
+    console.warn("Could not sync read marker:", error);
+  }
 }
 
 function openModal(id) {
@@ -2310,6 +2574,138 @@ function preview(text, max = 120) {
   return clean.length > max ? clean.slice(0, max - 1) + "..." : clean;
 }
 
+function formatFileSize(bytes) {
+  const value = Number(bytes || 0);
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(value < 10240 ? 1 : 0)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function attachmentTypeForFile(file) {
+  const extension = String(file.name || "").split(".").pop().toLowerCase();
+  return ALLOWED_ATTACHMENT_TYPES.has(file.type) ? file.type : (ATTACHMENT_TYPE_BY_EXTENSION[extension] || "");
+}
+
+function safeAttachmentName(name) {
+  const clean = String(name || "file")
+    .replace(/[\u0000-\u001f\u007f/\\]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (clean || "file").slice(0, 120);
+}
+
+function randomAttachmentId() {
+  const values = crypto.getRandomValues(new Uint8Array(16));
+  return [...values].map(value => value.toString(16).padStart(2, "0")).join("");
+}
+
+function attachmentEntries(attachments) {
+  return Object.entries(attachments || {})
+    .map(([slot, attachment]) => ({ slot, ...attachment, id: attachment.id || slot }))
+    .filter(attachment => attachment.path && attachment.name)
+    .slice(0, MAX_ATTACHMENTS);
+}
+
+function addPendingAttachments(fileList) {
+  const rejected = [];
+  for (const file of fileList) {
+    if (pendingAttachments.length >= MAX_ATTACHMENTS) {
+      rejected.push(`Only ${MAX_ATTACHMENTS} attachments can be sent at once.`);
+      break;
+    }
+    const type = attachmentTypeForFile(file);
+    if (!type) {
+      rejected.push(`${file.name}: file type is not supported.`);
+      continue;
+    }
+    if (!file.size || file.size > MAX_ATTACHMENT_BYTES) {
+      rejected.push(`${file.name}: files must be between 1 byte and 10 MB.`);
+      continue;
+    }
+    const duplicate = pendingAttachments.some(item => item.file.name === file.name && item.file.size === file.size && item.file.lastModified === file.lastModified);
+    if (duplicate) continue;
+    pendingAttachments.push({
+      id: randomAttachmentId(),
+      file,
+      name: safeAttachmentName(file.name),
+      type,
+      previewUrl: type.startsWith("image/") ? URL.createObjectURL(file) : ""
+    });
+  }
+  els.attachmentInput.value = "";
+  renderPendingAttachments();
+  if (rejected.length) toast("Some files were not added", rejected[0]);
+}
+
+function renderPendingAttachments() {
+  els.attachmentTray.replaceChildren();
+  els.attachmentTray.classList.toggle("hidden", pendingAttachments.length === 0);
+  pendingAttachments.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "pending-attachment";
+    card.setAttribute("role", "listitem");
+    if (item.previewUrl) {
+      const image = document.createElement("img");
+      image.className = "pending-thumbnail";
+      image.src = item.previewUrl;
+      image.alt = "";
+      card.appendChild(image);
+    } else {
+      const icon = document.createElement("div");
+      icon.className = "pending-thumbnail";
+      icon.textContent = item.name.split(".").pop().slice(0, 4) || "file";
+      card.appendChild(icon);
+    }
+    const copy = document.createElement("div");
+    copy.className = "attachment-copy";
+    const name = document.createElement("div");
+    name.className = "attachment-name";
+    name.textContent = item.name;
+    name.title = item.name;
+    const meta = document.createElement("div");
+    meta.className = "attachment-meta";
+    meta.textContent = formatFileSize(item.file.size);
+    copy.append(name, meta);
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "pending-remove";
+    removeButton.textContent = "×";
+    removeButton.setAttribute("aria-label", `Remove ${item.name}`);
+    removeButton.addEventListener("click", () => removePendingAttachment(item.id));
+    card.append(copy, removeButton);
+    els.attachmentTray.appendChild(card);
+  });
+  updateComposerState();
+}
+
+function removePendingAttachment(id) {
+  const item = pendingAttachments.find(attachment => attachment.id === id);
+  if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
+  pendingAttachments = pendingAttachments.filter(attachment => attachment.id !== id);
+  renderPendingAttachments();
+}
+
+function clearPendingAttachments() {
+  pendingAttachments.forEach(item => {
+    if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+  });
+  pendingAttachments = [];
+  if (els.attachmentTray) {
+    els.attachmentTray.replaceChildren();
+    els.attachmentTray.classList.add("hidden");
+  }
+  if (els.attachmentInput) els.attachmentInput.value = "";
+  if (els.uploadStatus) els.uploadStatus.textContent = "";
+  if (els.messageInput) updateComposerState();
+}
+
+function clearAttachmentObjectUrls() {
+  attachmentCacheGeneration += 1;
+  attachmentObjectUrls.forEach(url => URL.revokeObjectURL(url));
+  attachmentObjectUrls.clear();
+  attachmentLoadPromises.clear();
+}
+
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -2387,6 +2783,183 @@ async function decryptForGroup(msg, groupId = currentGroupId) {
   return new TextDecoder().decode(decrypted);
 }
 
+async function encryptAttachmentFile(file, groupId) {
+  const key = groupCryptoKeys.get(groupId);
+  if (!key) throw new Error("Set the E2E passphrase before uploading attachments.");
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, await file.arrayBuffer());
+  return {
+    blob: new Blob([encrypted], { type: "application/octet-stream" }),
+    iv: bytesToBase64(iv)
+  };
+}
+
+async function decryptAttachmentBlob(blob, attachment, groupId) {
+  const key = groupCryptoKeys.get(groupId);
+  if (!key) throw new Error("Set the group E2E passphrase to open this attachment.");
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: base64ToBytes(attachment.iv) },
+    key,
+    await blob.arrayBuffer()
+  );
+  return new Blob([decrypted], { type: attachment.type || "application/octet-stream" });
+}
+
+function setUploadStatus(groupId, text) {
+  if (currentGroupId === groupId) els.uploadStatus.textContent = text || "";
+}
+
+async function uploadMessageAttachments(items, groupId, messageId, user, encrypted) {
+  const attachments = {};
+  const uploadedPaths = [];
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    const path = `secureChatAttachments/${user.uid}/${groupId}/${messageId}/${item.id}`;
+    let uploadBlob = item.file;
+    let iv = "";
+    if (encrypted) {
+      const encryptedFile = await encryptAttachmentFile(item.file, groupId);
+      uploadBlob = encryptedFile.blob;
+      iv = encryptedFile.iv;
+    }
+    const task = uploadBytesResumable(storageRef(storage, path), uploadBlob, {
+      contentType: encrypted ? "application/octet-stream" : item.type,
+      customMetadata: {
+        uploaderUid: user.uid,
+        groupId,
+        messageId,
+        originalName: item.name,
+        originalType: item.type,
+        encrypted: String(encrypted)
+      }
+    });
+    try {
+      await new Promise((resolve, reject) => {
+        task.on("state_changed", snapshot => {
+          const percent = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+          setUploadStatus(groupId, `Uploading ${index + 1}/${items.length} · ${percent}%`);
+        }, reject, resolve);
+      });
+    } catch (error) {
+      const uploadError = error instanceof Error ? error : new Error("Attachment upload failed.");
+      uploadError.uploadedPaths = [...uploadedPaths];
+      throw uploadError;
+    }
+    uploadedPaths.push(path);
+    attachments[String(index)] = {
+      id: item.id,
+      path,
+      name: item.name,
+      size: item.file.size,
+      type: item.type,
+      uploaderUid: user.uid,
+      ...(encrypted ? { encrypted: true, iv } : {})
+    };
+  }
+  return { attachments, uploadedPaths };
+}
+
+async function removeUploadedAttachments(paths) {
+  await Promise.allSettled((paths || []).map(path => deleteObject(storageRef(storage, path))));
+}
+
+async function getAttachmentObjectUrl(attachment, groupId) {
+  const cacheKey = `${attachment.path}|${attachment.iv || "plain"}`;
+  if (attachmentObjectUrls.has(cacheKey)) return attachmentObjectUrls.get(cacheKey);
+  if (attachmentLoadPromises.has(cacheKey)) return attachmentLoadPromises.get(cacheKey);
+  const generation = attachmentCacheGeneration;
+  const load = (async () => {
+    let blob = await getBlob(storageRef(storage, attachment.path), MAX_ATTACHMENT_BYTES + 1024);
+    if (attachment.encrypted) blob = await decryptAttachmentBlob(blob, attachment, groupId);
+    const url = URL.createObjectURL(blob);
+    if (generation !== attachmentCacheGeneration) {
+      URL.revokeObjectURL(url);
+      throw new Error("Attachment load was cancelled.");
+    }
+    attachmentObjectUrls.set(cacheKey, url);
+    return url;
+  })();
+  attachmentLoadPromises.set(cacheKey, load);
+  try {
+    return await load;
+  } finally {
+    attachmentLoadPromises.delete(cacheKey);
+  }
+}
+
+async function downloadAttachment(attachment, groupId, button) {
+  const oldDisabled = button?.disabled;
+  if (button) button.disabled = true;
+  try {
+    const url = await getAttachmentObjectUrl(attachment, groupId);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = safeAttachmentName(attachment.name);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (error) {
+    toast("Could not open attachment", friendlyError(error));
+  } finally {
+    if (button) button.disabled = Boolean(oldDisabled);
+  }
+}
+
+function renderMessageAttachments(bubble, msg) {
+  if (msg.deleted) return;
+  const attachments = attachmentEntries(msg.attachments);
+  if (!attachments.length) return;
+  const groupId = currentGroupId;
+  const container = document.createElement("div");
+  container.className = "message-attachments";
+  attachments.forEach(attachment => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "attachment-card";
+    button.setAttribute("aria-label", `Download ${attachment.name}, ${formatFileSize(attachment.size)}`);
+    button.addEventListener("click", () => downloadAttachment(attachment, groupId, button));
+    if (attachment.type.startsWith("image/")) {
+      button.classList.add("image-card");
+      const image = document.createElement("img");
+      image.className = "attachment-image";
+      image.alt = attachment.name;
+      const label = document.createElement("span");
+      label.className = "attachment-image-label";
+      label.textContent = `${attachment.name} · ${formatFileSize(attachment.size)}`;
+      button.append(image, label);
+      getAttachmentObjectUrl(attachment, groupId).then(url => {
+        if (button.isConnected) image.src = url;
+      }).catch(error => {
+        if (!button.isConnected) return;
+        image.remove();
+        label.textContent = attachment.encrypted && !hasE2EKey(groupId)
+          ? "Set the E2E passphrase to view this image"
+          : "Image unavailable — click to retry";
+        button.title = friendlyError(error);
+      });
+    } else {
+      const icon = document.createElement("div");
+      icon.className = "attachment-file-icon";
+      icon.textContent = attachment.name.split(".").pop().slice(0, 4) || "file";
+      const copy = document.createElement("div");
+      copy.className = "attachment-copy";
+      const name = document.createElement("div");
+      name.className = "attachment-name";
+      name.textContent = attachment.name;
+      const meta = document.createElement("div");
+      meta.className = "attachment-meta";
+      meta.textContent = `${formatFileSize(attachment.size)}${attachment.encrypted ? " · encrypted" : ""}`;
+      const download = document.createElement("span");
+      download.className = "attachment-download";
+      download.textContent = "↓";
+      copy.append(name, meta);
+      button.append(icon, copy, download);
+    }
+    container.appendChild(button);
+  });
+  bubble.appendChild(container);
+}
+
 function messageTextForDisplay(msg) {
   if (!msg?.encrypted) return msg?.text || "";
   return msg.decryptedText || "Encrypted message";
@@ -2451,6 +3024,7 @@ function scrollToLatest(smooth = true) {
   });
   unseenMessageCount = 0;
   updateJumpLatest();
+  queueCurrentGroupRead();
 }
 
 function autoResizeComposer() {
@@ -2465,7 +3039,12 @@ function updateComposerState() {
   els.characterCount.classList.toggle("warning", length >= max * 0.9);
   const unavailable = !currentUser || !currentGroupId || !currentGroupData || !canUseGroup() || isCurrentUserMuted() || (isE2EEnabled() && !hasE2EKey());
   els.messageInput.disabled = unavailable;
-  els.sendBtn.disabled = unavailable || sendingMessage || !els.messageInput.value.trim();
+  els.attachmentBtn.disabled = unavailable || sendingMessage || pendingAttachments.length >= MAX_ATTACHMENTS;
+  els.attachmentInput.disabled = unavailable || sendingMessage;
+  els.attachmentTray.querySelectorAll("button").forEach(button => {
+    button.disabled = sendingMessage;
+  });
+  els.sendBtn.disabled = unavailable || sendingMessage || (!els.messageInput.value.trim() && pendingAttachments.length === 0);
   els.sendBtn.textContent = sendingMessage ? "Sending…" : "Send";
   autoResizeComposer();
 }
@@ -2637,8 +3216,10 @@ function cleanupRealtime() {
   cleanupTyping();
   if (notificationSeenTimer) clearTimeout(notificationSeenTimer);
   if (messageHistoryTimer) clearTimeout(messageHistoryTimer);
+  if (readMarkerTimer) clearTimeout(readMarkerTimer);
   if (publicGroupsUnsub) publicGroupsUnsub();
   if (membershipsUnsub) membershipsUnsub();
+  if (readStatesUnsub) readStatesUnsub();
   if (groupUnsub) groupUnsub();
   if (messagesUnsub) messagesUnsub();
   if (messageChangesUnsub) messageChangesUnsub();
@@ -2647,6 +3228,7 @@ function cleanupRealtime() {
   if (presenceUnsub) presenceUnsub();
   publicGroupsUnsub = null;
   membershipsUnsub = null;
+  readStatesUnsub = null;
   groupUnsub = null;
   messagesUnsub = null;
   messageChangesUnsub = null;
@@ -2655,15 +3237,19 @@ function cleanupRealtime() {
   presenceUnsub = null;
   notificationSeenTimer = null;
   messageHistoryTimer = null;
+  readMarkerTimer = null;
   loadingMessageHistory = false;
   notifications = {};
+  readStates = {};
   presence = {};
   typingUsers = {};
   clearReplyTarget();
+  clearPendingAttachments();
+  clearAttachmentObjectUrls();
   renderNotifications();
-  notificationWatchers.forEach(unsub => unsub());
-  notificationWatchers.clear();
-  notificationStart.clear();
+  unreadWatchers.forEach(watcher => watcher.unsub());
+  unreadWatchers.clear();
+  unreadByGroup.clear();
   groupCryptoKeys.clear();
 }
 
@@ -2692,6 +3278,11 @@ function startPresence() {
 }
 
 function startGroupListeners() {
+  readStatesUnsub = onValue(ref(db, `${PATH}/readStates/${currentUser.uid}`), snap => {
+    readStates = snap.val() || {};
+    syncUnreadWatchers();
+    renderGroups();
+  }, error => setStatus(friendlyError(error)));
   publicGroupsUnsub = onValue(ref(db, `${PATH}/publicGroups`), snap => {
     publicGroups = snap.val() || {};
     renderGroups();
@@ -2699,7 +3290,7 @@ function startGroupListeners() {
   membershipsUnsub = onValue(ref(db, `${PATH}/memberships/${currentUser.uid}`), snap => {
     memberships = snap.val() || {};
     renderGroups();
-    syncMentionWatchers();
+    syncUnreadWatchers();
   });
   startNotificationListeners();
 }
@@ -2753,8 +3344,7 @@ function renderGroups() {
   }
 
   groups.forEach(group => {
-    const unread = getCount("unread", group.id);
-    const mentions = getCount("mentions", group.id);
+    const { unread, mentions } = getUnreadCounts(group.id);
     const row = document.createElement("button");
     row.type = "button";
     row.className = "group-entry";
@@ -3016,9 +3606,17 @@ async function joinPublicGroup(groupId, summary) {
 }
 
 function selectGroup(id) {
+  const previousGroupId = currentGroupId;
+  const previousMessageId = latestActiveMessageId();
+  if (previousGroupId && previousMessageId && !document.hidden && isNearMessageBottom()) {
+    markGroupRead(previousGroupId, previousMessageId);
+  }
+  if (readMarkerTimer) clearTimeout(readMarkerTimer);
+  readMarkerTimer = null;
   saveDraft();
   cleanupTyping();
   clearReplyTarget();
+  clearPendingAttachments();
   closeMobilePanels();
   if (groupUnsub) groupUnsub();
   if (messagesUnsub) messagesUnsub();
@@ -3033,7 +3631,8 @@ function selectGroup(id) {
   unseenMessageCount = 0;
   loadingMessageHistory = true;
   if (messageHistoryTimer) clearTimeout(messageHistoryTimer);
-  resetCounts(id);
+  unreadByGroup.set(id, { unread: 0, mentions: 0 });
+  syncUnreadWatchers();
   renderGroups();
   els.messages.innerHTML = '<div class="empty-state">Loading messages...</div>';
   els.pinnedBar.classList.add("hidden");
@@ -3113,6 +3712,7 @@ function selectGroup(id) {
 
 function resetChat(text = "No group selected.") {
   closeMobilePanels();
+  clearPendingAttachments();
   els.chatTitle.textContent = "Choose a group";
   els.chatSubtitle.textContent = "Private groups only appear to members.";
   els.currentGroupIcon.textContent = "#";
@@ -3223,6 +3823,7 @@ async function applyE2EPassphrase() {
     groupCryptoKeys.set(groupId, key);
     localStorage.setItem(e2eStorageKey(groupId), "1");
     if (currentGroupId !== groupId) return;
+    clearAttachmentObjectUrls();
     els.e2ePassphrase.value = "";
     renderCurrentGroup();
     setStatus("E2E passphrase set.", els.e2eStatus);
@@ -3243,6 +3844,7 @@ function toggleE2EEnabled() {
 function clearE2EKey() {
   if (!currentGroupId) return;
   groupCryptoKeys.delete(currentGroupId);
+  clearAttachmentObjectUrls();
   localStorage.removeItem(e2eStorageKey());
   els.e2ePassphrase.value = "";
   activeMessages.forEach(msg => {
@@ -3510,30 +4112,42 @@ async function sendMessage(event) {
   }
   const draftValue = els.messageInput.value;
   const text = draftValue.trim();
-  if (!text) return;
+  const attachmentSnapshot = [...pendingAttachments];
+  if (!text && attachmentSnapshot.length === 0) return;
   const groupId = currentGroupId;
   const groupData = currentGroupData;
   const user = currentUser;
   const profileSnapshot = { ...profile };
   const reply = replyTarget ? { ...replyTarget } : null;
   const encrypted = isE2EEnabled();
+  const attachmentSummary = attachmentSnapshot.length === 1
+    ? "Shared an attachment"
+    : `Shared ${attachmentSnapshot.length} attachments`;
+  let uploadedPaths = [];
   try {
     sendingMessage = true;
     updateComposerState();
     setStatus("");
     const msgRef = push(ref(db, `${PATH}/messages/${groupId}`));
     const mentions = parseMentions(text, groupData);
+    const messageText = text || attachmentSummary;
     const payload = {
       senderUid: user.uid,
       senderHandle: profileSnapshot.handle,
       senderName: profileSnapshot.displayName,
       senderColor: profileSnapshot.color || settings.profileColor,
-      text,
+      text: messageText,
       mentions,
-      ts: serverTimestamp()
+      ts: serverTimestamp(),
+      ...(text ? {} : { attachmentOnly: true })
     };
+    if (attachmentSnapshot.length) {
+      const result = await uploadMessageAttachments(attachmentSnapshot, groupId, msgRef.key, user, encrypted);
+      payload.attachments = result.attachments;
+      uploadedPaths = result.uploadedPaths;
+    }
     if (encrypted) {
-      Object.assign(payload, await encryptForGroup(text, groupId));
+      Object.assign(payload, await encryptForGroup(messageText, groupId));
       payload.text = "Encrypted message";
     }
     if (reply) {
@@ -3545,6 +4159,7 @@ async function sendMessage(event) {
       };
     }
     await set(msgRef, payload);
+    uploadedPaths = [];
 
     const notificationUpdates = {};
     Object.keys(mentions).forEach(uid => {
@@ -3559,7 +4174,7 @@ async function sendMessage(event) {
         fromUid: user.uid,
         fromHandle: profileSnapshot.handle,
         fromName: profileSnapshot.displayName,
-        text: encrypted ? "Encrypted message" : preview(text, 180),
+        text: encrypted ? "Encrypted message" : preview(messageText, 180),
         read: false,
         status: "new",
         createdAt: serverTimestamp(),
@@ -3572,16 +4187,27 @@ async function sendMessage(event) {
         setStatus("Message sent, but mention notifications need updated database rules.");
       });
     }
-    if (currentGroupId === groupId && els.messageInput.value === draftValue) {
-      els.messageInput.value = "";
-      if (!replyTarget || replyTarget.id === reply?.id) clearReplyTarget();
-      clearTyping();
-      localStorage.removeItem(draftStorageKey(groupId));
+    if (currentGroupId === groupId) {
+      const sentIds = new Set(attachmentSnapshot.map(item => item.id));
+      pendingAttachments.forEach(item => {
+        if (sentIds.has(item.id) && item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      });
+      pendingAttachments = pendingAttachments.filter(item => !sentIds.has(item.id));
+      renderPendingAttachments();
+      if (els.messageInput.value === draftValue) {
+        els.messageInput.value = "";
+        if (!replyTarget || replyTarget.id === reply?.id) clearReplyTarget();
+        clearTyping();
+        localStorage.removeItem(draftStorageKey(groupId));
+      }
       scrollToLatest();
     }
   } catch (error) {
+    const pathsToRemove = error?.uploadedPaths || uploadedPaths;
+    if (pathsToRemove.length) await removeUploadedAttachments(pathsToRemove);
     setStatus(friendlyError(error));
   } finally {
+    setUploadStatus(groupId, "");
     sendingMessage = false;
     updateComposerState();
   }
@@ -3596,7 +4222,8 @@ function appendMessage(msg) {
   row.classList.toggle("mentioned", Boolean(msg.mentions && msg.mentions[currentUser?.uid]));
   row.dataset.messageId = msg.id || "";
   row.dataset.senderUid = msg.senderUid || "";
-  row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${messageTextForDisplay(msg)}`.toLowerCase();
+  const attachmentNames = attachmentEntries(msg.attachments).map(attachment => attachment.name).join(" ");
+  row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${messageTextForDisplay(msg)} ${attachmentNames}`.toLowerCase();
 
   const avatar = document.createElement("div");
   avatar.className = "avatar";
@@ -3652,6 +4279,7 @@ function appendMessage(msg) {
     appendHighlightedText(body, msg.text || "");
   }
   bubble.appendChild(body);
+  renderMessageAttachments(bubble, msg);
   renderReactions(bubble, msg);
   renderMessageActions(bubble, msg);
   row.append(avatar, bubble);
@@ -3674,7 +4302,8 @@ async function renderEncryptedMessageBody(body, row, msg) {
     msg.decryptedText = plainText;
     body.textContent = "";
     appendHighlightedText(body, plainText);
-    row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${plainText}`.toLowerCase();
+    const attachmentNames = attachmentEntries(msg.attachments).map(attachment => attachment.name).join(" ");
+    row.dataset.search = `${msg.senderName || ""} ${msg.senderHandle || ""} ${plainText} ${attachmentNames}`.toLowerCase();
     applyMessageSearch();
   } catch {
     body.textContent = "Encrypted message. Wrong passphrase or damaged message.";
@@ -3885,15 +4514,21 @@ async function deleteMessage(msg) {
   const owner = isGroupOwner();
   if (msg.senderUid !== currentUser?.uid && !owner) return;
   if (!confirm("Delete this message?")) return;
+  const attachmentPaths = attachmentEntries(msg.attachments).map(attachment => attachment.path);
   try {
     await update(ref(db, `${PATH}/messages/${currentGroupId}/${msg.id}`), {
       text: "Message deleted",
       mentions: null,
+      attachments: null,
+      attachmentOnly: null,
       deleted: true,
       deletedAt: serverTimestamp(),
       deletedBy: currentUser.uid,
       editedAt: serverTimestamp()
     });
+    if (msg.senderUid === currentUser.uid && attachmentPaths.length) {
+      removeUploadedAttachments(attachmentPaths);
+    }
   } catch (error) {
     setStatus(friendlyError(error));
   }
@@ -4063,32 +4698,38 @@ function cleanupTyping() {
   if (els.typingIndicator) els.typingIndicator.classList.add("hidden");
 }
 
-function syncMentionWatchers() {
+function syncUnreadWatchers() {
+  if (!currentUser) return;
   const ids = new Set(Object.keys(memberships || {}));
-  for (const [id, unsub] of notificationWatchers.entries()) {
-    if (!ids.has(id)) {
-      unsub();
-      notificationWatchers.delete(id);
-      notificationStart.delete(id);
+  for (const [id, watcher] of unreadWatchers.entries()) {
+    const marker = String(readStates[id]?.lastReadMessageId || "");
+    if (!ids.has(id) || id === currentGroupId || watcher.marker !== marker) {
+      watcher.unsub();
+      unreadWatchers.delete(id);
+      if (!ids.has(id) || id === currentGroupId) unreadByGroup.set(id, { unread: 0, mentions: 0 });
     }
   }
   ids.forEach(id => {
-    if (notificationWatchers.has(id)) return;
-    const startedAt = Date.now();
-    notificationStart.set(id, startedAt);
-    const q = query(ref(db, `${PATH}/messages/${id}`), limitToLast(30));
-    const unsub = onChildAdded(q, snap => {
-      const msg = snap.val();
-      if (!msg || !currentUser || msg.senderUid === currentUser.uid) return;
-      const ts = typeof msg.ts === "number" ? msg.ts : Date.now();
-      if (ts < startedAt - 3000) return;
-      if (id !== currentGroupId) incrementCount("unread", id);
-      if (msg.mentions && msg.mentions[currentUser.uid]) {
-        if (id !== currentGroupId || document.hidden) incrementCount("mentions", id);
-      }
+    if (id === currentGroupId) {
+      unreadByGroup.set(id, { unread: 0, mentions: 0 });
+      return;
+    }
+    const marker = String(readStates[id]?.lastReadMessageId || "");
+    if (unreadWatchers.get(id)?.marker === marker) return;
+    const messagesRef = ref(db, `${PATH}/messages/${id}`);
+    const unreadQuery = marker
+      ? query(messagesRef, orderByKey(), startAfter(marker), limitToLast(100))
+      : query(messagesRef, orderByKey(), limitToLast(100));
+    const unsub = onValue(unreadQuery, snap => {
+      if (!currentUser || id === currentGroupId) return;
+      const items = Object.values(snap.val() || {}).filter(msg => msg && !msg.deleted && msg.senderUid !== currentUser.uid);
+      unreadByGroup.set(id, {
+        unread: items.length,
+        mentions: items.filter(msg => Boolean(msg.mentions?.[currentUser.uid])).length
+      });
       renderGroups();
-    });
-    notificationWatchers.set(id, unsub);
+    }, error => console.warn(`Could not load unread state for ${id}:`, error));
+    unreadWatchers.set(id, { marker, unsub });
   });
 }
 
@@ -4341,6 +4982,7 @@ async function leaveGroup() {
     const updates = {};
     updates[`${PATH}/groups/${currentGroupId}/members/${currentUser.uid}`] = null;
     updates[`${PATH}/memberships/${currentUser.uid}/${currentGroupId}`] = null;
+    updates[`${PATH}/readStates/${currentUser.uid}/${currentGroupId}`] = null;
     await update(ref(db), updates);
     currentGroupId = null;
     currentGroupData = null;
@@ -4361,6 +5003,7 @@ async function deleteGroup() {
     Object.keys(currentGroupData.members || {}).forEach(uid => {
       updates[`${PATH}/memberships/${uid}/${groupId}`] = null;
     });
+    updates[`${PATH}/readStates/${currentUser.uid}/${groupId}`] = null;
     updates[`${PATH}/publicGroups/${groupId}`] = null;
     updates[`${PATH}/groups/${groupId}`] = null;
     await update(ref(db), updates);
@@ -4393,7 +5036,9 @@ function exportMessages() {
   if (!currentGroupData || !activeMessages.length) return;
   const lines = activeMessages.map(msg => {
     const date = new Date(typeof msg.ts === "number" ? msg.ts : Date.now()).toISOString();
-    return `[${date}] ${msg.senderName || msg.senderHandle}: ${messageTextForDisplay(msg)}`;
+    const files = attachmentEntries(msg.attachments).map(attachment => attachment.name);
+    const attachmentText = files.length ? ` [attachments: ${files.join(", ")}]` : "";
+    return `[${date}] ${msg.senderName || msg.senderHandle}: ${messageTextForDisplay(msg)}${attachmentText}`;
   });
   const blob = new Blob([lines.join("\n")], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
@@ -4511,6 +5156,28 @@ els.markAllNotificationsBtn.addEventListener("click", markAllNotificationsRead);
 els.groupSearch.addEventListener("input", renderGroups);
 els.messageSearch.addEventListener("input", applyMessageSearch);
 els.messageForm.addEventListener("submit", sendMessage);
+els.attachmentBtn.addEventListener("click", () => els.attachmentInput.click());
+els.attachmentInput.addEventListener("change", () => addPendingAttachments([...els.attachmentInput.files]));
+els.messageInput.addEventListener("paste", event => {
+  const files = [...(event.clipboardData?.files || [])];
+  if (!files.length) return;
+  event.preventDefault();
+  addPendingAttachments(files);
+});
+els.messageForm.addEventListener("dragover", event => {
+  event.preventDefault();
+  if (els.attachmentInput.disabled) return;
+  els.messageForm.classList.add("dragging");
+});
+els.messageForm.addEventListener("dragleave", event => {
+  if (!els.messageForm.contains(event.relatedTarget)) els.messageForm.classList.remove("dragging");
+});
+els.messageForm.addEventListener("drop", event => {
+  els.messageForm.classList.remove("dragging");
+  event.preventDefault();
+  if (els.attachmentInput.disabled) return;
+  addPendingAttachments([...(event.dataTransfer?.files || [])]);
+});
 els.messageInput.addEventListener("input", () => {
   saveDraft();
   markTyping();
@@ -4529,6 +5196,7 @@ els.messages.addEventListener("scroll", () => {
   if (isNearMessageBottom()) {
     unseenMessageCount = 0;
     updateJumpLatest();
+    queueCurrentGroupRead();
   }
 }, { passive: true });
 els.jumpLatestBtn.addEventListener("click", () => scrollToLatest());
@@ -4619,6 +5287,11 @@ document.querySelectorAll(".status-line").forEach(status => {
 });
 window.addEventListener("resize", () => {
   if (window.innerWidth > 1040) closeMobilePanels();
+});
+document.addEventListener("visibilitychange", () => {
+  if (!currentGroupId || !latestActiveMessageId() || !isNearMessageBottom()) return;
+  if (document.hidden) markGroupRead(currentGroupId, latestActiveMessageId());
+  else queueCurrentGroupRead(120);
 });
 if (window.matchMedia) {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applySettings);

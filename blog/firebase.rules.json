@@ -1,4 +1,4 @@
-﻿{
+{
   "rules": {
     ".read": false,
     ".write": false,
@@ -80,6 +80,15 @@
           }
         }
       },
+      "readStates": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$gid": {
+            ".write": "auth != null && auth.uid === $uid && (!newData.exists() || root.child('secureChat/groups/' + $gid + '/members/' + auth.uid).exists())",
+            ".validate": "!newData.exists() || (newData.hasChildren(['lastReadMessageId','lastReadAt','updatedAtClient']) && newData.child('lastReadMessageId').isString() && newData.child('lastReadMessageId').val().matches(/^[-A-Za-z0-9_]{8,128}$/) && newData.child('lastReadAt').isNumber() && newData.child('updatedAtClient').isNumber())"
+          }
+        }
+      },
       "presence": {
         ".read": "auth != null",
         "$uid": {
@@ -141,6 +150,14 @@
           "$mid": {
             ".write": "auth != null && ((!data.exists() && root.child('secureChat/groups/' + $gid + '/members/' + auth.uid).exists() && !root.child('secureChat/groups/' + $gid + '/mutes/' + auth.uid).exists() && !root.child('secureChat/groups/' + $gid + '/bans/' + auth.uid).exists() && newData.child('senderUid').val() === auth.uid) || (data.exists() && newData.exists() && data.child('senderUid').val() === auth.uid && newData.child('senderUid').val() === auth.uid) || (data.exists() && newData.exists() && root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid) || (!newData.exists() && root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid))",
             ".validate": "!newData.exists() || (newData.hasChildren(['senderUid','senderHandle','senderName','text','ts']) && ((!data.exists() && newData.child('senderUid').val() === auth.uid) || (data.exists() && newData.child('senderUid').val() === data.child('senderUid').val())) && newData.child('senderHandle').isString() && newData.child('senderHandle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('senderName').isString() && newData.child('senderName').val().matches(/^.{1,40}$/) && newData.child('text').isString() && newData.child('text').val().matches(/^.{1,2000}$/) && (!newData.child('senderColor').exists() || (newData.child('senderColor').isString() && newData.child('senderColor').val().matches(/^#[0-9A-Fa-f]{6}$/))) && (!newData.child('deleted').exists() || newData.child('deleted').isBoolean()) && (!newData.child('replyTo').exists() || (newData.child('replyTo').hasChildren(['id','senderName','text']) && newData.child('replyTo').child('id').isString() && newData.child('replyTo').child('senderName').isString() && newData.child('replyTo').child('senderName').val().matches(/^.{1,40}$/) && newData.child('replyTo').child('text').isString() && newData.child('replyTo').child('text').val().matches(/^.{1,180}$/))))",
+            "attachmentOnly": {
+              ".validate": "!newData.exists() || newData.isBoolean()"
+            },
+            "attachments": {
+              "$slot": {
+                ".validate": "$slot.matches(/^[0-2]$/) && newData.hasChildren(['id','path','name','size','type','uploaderUid']) && newData.child('id').isString() && newData.child('id').val().matches(/^[a-f0-9]{32}$/) && newData.child('path').isString() && newData.child('path').val() === 'secureChatAttachments/' + newData.child('uploaderUid').val() + '/' + $gid + '/' + $mid + '/' + newData.child('id').val() && newData.child('name').isString() && newData.child('name').val().matches(/^.{1,120}$/) && newData.child('size').isNumber() && newData.child('size').val() > 0 && newData.child('size').val() <= 10485760 && newData.child('uploaderUid').val() === newData.parent().parent().child('senderUid').val() && newData.child('type').isString() && (newData.child('type').val() === 'image/jpeg' || newData.child('type').val() === 'image/png' || newData.child('type').val() === 'image/gif' || newData.child('type').val() === 'image/webp' || newData.child('type').val() === 'text/plain' || newData.child('type').val() === 'application/pdf' || newData.child('type').val() === 'application/json' || newData.child('type').val() === 'application/zip' || newData.child('type').val() === 'application/msword' || newData.child('type').val() === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || newData.child('type').val() === 'application/vnd.ms-excel' || newData.child('type').val() === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || newData.child('type').val() === 'application/vnd.ms-powerpoint' || newData.child('type').val() === 'application/vnd.openxmlformats-officedocument.presentationml.presentation') && (!newData.child('encrypted').exists() || (newData.child('encrypted').val() === true && newData.child('iv').isString() && newData.child('iv').val().matches(/^.{16}$/)))"
+              }
+            },
             "reactions": {
               "$reaction": {
                 "$uid": {

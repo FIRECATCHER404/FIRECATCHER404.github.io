@@ -1,0 +1,61 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /secureChatAttachments/{uid}/{groupId}/{messageId}/{fileId} {
+      allow get: if request.auth != null;
+      allow list: if false;
+
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && fileId.matches('[a-f0-9]{32}')
+        && request.resource.size > 0
+        && request.resource.size <= 10486784
+        && request.resource.metadata.keys().hasAll([
+          'uploaderUid',
+          'groupId',
+          'messageId',
+          'originalName',
+          'originalType',
+          'encrypted'
+        ])
+        && request.resource.metadata.uploaderUid == request.auth.uid
+        && request.resource.metadata.groupId == groupId
+        && request.resource.metadata.messageId == messageId
+        && request.resource.metadata.originalName.size() > 0
+        && request.resource.metadata.originalName.size() <= 120
+        && (
+          (
+            request.resource.metadata.encrypted == 'true'
+            && request.resource.contentType == 'application/octet-stream'
+            && isAllowedType(request.resource.metadata.originalType)
+          )
+          || (
+            request.resource.metadata.encrypted == 'false'
+            && request.resource.contentType == request.resource.metadata.originalType
+            && isAllowedType(request.resource.contentType)
+          )
+        );
+
+      allow update: if false;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+
+  function isAllowedType(contentType) {
+    return contentType == 'image/jpeg'
+      || contentType == 'image/png'
+      || contentType == 'image/gif'
+      || contentType == 'image/webp'
+      || contentType == 'text/plain'
+      || contentType == 'application/pdf'
+      || contentType == 'application/json'
+      || contentType == 'application/zip'
+      || contentType == 'application/msword'
+      || contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      || contentType == 'application/vnd.ms-excel'
+      || contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      || contentType == 'application/vnd.ms-powerpoint'
+      || contentType == 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  }
+}
