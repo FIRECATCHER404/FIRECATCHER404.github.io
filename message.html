@@ -1822,7 +1822,7 @@
         <div class="attachment-tray hidden" id="attachmentTray" role="list" aria-label="Attachments ready to send"></div>
         <form class="composer-form" id="messageForm">
           <input class="hidden" id="attachmentInput" type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,text/plain,application/pdf,application/json,application/zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
-          <button class="icon-btn attach-btn" id="attachmentBtn" type="button" title="Attach files (up to 3 files, 10 MB each)" aria-label="Attach files" disabled>
+          <button class="icon-btn attach-btn" id="attachmentBtn" type="button" title="Attach files (up to 3 files, 1 MB each)" aria-label="Attach files" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m20.5 11.5-8.9 8.9a6 6 0 0 1-8.5-8.5l9.6-9.6a4 4 0 0 1 5.7 5.7l-9.6 9.6a2 2 0 1 1-2.8-2.8l8.9-8.9"/></svg>
           </button>
           <textarea class="textarea" id="messageInput" rows="1" placeholder="Write a message…" aria-label="Message" aria-describedby="composerHint characterCount" maxlength="2000" spellcheck="true" disabled></textarea>
@@ -2069,18 +2069,11 @@ import {
   runTransaction,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
-import {
-  getStorage,
-  ref as storageRef,
-  uploadBytesResumable,
-  getBlob,
-  deleteObject
-} from "https://www.gstatic.com/firebasejs/10.1.0/firebase-storage.js";
 import { firebaseConfig } from "./message-firebase-config.js";
 
 const PATH = "secureChat";
 const MAX_ATTACHMENTS = 3;
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -2129,7 +2122,6 @@ const DEFAULT_SETTINGS = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
-const storage = getStorage(app);
 const authReady = setPersistence(auth, browserLocalPersistence).catch(() => {});
 
 const els = {
@@ -2278,6 +2270,7 @@ const unreadWatchers = new Map();
 const unreadByGroup = new Map();
 const attachmentObjectUrls = new Map();
 const attachmentLoadPromises = new Map();
+const attachmentPreviewObservers = new Set();
 let attachmentCacheGeneration = 0;
 const userProfileCache = new Map();
 const groupCryptoKeys = new Map();
@@ -2619,7 +2612,7 @@ function addPendingAttachments(fileList) {
       continue;
     }
     if (!file.size || file.size > MAX_ATTACHMENT_BYTES) {
-      rejected.push(`${file.name}: files must be between 1 byte and 10 MB.`);
+      rejected.push(`${file.name}: files must be between 1 byte and 1 MB.`);
       continue;
     }
     const duplicate = pendingAttachments.some(item => item.file.name === file.name && item.file.size === file.size && item.file.lastModified === file.lastModified);
@@ -2701,9 +2694,26 @@ function clearPendingAttachments() {
 
 function clearAttachmentObjectUrls() {
   attachmentCacheGeneration += 1;
+  attachmentPreviewObservers.forEach(observer => observer.disconnect());
+  attachmentPreviewObservers.clear();
   attachmentObjectUrls.forEach(url => URL.revokeObjectURL(url));
   attachmentObjectUrls.clear();
   attachmentLoadPromises.clear();
+}
+
+function loadWhenNearViewport(element, callback) {
+  if (!("IntersectionObserver" in window)) {
+    callback();
+    return;
+  }
+  const observer = new IntersectionObserver(entries => {
+    if (!entries.some(entry => entry.isIntersecting)) return;
+    observer.disconnect();
+    attachmentPreviewObservers.delete(observer);
+    callback();
+  }, { root: els.messages, rootMargin: "160px 0px" });
+  attachmentPreviewObservers.add(observer);
+  observer.observe(element);
 }
 
 function escapeRegExp(value) {
@@ -2809,44 +2819,31 @@ function setUploadStatus(groupId, text) {
   if (currentGroupId === groupId) els.uploadStatus.textContent = text || "";
 }
 
-async function uploadMessageAttachments(items, groupId, messageId, user, encrypted) {
+async function prepareMessageAttachments(items, groupId, messageId, user, encrypted) {
   const attachments = {};
-  const uploadedPaths = [];
+  const dataUpdates = {};
   for (let index = 0; index < items.length; index += 1) {
     const item = items[index];
-    const path = `secureChatAttachments/${user.uid}/${groupId}/${messageId}/${item.id}`;
-    let uploadBlob = item.file;
+    const slot = String(index);
+    const path = `${PATH}/attachmentData/${groupId}/${user.uid}/${messageId}/${slot}`;
+    let storedBlob = item.file;
     let iv = "";
     if (encrypted) {
       const encryptedFile = await encryptAttachmentFile(item.file, groupId);
-      uploadBlob = encryptedFile.blob;
+      storedBlob = encryptedFile.blob;
       iv = encryptedFile.iv;
     }
-    const task = uploadBytesResumable(storageRef(storage, path), uploadBlob, {
-      contentType: encrypted ? "application/octet-stream" : item.type,
-      customMetadata: {
-        uploaderUid: user.uid,
-        groupId,
-        messageId,
-        originalName: item.name,
-        originalType: item.type,
-        encrypted: String(encrypted)
-      }
-    });
-    try {
-      await new Promise((resolve, reject) => {
-        task.on("state_changed", snapshot => {
-          const percent = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
-          setUploadStatus(groupId, `Uploading ${index + 1}/${items.length} · ${percent}%`);
-        }, reject, resolve);
-      });
-    } catch (error) {
-      const uploadError = error instanceof Error ? error : new Error("Attachment upload failed.");
-      uploadError.uploadedPaths = [...uploadedPaths];
-      throw uploadError;
-    }
-    uploadedPaths.push(path);
-    attachments[String(index)] = {
+    setUploadStatus(groupId, `Preparing ${index + 1}/${items.length} · ${formatFileSize(item.file.size)}`);
+    const content = bytesToBase64(new Uint8Array(await storedBlob.arrayBuffer()));
+    dataUpdates[path] = {
+      id: item.id,
+      uploaderUid: user.uid,
+      size: item.file.size,
+      type: item.type,
+      content,
+      ...(encrypted ? { encrypted: true } : {})
+    };
+    attachments[slot] = {
       id: item.id,
       path,
       name: item.name,
@@ -2856,11 +2853,7 @@ async function uploadMessageAttachments(items, groupId, messageId, user, encrypt
       ...(encrypted ? { encrypted: true, iv } : {})
     };
   }
-  return { attachments, uploadedPaths };
-}
-
-async function removeUploadedAttachments(paths) {
-  await Promise.allSettled((paths || []).map(path => deleteObject(storageRef(storage, path))));
+  return { attachments, dataUpdates };
 }
 
 async function getAttachmentObjectUrl(attachment, groupId) {
@@ -2869,7 +2862,18 @@ async function getAttachmentObjectUrl(attachment, groupId) {
   if (attachmentLoadPromises.has(cacheKey)) return attachmentLoadPromises.get(cacheKey);
   const generation = attachmentCacheGeneration;
   const load = (async () => {
-    let blob = await getBlob(storageRef(storage, attachment.path), MAX_ATTACHMENT_BYTES + 1024);
+    const snapshot = await get(ref(db, attachment.path));
+    const stored = snapshot.val();
+    if (!stored || typeof stored.content !== "string") throw new Error("Attachment data is unavailable.");
+    if (stored.id !== attachment.id || stored.uploaderUid !== attachment.uploaderUid || stored.size !== attachment.size || stored.type !== attachment.type || Boolean(stored.encrypted) !== Boolean(attachment.encrypted)) {
+      throw new Error("Attachment metadata does not match the stored file.");
+    }
+    const bytes = base64ToBytes(stored.content);
+    const expectedBytes = Number(attachment.size) + (attachment.encrypted ? 16 : 0);
+    if (bytes.byteLength !== expectedBytes || bytes.byteLength > MAX_ATTACHMENT_BYTES + 16) {
+      throw new Error("Attachment data is invalid or too large.");
+    }
+    let blob = new Blob([bytes], { type: attachment.encrypted ? "application/octet-stream" : attachment.type });
     if (attachment.encrypted) blob = await decryptAttachmentBlob(blob, attachment, groupId);
     const url = URL.createObjectURL(blob);
     if (generation !== attachmentCacheGeneration) {
@@ -2922,20 +2926,26 @@ function renderMessageAttachments(bubble, msg) {
       button.classList.add("image-card");
       const image = document.createElement("img");
       image.className = "attachment-image";
-      image.alt = attachment.name;
+      image.alt = "";
+      image.hidden = true;
       const label = document.createElement("span");
       label.className = "attachment-image-label";
       label.textContent = `${attachment.name} · ${formatFileSize(attachment.size)}`;
       button.append(image, label);
-      getAttachmentObjectUrl(attachment, groupId).then(url => {
-        if (button.isConnected) image.src = url;
-      }).catch(error => {
-        if (!button.isConnected) return;
-        image.remove();
-        label.textContent = attachment.encrypted && !hasE2EKey(groupId)
-          ? "Set the E2E passphrase to view this image"
-          : "Image unavailable — click to retry";
-        button.title = friendlyError(error);
+      loadWhenNearViewport(button, () => {
+        getAttachmentObjectUrl(attachment, groupId).then(url => {
+          if (!button.isConnected) return;
+          image.src = url;
+          image.alt = attachment.name;
+          image.hidden = false;
+        }).catch(error => {
+          if (!button.isConnected) return;
+          image.remove();
+          label.textContent = attachment.encrypted && !hasE2EKey(groupId)
+            ? "Set the E2E passphrase to view this image"
+            : "Image unavailable — click to retry";
+          button.title = friendlyError(error);
+        });
       });
     } else {
       const icon = document.createElement("div");
@@ -4123,7 +4133,6 @@ async function sendMessage(event) {
   const attachmentSummary = attachmentSnapshot.length === 1
     ? "Shared an attachment"
     : `Shared ${attachmentSnapshot.length} attachments`;
-  let uploadedPaths = [];
   try {
     sendingMessage = true;
     updateComposerState();
@@ -4141,10 +4150,11 @@ async function sendMessage(event) {
       ts: serverTimestamp(),
       ...(text ? {} : { attachmentOnly: true })
     };
+    let attachmentDataUpdates = {};
     if (attachmentSnapshot.length) {
-      const result = await uploadMessageAttachments(attachmentSnapshot, groupId, msgRef.key, user, encrypted);
+      const result = await prepareMessageAttachments(attachmentSnapshot, groupId, msgRef.key, user, encrypted);
       payload.attachments = result.attachments;
-      uploadedPaths = result.uploadedPaths;
+      attachmentDataUpdates = result.dataUpdates;
     }
     if (encrypted) {
       Object.assign(payload, await encryptForGroup(messageText, groupId));
@@ -4158,8 +4168,11 @@ async function sendMessage(event) {
         text: encrypted ? "Encrypted reply" : preview(reply.text, 180)
       };
     }
-    await set(msgRef, payload);
-    uploadedPaths = [];
+    if (attachmentSnapshot.length) setUploadStatus(groupId, "Sending message and attachments…");
+    await update(ref(db), {
+      [`${PATH}/messages/${groupId}/${msgRef.key}`]: payload,
+      ...attachmentDataUpdates
+    });
 
     const notificationUpdates = {};
     Object.keys(mentions).forEach(uid => {
@@ -4203,8 +4216,6 @@ async function sendMessage(event) {
       scrollToLatest();
     }
   } catch (error) {
-    const pathsToRemove = error?.uploadedPaths || uploadedPaths;
-    if (pathsToRemove.length) await removeUploadedAttachments(pathsToRemove);
     setStatus(friendlyError(error));
   } finally {
     setUploadStatus(groupId, "");
@@ -4516,7 +4527,8 @@ async function deleteMessage(msg) {
   if (!confirm("Delete this message?")) return;
   const attachmentPaths = attachmentEntries(msg.attachments).map(attachment => attachment.path);
   try {
-    await update(ref(db, `${PATH}/messages/${currentGroupId}/${msg.id}`), {
+    const messagePath = `${PATH}/messages/${currentGroupId}/${msg.id}`;
+    const changes = {
       text: "Message deleted",
       mentions: null,
       attachments: null,
@@ -4525,10 +4537,15 @@ async function deleteMessage(msg) {
       deletedAt: serverTimestamp(),
       deletedBy: currentUser.uid,
       editedAt: serverTimestamp()
+    };
+    const updates = {};
+    Object.entries(changes).forEach(([key, value]) => {
+      updates[`${messagePath}/${key}`] = value;
     });
-    if (msg.senderUid === currentUser.uid && attachmentPaths.length) {
-      removeUploadedAttachments(attachmentPaths);
-    }
+    attachmentPaths.forEach(path => {
+      if (String(path).startsWith(`${PATH}/attachmentData/`)) updates[path] = null;
+    });
+    await update(ref(db), updates);
   } catch (error) {
     setStatus(friendlyError(error));
   }
@@ -4997,13 +5014,14 @@ async function deleteGroup() {
   if (!confirm("Delete this group and its messages?")) return;
   const groupId = currentGroupId;
   try {
-    if (currentGroupData.inviteCode) await remove(ref(db, `${PATH}/invites/${currentGroupData.inviteCode}`));
-    await remove(ref(db, `${PATH}/messages/${groupId}`));
     const updates = {};
     Object.keys(currentGroupData.members || {}).forEach(uid => {
       updates[`${PATH}/memberships/${uid}/${groupId}`] = null;
+      updates[`${PATH}/readStates/${uid}/${groupId}`] = null;
     });
-    updates[`${PATH}/readStates/${currentUser.uid}/${groupId}`] = null;
+    if (currentGroupData.inviteCode) updates[`${PATH}/invites/${currentGroupData.inviteCode}`] = null;
+    updates[`${PATH}/messages/${groupId}`] = null;
+    updates[`${PATH}/attachmentData/${groupId}`] = null;
     updates[`${PATH}/publicGroups/${groupId}`] = null;
     updates[`${PATH}/groups/${groupId}`] = null;
     await update(ref(db), updates);
