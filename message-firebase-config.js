@@ -9,3 +9,10 @@ export const firebaseConfig = Object.freeze({
   messagingSenderId: "821866548441",
   appId: "1:821866548441:web:00a08e534699a6f97902c8"
 });
+
+// Create a free reCAPTCHA v3 site key for firecatcher404.github.io, paste it
+// below, deploy, verify requests, and only then enable App Check enforcement in
+// the Firebase console. The app remains usable while this is blank.
+export const appCheckConfig = Object.freeze({
+  siteKey: ""
+});

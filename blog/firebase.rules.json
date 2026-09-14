@@ -48,6 +48,38 @@
           ".validate": "$handle.matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.hasChildren(['uid','handle']) && newData.child('uid').isString() && newData.child('handle').val() === $handle"
         }
       },
+      "socialRateLimits": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid && newData.hasChildren(['action','targetUid','nonce','at']) && newData.child('at').isNumber() && newData.child('at').val() >= now - 5000 && newData.child('at').val() <= now + 5000 && (!data.exists() || data.child('at').val() <= now - 3500)",
+          ".validate": "newData.child('action').isString() && newData.child('action').val().matches(/^(friend|invite)$/) && newData.child('targetUid').isString() && newData.child('nonce').isString() && newData.child('nonce').val().matches(/^[a-f0-9]{32}$/)"
+        }
+      },
+      "friendRequests": {
+        "$targetUid": {
+          ".read": "auth != null && auth.uid === $targetUid",
+          "$senderUid": {
+            ".read": "auth != null && (auth.uid === $targetUid || auth.uid === $senderUid)",
+            ".write": "auth != null && ((!data.exists() && auth.uid === $senderUid && $targetUid !== $senderUid && root.child('secureChat/users/' + $targetUid).exists() && !root.child('secureChat/friends/' + $targetUid + '/' + $senderUid).exists() && !root.child('secureChat/friends/' + $senderUid + '/' + $targetUid).exists() && root.child('secureChat/socialRateLimits/' + $senderUid + '/action').val() === 'friend' && root.child('secureChat/socialRateLimits/' + $senderUid + '/targetUid').val() === $targetUid && root.child('secureChat/socialRateLimits/' + $senderUid + '/nonce').val() === newData.child('actionNonce').val() && root.child('secureChat/socialRateLimits/' + $senderUid + '/at').val() >= now - 10000) || (data.exists() && !newData.exists() && (auth.uid === $targetUid || auth.uid === $senderUid)))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['senderUid','targetUid','handle','displayName','color','actionNonce','createdAt','createdAtClient']) && newData.child('senderUid').val() === $senderUid && newData.child('targetUid').val() === $targetUid && newData.child('handle').val() === root.child('secureChat/users/' + $senderUid + '/handle').val() && newData.child('displayName').val() === root.child('secureChat/users/' + $senderUid + '/displayName').val() && newData.child('color').val() === root.child('secureChat/users/' + $senderUid + '/color').val() && newData.child('actionNonce').isString() && newData.child('actionNonce').val().matches(/^[a-f0-9]{32}$/) && newData.child('createdAtClient').isNumber())",
+            "$field": {
+              ".validate": "$field.matches(/^(senderUid|targetUid|handle|displayName|color|actionNonce|createdAt|createdAtClient)$/)"
+            }
+          }
+        }
+      },
+      "friends": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$friendUid": {
+            ".write": "auth != null && ((!data.exists() && ((auth.uid === $uid && root.child('secureChat/friendRequests/' + $uid + '/' + $friendUid).exists()) || (auth.uid === $friendUid && root.child('secureChat/friendRequests/' + $friendUid + '/' + $uid).exists()))) || (data.exists() && !newData.exists() && (auth.uid === $uid || auth.uid === $friendUid)) || (data.exists() && newData.exists() && auth.uid === $friendUid && newData.child('since').val() === data.child('since').val()))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid','handle','displayName','color','since']) && newData.child('uid').val() === $friendUid && newData.child('handle').val() === root.child('secureChat/users/' + $friendUid + '/handle').val() && newData.child('displayName').val() === root.child('secureChat/users/' + $friendUid + '/displayName').val() && newData.child('color').val() === root.child('secureChat/users/' + $friendUid + '/color').val() && newData.child('handle').isString() && newData.child('handle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('displayName').isString() && newData.child('displayName').val().matches(/^.{1,40}$/) && newData.child('color').isString() && newData.child('color').val().matches(/^#[0-9A-Fa-f]{6}$/) && newData.child('since').isNumber())",
+            "$field": {
+              ".validate": "$field.matches(/^(uid|handle|displayName|color|since)$/)"
+            }
+          }
+        }
+      },
       "publicGroups": {
         ".read": "auth != null",
         "$gid": {
@@ -59,8 +91,8 @@
         "$uid": {
           ".read": "auth != null && auth.uid === $uid",
           "$gid": {
-            ".write": "auth != null && (auth.uid === $uid || root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid)",
-            ".validate": "!newData.exists() || (newData.hasChildren(['name','privacy','role','joinedAt']) && newData.child('name').isString() && newData.child('name').val().matches(/^.{1,60}$/) && (newData.child('privacy').val() === 'public' || newData.child('privacy').val() === 'private'))"
+            ".write": "auth != null && (auth.uid === $uid || (root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid && (root.child('secureChat/groups/' + $gid + '/kind').val() !== 'dm' || (!data.exists() && root.child('secureChat/groups/' + $gid + '/members/' + $uid).exists() && root.child('secureChat/friends/' + auth.uid + '/' + $uid).exists()))))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['name','privacy','role','joinedAt']) && newData.child('name').isString() && newData.child('name').val().matches(/^.{1,60}$/) && (newData.child('privacy').val() === 'public' || newData.child('privacy').val() === 'private') && (!newData.child('kind').exists() || (newData.child('kind').val() === 'dm' && newData.child('privacy').val() === 'private' && newData.child('peerUid').isString() && newData.child('peerUid').val() !== $uid && newData.child('peerHandle').isString() && newData.child('peerHandle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/))))"
           }
         }
       },
@@ -68,15 +100,33 @@
         "$code": {
           ".read": "auth != null",
           ".write": "auth != null && ((!data.exists() && root.child('secureChat/groups/' + newData.child('groupId').val() + '/ownerUid').val() === auth.uid) || (data.exists() && root.child('secureChat/groups/' + data.child('groupId').val() + '/ownerUid').val() === auth.uid))",
-          ".validate": "!newData.exists() || ($code.matches(/^[A-Z0-9]{10,16}$/) && newData.hasChildren(['groupId','groupName','createdBy','createdAt']) && newData.child('createdBy').val() === auth.uid)"
+          ".validate": "!newData.exists() || ($code.matches(/^[A-Z0-9]{10,16}$/) && newData.hasChildren(['groupId','groupName','createdBy','ownerHandle','createdAt','createdAtClient','expiresAt','maxUses','slots']) && newData.child('createdBy').val() === auth.uid && newData.child('ownerHandle').isString() && newData.child('ownerHandle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('createdAtClient').isNumber() && newData.child('expiresAt').isNumber() && newData.child('expiresAt').val() > now && newData.child('expiresAt').val() <= now + 2678400000 && (newData.child('maxUses').val() === 1 || newData.child('maxUses').val() === 5 || newData.child('maxUses').val() === 10 || newData.child('maxUses').val() === 25))",
+          "slots": {
+            "$slot": {
+              ".validate": "newData.val() === true && ((newData.parent().parent().child('maxUses').val() === 1 && $slot.matches(/^1$/)) || (newData.parent().parent().child('maxUses').val() === 5 && $slot.matches(/^[1-5]$/)) || (newData.parent().parent().child('maxUses').val() === 10 && $slot.matches(/^([1-9]|10)$/)) || (newData.parent().parent().child('maxUses').val() === 25 && $slot.matches(/^([1-9]|1[0-9]|2[0-5])$/)))"
+            }
+          },
+          "$field": {
+            ".validate": "$field.matches(/^(groupId|groupName|createdBy|ownerHandle|createdAt|createdAtClient|expiresAt|maxUses|slots)$/)"
+          }
+        }
+      },
+      "inviteUses": {
+        "$code": {
+          ".read": "auth != null && root.child('secureChat/invites/' + $code + '/createdBy').val() === auth.uid",
+          ".write": "auth != null && data.exists() && !newData.exists() && root.child('secureChat/invites/' + $code + '/createdBy').val() === auth.uid",
+          "$slot": {
+            ".write": "auth != null && newData.val() === auth.uid && root.child('secureChat/invites/' + $code + '/expiresAt').val() > now && root.child('secureChat/invites/' + $code + '/slots/' + $slot).val() === true && (!data.exists() || data.val() === auth.uid)",
+            ".validate": "newData.isString() && newData.val() === auth.uid"
+          }
         }
       },
       "notifications": {
         "$uid": {
           ".read": "auth != null && auth.uid === $uid",
           "$nid": {
-            ".write": "auth != null && (auth.uid === $uid || (!data.exists() && newData.child('targetUid').val() === $uid && newData.child('fromUid').val() === auth.uid && ((newData.child('type').val() === 'mention' && root.child('secureChat/groups/' + newData.child('groupId').val() + '/members/' + auth.uid).exists() && root.child('secureChat/groups/' + newData.child('groupId').val() + '/members/' + $uid).exists()) || (newData.child('type').val() === 'invite' && root.child('secureChat/groups/' + newData.child('groupId').val() + '/members/' + auth.uid).exists() && !root.child('secureChat/groups/' + newData.child('groupId').val() + '/bans/' + $uid).exists()))))",
-            ".validate": "!newData.exists() || (newData.hasChildren(['type','targetUid','groupId','groupName','fromUid','fromHandle','fromName','read','status','createdAt','createdAtClient']) && newData.child('targetUid').val() === $uid && (newData.child('type').val() === 'mention' || newData.child('type').val() === 'invite') && newData.child('groupId').isString() && newData.child('groupName').isString() && newData.child('groupName').val().matches(/^.{1,60}$/) && newData.child('fromUid').isString() && newData.child('fromHandle').isString() && newData.child('fromHandle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('fromName').isString() && newData.child('fromName').val().matches(/^.{1,40}$/) && newData.child('read').isBoolean() && newData.child('status').isString() && newData.child('status').val().matches(/^(new|pending|accepted|declined|dismissed)$/) && newData.child('createdAtClient').isNumber() && (newData.child('type').val() === 'invite' || (newData.child('text').isString() && newData.child('text').val().matches(/^.{1,180}$/))) && (!newData.child('inviteCode').exists() || newData.child('inviteCode').val().matches(/^[A-Z0-9]{10,16}$/)))"
+            ".write": "auth != null && (auth.uid === $uid || (!data.exists() && newData.child('targetUid').val() === $uid && newData.child('fromUid').val() === auth.uid && ((newData.child('type').val() === 'mention' && root.child('secureChat/groups/' + newData.child('groupId').val() + '/members/' + auth.uid).exists() && root.child('secureChat/groups/' + newData.child('groupId').val() + '/members/' + $uid).exists()) || (newData.child('type').val() === 'invite' && root.child('secureChat/groups/' + newData.child('groupId').val() + '/members/' + auth.uid).exists() && !root.child('secureChat/groups/' + newData.child('groupId').val() + '/bans/' + $uid).exists() && root.child('secureChat/socialRateLimits/' + auth.uid + '/action').val() === 'invite' && root.child('secureChat/socialRateLimits/' + auth.uid + '/targetUid').val() === $uid && root.child('secureChat/socialRateLimits/' + auth.uid + '/nonce').val() === newData.child('actionNonce').val() && root.child('secureChat/socialRateLimits/' + auth.uid + '/at').val() >= now - 10000 && (root.child('secureChat/groups/' + newData.child('groupId').val() + '/privacy').val() === 'public' || (root.child('secureChat/groups/' + newData.child('groupId').val() + '/inviteCode').val() === newData.child('inviteCode').val() && root.child('secureChat/invites/' + newData.child('inviteCode').val() + '/expiresAt').val() > now))))))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['type','targetUid','groupId','groupName','fromUid','fromHandle','fromName','read','status','createdAt','createdAtClient']) && newData.child('targetUid').val() === $uid && (newData.child('type').val() === 'mention' || newData.child('type').val() === 'invite') && newData.child('groupId').isString() && newData.child('groupName').isString() && newData.child('groupName').val().matches(/^.{1,60}$/) && newData.child('fromUid').isString() && newData.child('fromHandle').isString() && newData.child('fromHandle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('fromName').isString() && newData.child('fromName').val().matches(/^.{1,40}$/) && newData.child('read').isBoolean() && newData.child('status').isString() && newData.child('status').val().matches(/^(new|pending|accepted|declined|dismissed)$/) && newData.child('createdAtClient').isNumber() && (newData.child('type').val() === 'invite' || (newData.child('text').isString() && newData.child('text').val().matches(/^.{1,180}$/))) && (!newData.child('inviteCode').exists() || newData.child('inviteCode').val().matches(/^[A-Z0-9]{10,16}$/)) && (newData.child('type').val() !== 'invite' || (newData.child('actionNonce').isString() && newData.child('actionNonce').val().matches(/^[a-f0-9]{32}$/))))"
           }
         }
       },
@@ -133,7 +183,7 @@
       "groups": {
         "$gid": {
           ".read": "auth != null && (data.child('privacy').val() === 'public' || data.child('members').child(auth.uid).exists())",
-          ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid && newData.child('members').child(auth.uid).child('role').val() === 'owner') || (data.exists() && data.child('ownerUid').val() === auth.uid))",
+          ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid && newData.child('members').child(auth.uid).child('role').val() === 'owner' && (!newData.child('kind').exists() || (newData.child('kind').val() === 'dm' && newData.child('privacy').val() === 'private' && newData.child('dmPeerUid').isString() && newData.child('dmPeerUid').val() !== auth.uid && newData.child('members').child(newData.child('dmPeerUid').val()).child('role').val() === 'member' && root.child('secureChat/friends/' + auth.uid + '/' + newData.child('dmPeerUid').val()).exists() && root.child('secureChat/friends/' + newData.child('dmPeerUid').val() + '/' + auth.uid).exists()))) || (data.exists() && data.child('ownerUid').val() === auth.uid && (data.child('kind').val() !== 'dm' || !newData.exists())))",
           "name": {
             ".validate": "newData.isString() && newData.val().matches(/^.{1,60}$/)"
           },
@@ -152,10 +202,22 @@
           "inviteCode": {
             ".validate": "!newData.exists() || newData.val() === null || newData.val().matches(/^[A-Z0-9]{10,16}$/)"
           },
+          "inviteExpiresAt": {
+            ".validate": "!newData.exists() || (newData.isNumber() && newData.val() > now && newData.val() <= now + 2678400000)"
+          },
+          "inviteMaxUses": {
+            ".validate": "!newData.exists() || (newData.val() === 1 || newData.val() === 5 || newData.val() === 10 || newData.val() === 25)"
+          },
+          "kind": {
+            ".validate": "!newData.exists() || newData.val() === 'dm'"
+          },
+          "dmPeerUid": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val() !== auth.uid)"
+          },
           "members": {
             "$uid": {
-              ".write": "auth != null && (root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid || (auth.uid === $uid && !newData.exists() && data.exists()) || (auth.uid === $uid && !root.child('secureChat/groups/' + $gid + '/bans/' + auth.uid).exists() && data.exists() && newData.exists() && newData.child('role').val() === data.child('role').val()) || (auth.uid === $uid && !root.child('secureChat/groups/' + $gid + '/bans/' + auth.uid).exists() && root.child('secureChat/groups/' + $gid + '/privacy').val() === 'public') || (auth.uid === $uid && !root.child('secureChat/groups/' + $gid + '/bans/' + auth.uid).exists() && newData.child('inviteCode').isString() && root.child('secureChat/invites/' + newData.child('inviteCode').val() + '/groupId').val() === $gid))",
-              ".validate": "!newData.exists() || (newData.hasChildren(['role','handle','displayName','joinedAt']) && (newData.child('role').val() === 'owner' || newData.child('role').val() === 'member') && newData.child('handle').isString() && newData.child('handle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('displayName').isString() && newData.child('displayName').val().matches(/^.{1,40}$/) && (!newData.child('color').exists() || (newData.child('color').isString() && newData.child('color').val().matches(/^#[0-9A-Fa-f]{6}$/))))"
+              ".write": "auth != null && ((root.child('secureChat/groups/' + $gid + '/kind').val() !== 'dm' && root.child('secureChat/groups/' + $gid + '/ownerUid').val() === auth.uid) || (auth.uid === $uid && root.child('secureChat/groups/' + $gid + '/kind').val() !== 'dm' && !newData.exists() && data.exists()) || (auth.uid === $uid && !root.child('secureChat/groups/' + $gid + '/bans/' + auth.uid).exists() && data.exists() && newData.exists() && newData.child('role').val() === data.child('role').val()) || (auth.uid === $uid && !data.exists() && !root.child('secureChat/groups/' + $gid + '/bans/' + auth.uid).exists() && root.child('secureChat/groups/' + $gid + '/privacy').val() === 'public' && root.child('secureChat/groups/' + $gid + '/kind').val() !== 'dm') || (auth.uid === $uid && !data.exists() && !root.child('secureChat/groups/' + $gid + '/bans/' + auth.uid).exists() && newData.child('inviteCode').isString() && newData.child('inviteSlot').isString() && root.child('secureChat/invites/' + newData.child('inviteCode').val() + '/groupId').val() === $gid && root.child('secureChat/invites/' + newData.child('inviteCode').val() + '/expiresAt').val() > now && root.child('secureChat/inviteUses/' + newData.child('inviteCode').val() + '/' + newData.child('inviteSlot').val()).val() === auth.uid))",
+              ".validate": "!newData.exists() || (newData.hasChildren(['role','handle','displayName','joinedAt']) && (newData.child('role').val() === 'owner' || newData.child('role').val() === 'member') && (!newData.parent().parent().child('kind').exists() || $uid === auth.uid || $uid === newData.parent().parent().child('dmPeerUid').val()) && newData.child('handle').isString() && newData.child('handle').val().matches(/^[a-z0-9][a-z0-9_.-]{1,22}[a-z0-9]$/) && newData.child('displayName').isString() && newData.child('displayName').val().matches(/^.{1,40}$/) && (!newData.child('color').exists() || (newData.child('color').isString() && newData.child('color').val().matches(/^#[0-9A-Fa-f]{6}$/))))"
             }
           }
         }

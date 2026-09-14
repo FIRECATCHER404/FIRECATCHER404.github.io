@@ -647,6 +647,15 @@
     overflow-anchor: none;
   }
 
+  .group-list-heading {
+    padding: 10px 10px 5px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
   [data-density="compact"] .messages {
     gap: 6px;
     padding: 12px;
@@ -1248,6 +1257,88 @@
     overflow: auto;
   }
 
+  .friend-section {
+    display: grid;
+    gap: 9px;
+  }
+
+  .friend-section + .friend-section {
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+
+  .friend-section-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .friend-section-heading h3 {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  .friend-list {
+    display: grid;
+    gap: 9px;
+    max-height: min(300px, 36vh);
+    overflow: auto;
+  }
+
+  .friend-row {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    padding: 9px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface-2);
+  }
+
+  .friend-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .friend-copy strong,
+  .friend-copy span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .friend-copy span {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .friend-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .friend-actions .small-btn,
+  .friend-actions .primary-btn {
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .invite-policy-note {
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
   .notification-card {
     border: 1px solid var(--line);
     border-left: 4px solid var(--line);
@@ -1735,6 +1826,10 @@
             </div>
           </div>
           <div class="header-actions">
+            <button class="icon-btn notification-btn" id="friendsBtn" type="button" title="Friends" aria-label="Friends">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+              <span class="notification-count hidden" id="friendRequestCount">0</span>
+            </button>
             <button class="icon-btn notification-btn" id="notificationsBtn" type="button" title="Notifications" aria-label="Notifications">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
               <span class="notification-count hidden" id="notificationCount">0</span>
@@ -1822,7 +1917,7 @@
         <div class="attachment-tray hidden" id="attachmentTray" role="list" aria-label="Attachments ready to send"></div>
         <form class="composer-form" id="messageForm">
           <input class="hidden" id="attachmentInput" type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp,text/plain,application/pdf,application/json,application/zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx" />
-          <button class="icon-btn attach-btn" id="attachmentBtn" type="button" title="Attach files (up to 3 files, 1 MB each)" aria-label="Attach files" disabled>
+          <button class="icon-btn attach-btn" id="attachmentBtn" type="button" title="Attach up to 3 files; larger photos are compressed to fit the 1 MB limit" aria-label="Attach files" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m20.5 11.5-8.9 8.9a6 6 0 0 1-8.5-8.5l9.6-9.6a4 4 0 0 1 5.7 5.7l-9.6 9.6a2 2 0 1 1-2.8-2.8l8.9-8.9"/></svg>
           </button>
           <textarea class="textarea" id="messageInput" rows="1" placeholder="Write a message…" aria-label="Message" aria-describedby="composerHint characterCount" maxlength="2000" spellcheck="true" disabled></textarea>
@@ -1851,6 +1946,7 @@
           <button class="secondary-btn hidden" id="rotateInviteBtn" type="button">New Invite Code</button>
           <button class="danger-btn hidden" id="deleteGroupBtn" type="button">Delete Group</button>
         </div>
+        <div class="invite-policy-note hidden" id="invitePolicyStatus"></div>
         <div class="e2e-panel hidden" id="e2ePanel">
           <label class="switch-row"><span>E2E encrypted send</span><input id="e2eToggle" type="checkbox" /></label>
           <label><span>Passphrase</span><input class="field" id="e2ePassphrase" type="password" autocomplete="off" placeholder="Local only" /></label>
@@ -1908,11 +2004,60 @@
             <option value="public">Public, visible to signed-in users</option>
           </select>
         </label>
+        <div class="friend-section" id="createInvitePolicyFields">
+          <label><span>Invite expires</span>
+            <select class="select" id="createInviteExpiry">
+              <option value="1">After 1 day</option>
+              <option value="7" selected>After 7 days</option>
+              <option value="30">After 30 days</option>
+            </select>
+          </label>
+          <label><span>Maximum uses</span>
+            <select class="select" id="createInviteMaxUses">
+              <option value="1">1 person</option>
+              <option value="5">5 people</option>
+              <option value="10" selected>10 people</option>
+              <option value="25">25 people</option>
+            </select>
+          </label>
+        </div>
         <div class="modal-actions">
           <button class="secondary-btn" data-close-modal="createGroupModal" type="button">Cancel</button>
           <button class="primary-btn" id="createGroupConfirm" type="button">Create</button>
         </div>
         <div class="status-line" id="createGroupStatus"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="invitePolicyModal" aria-hidden="true">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="invitePolicyTitle" tabindex="-1">
+      <div class="modal-head">
+        <h2 class="modal-title" id="invitePolicyTitle">Create New Invite</h2>
+        <button class="icon-btn" data-close-modal="invitePolicyModal" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label><span>Invite expires</span>
+          <select class="select" id="rotateInviteExpiry" data-initial-focus>
+            <option value="1">After 1 day</option>
+            <option value="7" selected>After 7 days</option>
+            <option value="30">After 30 days</option>
+          </select>
+        </label>
+        <label><span>Maximum uses</span>
+          <select class="select" id="rotateInviteMaxUses">
+            <option value="1">1 person</option>
+            <option value="5">5 people</option>
+            <option value="10" selected>10 people</option>
+            <option value="25">25 people</option>
+          </select>
+        </label>
+        <div class="invite-policy-note">Creating a new code immediately revokes the old one.</div>
+        <div class="modal-actions">
+          <button class="secondary-btn" data-close-modal="invitePolicyModal" type="button">Cancel</button>
+          <button class="primary-btn" id="rotateInviteConfirm" type="button">Create &amp; Copy</button>
+        </div>
+        <div class="status-line" id="invitePolicyModalStatus"></div>
       </div>
     </section>
   </div>
@@ -1958,11 +2103,39 @@
         <label class="switch-row"><span>Show seconds on timestamps</span><input id="settingsSeconds" type="checkbox" /></label>
         <label class="switch-row"><span>Desktop mention notifications</span><input id="settingsDesktopMentions" type="checkbox" /></label>
         <label class="switch-row"><span>Sound on mention</span><input id="settingsSoundMentions" type="checkbox" /></label>
+        <div class="invite-policy-note" id="appCheckStatusLine">App protection is waiting for a reCAPTCHA site key.</div>
         <div class="modal-actions">
           <button class="secondary-btn" id="notificationPermissionBtn" type="button">Allow Notifications</button>
           <button class="primary-btn" id="saveSettingsBtn" type="button">Save</button>
         </div>
         <div class="status-line" id="settingsStatusLine"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="friendsModal" aria-hidden="true">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="friendsTitle" tabindex="-1">
+      <div class="modal-head">
+        <h2 class="modal-title" id="friendsTitle">Friends</h2>
+        <button class="icon-btn" data-close-modal="friendsModal" type="button" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="friend-section">
+          <div class="friend-section-heading"><h3>Add a friend</h3><span class="muted">Use their exact username</span></div>
+          <label><span>Username</span><input class="field" id="friendHandleInput" maxlength="24" autocomplete="off" placeholder="firecatcher404" data-initial-focus /></label>
+          <div class="modal-actions">
+            <button class="primary-btn" id="sendFriendRequestBtn" type="button">Send Request</button>
+          </div>
+          <div class="status-line" id="friendsStatus"></div>
+        </div>
+        <div class="friend-section">
+          <div class="friend-section-heading"><h3>Requests</h3><span class="muted" id="friendRequestsLabel">0 pending</span></div>
+          <div class="friend-list" id="friendRequestsList"><div class="empty-list">No pending requests.</div></div>
+        </div>
+        <div class="friend-section">
+          <div class="friend-section-heading"><h3>Your friends</h3><span class="muted" id="friendsLabel">0 friends</span></div>
+          <div class="friend-list" id="friendsList"><div class="empty-list">No friends yet.</div></div>
+        </div>
       </div>
     </section>
   </div>
@@ -2069,11 +2242,20 @@ import {
   runTransaction,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
-import { firebaseConfig } from "./message-firebase-config.js";
+import {
+  initializeAppCheck,
+  ReCaptchaV3Provider
+} from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app-check.js";
+import { firebaseConfig, appCheckConfig } from "./message-firebase-config.js";
 
 const PATH = "secureChat";
 const MAX_ATTACHMENTS = 3;
 const MAX_ATTACHMENT_BYTES = 1024 * 1024;
+const MAX_IMAGE_SOURCE_BYTES = 12 * 1024 * 1024;
+const IMAGE_TARGET_BYTES = 900 * 1024;
+const IMAGE_MAX_DIMENSION = 1920;
+const MESSAGE_COOLDOWN_MS = 900;
+const SOCIAL_ACTION_COOLDOWN_MS = 4000;
 const ALLOWED_ATTACHMENT_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -2120,6 +2302,19 @@ const DEFAULT_SETTINGS = {
 };
 
 const app = initializeApp(firebaseConfig);
+let appCheckState = "not-configured";
+if (appCheckConfig?.siteKey) {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(appCheckConfig.siteKey),
+      isTokenAutoRefreshEnabled: true
+    });
+    appCheckState = "active";
+  } catch (error) {
+    console.warn("App Check could not start:", error);
+    appCheckState = "error";
+  }
+}
 const auth = getAuth(app);
 const db = getDatabase(app);
 const authReady = setPersistence(auth, browserLocalPersistence).catch(() => {});
@@ -2146,6 +2341,8 @@ const els = {
   groupSearch: document.getElementById("groupSearch"),
   newGroupBtn: document.getElementById("newGroupBtn"),
   joinGroupBtn: document.getElementById("joinGroupBtn"),
+  friendsBtn: document.getElementById("friendsBtn"),
+  friendRequestCount: document.getElementById("friendRequestCount"),
   chatTitle: document.getElementById("chatTitle"),
   chatSubtitle: document.getElementById("chatSubtitle"),
   currentGroupIcon: document.getElementById("currentGroupIcon"),
@@ -2186,12 +2383,20 @@ const els = {
   groupNameInput: document.getElementById("groupNameInput"),
   groupDescInput: document.getElementById("groupDescInput"),
   groupPrivacyInput: document.getElementById("groupPrivacyInput"),
+  createInvitePolicyFields: document.getElementById("createInvitePolicyFields"),
+  createInviteExpiry: document.getElementById("createInviteExpiry"),
+  createInviteMaxUses: document.getElementById("createInviteMaxUses"),
   createGroupConfirm: document.getElementById("createGroupConfirm"),
   createGroupStatus: document.getElementById("createGroupStatus"),
   inviteCodeInput: document.getElementById("inviteCodeInput"),
   joinInviteConfirm: document.getElementById("joinInviteConfirm"),
   joinGroupStatus: document.getElementById("joinGroupStatus"),
   settingsBtn: document.getElementById("settingsBtn"),
+  invitePolicyStatus: document.getElementById("invitePolicyStatus"),
+  rotateInviteExpiry: document.getElementById("rotateInviteExpiry"),
+  rotateInviteMaxUses: document.getElementById("rotateInviteMaxUses"),
+  rotateInviteConfirm: document.getElementById("rotateInviteConfirm"),
+  invitePolicyModalStatus: document.getElementById("invitePolicyModalStatus"),
   notificationsBtn: document.getElementById("notificationsBtn"),
   notificationCount: document.getElementById("notificationCount"),
   notificationsList: document.getElementById("notificationsList"),
@@ -2211,6 +2416,7 @@ const els = {
   notificationPermissionBtn: document.getElementById("notificationPermissionBtn"),
   saveSettingsBtn: document.getElementById("saveSettingsBtn"),
   settingsStatusLine: document.getElementById("settingsStatusLine"),
+  appCheckStatusLine: document.getElementById("appCheckStatusLine"),
   e2ePanel: document.getElementById("e2ePanel"),
   e2eToggle: document.getElementById("e2eToggle"),
   e2ePassphrase: document.getElementById("e2ePassphrase"),
@@ -2220,6 +2426,13 @@ const els = {
   inviteHandleInput: document.getElementById("inviteHandleInput"),
   sendInviteConfirm: document.getElementById("sendInviteConfirm"),
   inviteUserStatus: document.getElementById("inviteUserStatus"),
+  friendHandleInput: document.getElementById("friendHandleInput"),
+  sendFriendRequestBtn: document.getElementById("sendFriendRequestBtn"),
+  friendRequestsLabel: document.getElementById("friendRequestsLabel"),
+  friendRequestsList: document.getElementById("friendRequestsList"),
+  friendsLabel: document.getElementById("friendsLabel"),
+  friendsList: document.getElementById("friendsList"),
+  friendsStatus: document.getElementById("friendsStatus"),
   editMessageInput: document.getElementById("editMessageInput"),
   saveEditMessageBtn: document.getElementById("saveEditMessageBtn"),
   editMessageStatus: document.getElementById("editMessageStatus"),
@@ -2235,11 +2448,15 @@ let currentGroupId = null;
 let currentGroupData = null;
 let memberships = {};
 let publicGroups = {};
+let friends = {};
+let friendRequests = {};
 let activeMessages = [];
 let settings = loadLocalSettings();
 let publicGroupsUnsub = null;
 let membershipsUnsub = null;
 let readStatesUnsub = null;
+let friendsUnsub = null;
+let friendRequestsUnsub = null;
 let groupUnsub = null;
 let messagesUnsub = null;
 let messageChangesUnsub = null;
@@ -2266,6 +2483,11 @@ let authBusy = false;
 let readStates = {};
 let pendingAttachments = [];
 let readMarkerTimer = null;
+let attachmentAddQueue = Promise.resolve();
+let currentInviteUseCount = 0;
+let inviteUsageLoadToken = 0;
+let lastMessageSentAt = 0;
+let lastSocialActionAt = 0;
 const unreadWatchers = new Map();
 const unreadByGroup = new Map();
 const attachmentObjectUrls = new Map();
@@ -2431,6 +2653,71 @@ function inviteLink(code) {
   const url = new URL("/message.html", window.location.origin);
   url.searchParams.set("invite", normalizeInviteCode(code));
   return url.toString();
+}
+
+function invitePolicyFromInputs(expiryInput, maxUsesInput) {
+  const days = Math.min(30, Math.max(1, Number(expiryInput.value) || 7));
+  const maxUses = Math.min(25, Math.max(1, Number(maxUsesInput.value) || 10));
+  const createdAtClient = Date.now();
+  return {
+    createdAtClient,
+    expiresAt: createdAtClient + days * 24 * 60 * 60 * 1000,
+    maxUses
+  };
+}
+
+function invitePayload(groupId, groupName, policy) {
+  const slots = {};
+  for (let slot = 1; slot <= policy.maxUses; slot += 1) slots[String(slot)] = true;
+  return {
+    groupId,
+    groupName,
+    createdBy: currentUser.uid,
+    ownerHandle: profile?.handle || currentGroupData?.ownerHandle || "",
+    createdAt: serverTimestamp(),
+    slots,
+    ...policy
+  };
+}
+
+function inviteIsExpired(group = currentGroupData) {
+  return Boolean(group?.inviteExpiresAt && Number(group.inviteExpiresAt) <= Date.now());
+}
+
+function inviteIsFull(group = currentGroupData) {
+  return Boolean(group?.inviteMaxUses && currentInviteUseCount >= Number(group.inviteMaxUses));
+}
+
+function renderInvitePolicyStatus() {
+  const group = currentGroupData;
+  const visible = Boolean(group && group.privacy === "private" && group.ownerUid === currentUser?.uid && !isDirectMessage(group));
+  els.invitePolicyStatus.classList.toggle("hidden", !visible);
+  if (!visible) {
+    els.invitePolicyStatus.textContent = "";
+    return;
+  }
+  if (!group.inviteCode || !group.inviteExpiresAt || !group.inviteMaxUses) {
+    els.invitePolicyStatus.textContent = "This legacy invite needs to be replaced before it can be shared.";
+    return;
+  }
+  const expiration = new Date(Number(group.inviteExpiresAt)).toLocaleString();
+  const state = inviteIsExpired(group) ? "expired" : (inviteIsFull(group) ? "full" : "active");
+  els.invitePolicyStatus.textContent = `Invite ${state} · ${currentInviteUseCount}/${group.inviteMaxUses} uses · expires ${expiration}`;
+}
+
+async function loadInviteUseCount(groupId, group) {
+  const token = ++inviteUsageLoadToken;
+  currentInviteUseCount = 0;
+  renderInvitePolicyStatus();
+  if (!group?.inviteCode || group.ownerUid !== currentUser?.uid || isDirectMessage(group)) return;
+  try {
+    const snap = await get(ref(db, `${PATH}/inviteUses/${group.inviteCode}`));
+    if (token !== inviteUsageLoadToken || currentGroupId !== groupId) return;
+    currentInviteUseCount = snap.size || Object.keys(snap.val() || {}).length;
+    renderInvitePolicyStatus();
+  } catch (error) {
+    if (token === inviteUsageLoadToken) setStatus(friendlyError(error));
+  }
 }
 
 function clearInviteFromUrl() {
@@ -2599,12 +2886,77 @@ function attachmentEntries(attachments) {
     .slice(0, MAX_ATTACHMENTS);
 }
 
-function addPendingAttachments(fileList) {
+function canvasToBlob(canvas, type, quality) {
+  return new Promise(resolve => canvas.toBlob(resolve, type, quality));
+}
+
+function compressedImageName(name) {
+  const base = safeAttachmentName(name).replace(/\.[^.]+$/, "") || "image";
+  return `${base.slice(0, 112)}.webp`;
+}
+
+async function compressImageFile(file) {
+  if (!file.type.startsWith("image/") || file.type === "image/gif" || file.size <= MAX_ATTACHMENT_BYTES) return file;
+  if (file.size > MAX_IMAGE_SOURCE_BYTES) throw new Error(`${file.name}: photos must be 12 MB or smaller before compression.`);
+
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error(`${file.name}: this browser could not read that image.`);
+  }
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) {
+    bitmap.close?.();
+    throw new Error(`${file.name}: image compression is unavailable in this browser.`);
+  }
+
+  let scale = Math.min(1, IMAGE_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+  let quality = 0.84;
+  let blob = null;
+  for (let attempt = 0; attempt < 7; attempt += 1) {
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    blob = await canvasToBlob(canvas, "image/webp", quality);
+    if (blob && blob.size <= IMAGE_TARGET_BYTES) break;
+    if (quality > 0.54) quality -= 0.1;
+    else scale *= 0.78;
+  }
+  bitmap.close?.();
+  if (!blob || blob.size > MAX_ATTACHMENT_BYTES) {
+    throw new Error(`${file.name}: the photo could not be compressed below 1 MB.`);
+  }
+  return new File([blob], compressedImageName(file.name), {
+    type: blob.type || "image/webp",
+    lastModified: file.lastModified
+  });
+}
+
+async function addPendingAttachments(fileList) {
   const rejected = [];
-  for (const file of fileList) {
+  for (const sourceFile of fileList) {
     if (pendingAttachments.length >= MAX_ATTACHMENTS) {
       rejected.push(`Only ${MAX_ATTACHMENTS} attachments can be sent at once.`);
       break;
+    }
+    const sourceType = attachmentTypeForFile(sourceFile);
+    if (!sourceType) {
+      rejected.push(`${sourceFile.name}: file type is not supported.`);
+      continue;
+    }
+    let file = sourceFile;
+    if (sourceType.startsWith("image/") && sourceType !== "image/gif" && sourceFile.size > MAX_ATTACHMENT_BYTES) {
+      setStatus(`Compressing ${sourceFile.name} locally...`, els.uploadStatus);
+      try {
+        file = await compressImageFile(sourceFile);
+      } catch (error) {
+        rejected.push(error?.message || `${sourceFile.name}: compression failed.`);
+        continue;
+      }
     }
     const type = attachmentTypeForFile(file);
     if (!type) {
@@ -2622,12 +2974,24 @@ function addPendingAttachments(fileList) {
       file,
       name: safeAttachmentName(file.name),
       type,
+      compressedFrom: file !== sourceFile ? sourceFile.size : 0,
       previewUrl: type.startsWith("image/") ? URL.createObjectURL(file) : ""
     });
   }
   els.attachmentInput.value = "";
+  setStatus("", els.uploadStatus);
   renderPendingAttachments();
   if (rejected.length) toast("Some files were not added", rejected[0]);
+}
+
+function queuePendingAttachments(fileList) {
+  const files = [...fileList];
+  attachmentAddQueue = attachmentAddQueue
+    .then(() => addPendingAttachments(files))
+    .catch(error => {
+      setStatus("", els.uploadStatus);
+      toast("Could not add attachment", error?.message || "Try another file.");
+    });
 }
 
 function renderPendingAttachments() {
@@ -2657,7 +3021,9 @@ function renderPendingAttachments() {
     name.title = item.name;
     const meta = document.createElement("div");
     meta.className = "attachment-meta";
-    meta.textContent = formatFileSize(item.file.size);
+    meta.textContent = item.compressedFrom
+      ? `${formatFileSize(item.file.size)} · compressed from ${formatFileSize(item.compressedFrom)}`
+      : formatFileSize(item.file.size);
     copy.append(name, meta);
     const removeButton = document.createElement("button");
     removeButton.type = "button";
@@ -3180,17 +3546,22 @@ onAuthStateChanged(auth, async user => {
   currentUser = user;
   currentGroupId = null;
   currentGroupData = null;
+  currentInviteUseCount = 0;
+  inviteUsageLoadToken += 1;
   activeMessages = [];
   if (!user) {
     profile = null;
     memberships = {};
     publicGroups = {};
+    friends = {};
+    friendRequests = {};
     notifications = {};
     els.authScreen.classList.add("open");
     els.authScreen.setAttribute("aria-hidden", "false");
     setStatus("");
     updateProfileChrome();
     renderNotifications();
+    renderFriends();
     renderGroups();
     resetChat();
     if (pendingInviteCode) {
@@ -3230,6 +3601,8 @@ function cleanupRealtime() {
   if (publicGroupsUnsub) publicGroupsUnsub();
   if (membershipsUnsub) membershipsUnsub();
   if (readStatesUnsub) readStatesUnsub();
+  if (friendsUnsub) friendsUnsub();
+  if (friendRequestsUnsub) friendRequestsUnsub();
   if (groupUnsub) groupUnsub();
   if (messagesUnsub) messagesUnsub();
   if (messageChangesUnsub) messageChangesUnsub();
@@ -3239,6 +3612,8 @@ function cleanupRealtime() {
   publicGroupsUnsub = null;
   membershipsUnsub = null;
   readStatesUnsub = null;
+  friendsUnsub = null;
+  friendRequestsUnsub = null;
   groupUnsub = null;
   messagesUnsub = null;
   messageChangesUnsub = null;
@@ -3251,12 +3626,15 @@ function cleanupRealtime() {
   loadingMessageHistory = false;
   notifications = {};
   readStates = {};
+  friends = {};
+  friendRequests = {};
   presence = {};
   typingUsers = {};
   clearReplyTarget();
   clearPendingAttachments();
   clearAttachmentObjectUrls();
   renderNotifications();
+  renderFriends();
   unreadWatchers.forEach(watcher => watcher.unsub());
   unreadWatchers.clear();
   unreadByGroup.clear();
@@ -3284,6 +3662,9 @@ function startPresence() {
   presenceUnsub = onValue(ref(db, `${PATH}/presence`), snap => {
     presence = snap.val() || {};
     renderMembers();
+    renderFriends();
+    renderGroups();
+    if (isDirectMessage()) renderCurrentGroup();
   }, error => setStatus(friendlyError(error)));
 }
 
@@ -3302,7 +3683,38 @@ function startGroupListeners() {
     renderGroups();
     syncUnreadWatchers();
   });
+  friendsUnsub = onValue(ref(db, `${PATH}/friends/${currentUser.uid}`), snap => {
+    friends = snap.val() || {};
+    renderFriends();
+  }, error => setStatus(friendlyError(error), els.friendsStatus));
+  friendRequestsUnsub = onValue(ref(db, `${PATH}/friendRequests/${currentUser.uid}`), snap => {
+    friendRequests = snap.val() || {};
+    renderFriends();
+  }, error => setStatus(friendlyError(error), els.friendsStatus));
   startNotificationListeners();
+}
+
+function isDirectMessage(group = currentGroupData) {
+  return group?.kind === "dm";
+}
+
+function directMessagePeer(group = currentGroupData) {
+  if (!group || !currentUser) return null;
+  const peerUid = group.peerUid
+    || Object.keys(group.members || {}).find(uid => uid !== currentUser.uid)
+    || (group.dmPeerUid !== currentUser.uid ? group.dmPeerUid : "");
+  if (!peerUid) return null;
+  const member = group.members?.[peerUid] || friends[peerUid] || userProfileCache.get(peerUid) || {};
+  return {
+    uid: peerUid,
+    handle: group.peerHandle || member.handle || "unknown",
+    displayName: group.name && group.name !== "Direct message" ? group.name : (member.displayName || member.handle || "Direct message"),
+    color: member.color || "#7c3aed"
+  };
+}
+
+function groupDisplayName(group) {
+  return group?.kind === "dm" ? (directMessagePeer(group)?.displayName || group.name || "Direct message") : (group?.name || "Unnamed group");
 }
 
 function startNotificationListeners() {
@@ -3335,12 +3747,12 @@ function renderGroups() {
   });
 
   const groups = [...byId.values()]
-    .filter(group => !search || `${group.name || ""} ${group.description || ""}`.toLowerCase().includes(search))
+    .filter(group => !search || `${groupDisplayName(group)} ${group.description || ""} ${group.peerHandle || ""}`.toLowerCase().includes(search))
     .sort((a, b) => {
       const ap = a.pinned ? 0 : 1;
       const bp = b.pinned ? 0 : 1;
       if (ap !== bp) return ap - bp;
-      return String(a.name || "").localeCompare(String(b.name || ""));
+      return groupDisplayName(a).localeCompare(groupDisplayName(b));
     });
 
   els.groupList.innerHTML = "";
@@ -3353,7 +3765,13 @@ function renderGroups() {
     return;
   }
 
-  groups.forEach(group => {
+  const renderSection = (title, items) => {
+    if (!items.length) return;
+    const heading = document.createElement("div");
+    heading.className = "group-list-heading";
+    heading.textContent = title;
+    els.groupList.appendChild(heading);
+    items.forEach(group => {
     const { unread, mentions } = getUnreadCounts(group.id);
     const row = document.createElement("button");
     row.type = "button";
@@ -3364,19 +3782,26 @@ function renderGroups() {
 
     const icon = document.createElement("div");
     icon.className = "group-icon";
-    icon.textContent = groupInitial(group.name);
-    icon.style.background = group.privacy === "private" ? "#7c3aed" : settings.accent;
+    const displayName = groupDisplayName(group);
+    const peer = group.kind === "dm" ? directMessagePeer(group) : null;
+    icon.textContent = group.kind === "dm" ? initials(displayName) : groupInitial(displayName);
+    icon.style.background = peer?.color || (group.privacy === "private" ? "#7c3aed" : settings.accent);
 
     const main = document.createElement("div");
     main.className = "group-main";
     const name = document.createElement("div");
     name.className = "group-name";
-    name.textContent = group.name || "Unnamed group";
+    name.textContent = displayName;
     const meta = document.createElement("div");
     meta.className = "group-meta";
-    const privacy = group.privacy === "private" ? "Private" : "Public";
-    const membership = group.isMember ? (group.role === "owner" ? "owner" : "member") : "tap to join";
-    meta.textContent = `${privacy} - ${membership}`;
+    if (group.kind === "dm") {
+      const online = Boolean(presence[peer?.uid]?.online);
+      meta.textContent = `@${peer?.handle || "unknown"} · ${online ? "online" : "offline"}`;
+    } else {
+      const privacy = group.privacy === "private" ? "Private" : "Public";
+      const membership = group.isMember ? (group.role === "owner" ? "owner" : "member") : "tap to join";
+      meta.textContent = `${privacy} · ${membership}`;
+    }
     main.append(name, meta);
 
     const badges = document.createElement("div");
@@ -3386,7 +3811,279 @@ function renderGroups() {
 
     row.append(icon, main, badges);
     els.groupList.appendChild(row);
+    });
+  };
+
+  renderSection("Direct messages", groups.filter(group => group.kind === "dm"));
+  renderSection("Groups", groups.filter(group => group.kind !== "dm"));
+}
+
+function updateFriendRequestBadge() {
+  const count = Object.keys(friendRequests || {}).length;
+  els.friendRequestCount.textContent = count > 99 ? "99+" : String(count);
+  els.friendRequestCount.classList.toggle("hidden", count === 0);
+  els.friendsBtn.setAttribute("aria-label", count ? `Friends, ${count} pending request${count === 1 ? "" : "s"}` : "Friends");
+}
+
+function friendRow(person, actions = []) {
+  const row = document.createElement("div");
+  row.className = "friend-row";
+  const avatar = document.createElement("div");
+  avatar.className = "member-avatar";
+  avatar.textContent = initials(person.displayName || person.handle);
+  avatar.style.background = person.color || "#64748b";
+  const copy = document.createElement("div");
+  copy.className = "friend-copy";
+  const name = document.createElement("strong");
+  name.textContent = person.displayName || person.handle || "Unknown user";
+  const meta = document.createElement("span");
+  const online = Boolean(presence[person.uid]?.online);
+  meta.textContent = `@${person.handle || "unknown"} · ${online ? "online" : "offline"}`;
+  copy.append(name, meta);
+  const actionWrap = document.createElement("div");
+  actionWrap.className = "friend-actions";
+  actions.forEach(({ label, run, primary = false }) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = primary ? "primary-btn" : "small-btn";
+    button.textContent = label;
+    button.addEventListener("click", run);
+    actionWrap.appendChild(button);
   });
+  row.append(avatar, copy, actionWrap);
+  return row;
+}
+
+function renderFriends() {
+  updateFriendRequestBadge();
+  els.friendRequestsList.replaceChildren();
+  els.friendsList.replaceChildren();
+  if (!currentUser) {
+    els.friendRequestsList.innerHTML = '<div class="empty-list">Sign in to manage friends.</div>';
+    els.friendsList.innerHTML = '<div class="empty-list">Sign in to manage friends.</div>';
+    els.friendRequestsLabel.textContent = "Requests";
+    els.friendsLabel.textContent = "Friends";
+    return;
+  }
+
+  const requests = Object.entries(friendRequests || {})
+    .map(([uid, request]) => ({ uid, ...request }))
+    .sort((a, b) => Number(b.createdAtClient || 0) - Number(a.createdAtClient || 0));
+  const people = Object.entries(friends || {})
+    .map(([uid, friend]) => ({ uid, ...friend }))
+    .sort((a, b) => String(a.displayName || a.handle || "").localeCompare(String(b.displayName || b.handle || "")));
+  els.friendRequestsLabel.textContent = `Requests (${requests.length})`;
+  els.friendsLabel.textContent = `Friends (${people.length})`;
+
+  if (!requests.length) els.friendRequestsList.innerHTML = '<div class="empty-list">No pending requests.</div>';
+  requests.forEach(request => {
+    els.friendRequestsList.appendChild(friendRow(request, [
+      { label: "Accept", primary: true, run: () => acceptFriendRequest(request.uid, request) },
+      { label: "Decline", run: () => declineFriendRequest(request.uid) }
+    ]));
+  });
+
+  if (!people.length) els.friendsList.innerHTML = '<div class="empty-list">Add a friend by username to start a DM.</div>';
+  people.forEach(friend => {
+    els.friendsList.appendChild(friendRow(friend, [
+      { label: "Message", primary: true, run: () => startDirectMessage(friend.uid, friend) },
+      { label: "Remove", run: () => removeFriend(friend.uid, friend) }
+    ]));
+  });
+}
+
+function socialActionAllowed(statusTarget = els.friendsStatus) {
+  const remaining = SOCIAL_ACTION_COOLDOWN_MS - (Date.now() - lastSocialActionAt);
+  if (remaining <= 0) return true;
+  setStatus(`Please wait ${Math.ceil(remaining / 1000)} seconds before another social action.`, statusTarget);
+  return false;
+}
+
+async function claimSocialAction(action, targetUid) {
+  const nonce = randomAttachmentId();
+  const at = Date.now();
+  await set(ref(db, `${PATH}/socialRateLimits/${currentUser.uid}`), {
+    action,
+    targetUid,
+    nonce,
+    at
+  });
+  lastSocialActionAt = at;
+  return nonce;
+}
+
+async function sendFriendRequest() {
+  if (!currentUser || !profile) return;
+  const handle = normalizeHandle(els.friendHandleInput.value);
+  setStatus("", els.friendsStatus);
+  if (!isValidHandle(handle)) {
+    setStatus("Enter a valid username.", els.friendsStatus);
+    return;
+  }
+  if (handle === profile.handle) {
+    setStatus("You cannot add yourself.", els.friendsStatus);
+    return;
+  }
+  if (!socialActionAllowed()) return;
+  try {
+    els.sendFriendRequestBtn.disabled = true;
+    const usernameSnap = await get(ref(db, `${PATH}/usernames/${handle}`));
+    const targetUid = usernameSnap.val()?.uid;
+    if (!targetUid) throw new Error(`No user named @${handle}.`);
+    if (friends[targetUid]) throw new Error(`@${handle} is already your friend.`);
+    if (friendRequests[targetUid]) {
+      await acceptFriendRequest(targetUid, friendRequests[targetUid], true);
+      return;
+    }
+    const existingSnap = await get(ref(db, `${PATH}/friendRequests/${targetUid}/${currentUser.uid}`));
+    if (existingSnap.exists()) throw new Error(`A request to @${handle} is already pending.`);
+    const actionNonce = await claimSocialAction("friend", targetUid);
+    await set(ref(db, `${PATH}/friendRequests/${targetUid}/${currentUser.uid}`), {
+      senderUid: currentUser.uid,
+      targetUid,
+      handle: profile.handle,
+      displayName: profile.displayName,
+      color: profileColor(),
+      actionNonce,
+      createdAt: serverTimestamp(),
+      createdAtClient: Date.now()
+    });
+    els.friendHandleInput.value = "";
+    setStatus(`Friend request sent to @${handle}.`, els.friendsStatus);
+  } catch (error) {
+    setStatus(friendlyError(error), els.friendsStatus);
+  } finally {
+    els.sendFriendRequestBtn.disabled = false;
+  }
+}
+
+async function acceptFriendRequest(senderUid, request = {}, skipCooldown = false) {
+  if (!currentUser || !profile || !senderUid || (!skipCooldown && !socialActionAllowed())) return;
+  try {
+    if (!skipCooldown) lastSocialActionAt = Date.now();
+    const senderSnap = await get(ref(db, `${PATH}/users/${senderUid}`));
+    const sender = { ...request, ...(senderSnap.val() || {}) };
+    if (!sender.handle) throw new Error("That user profile is unavailable.");
+    const since = Date.now();
+    const updates = {};
+    updates[`${PATH}/friends/${currentUser.uid}/${senderUid}`] = {
+      uid: senderUid,
+      handle: sender.handle,
+      displayName: sender.displayName || sender.handle,
+      color: sender.color || "#64748b",
+      since
+    };
+    updates[`${PATH}/friends/${senderUid}/${currentUser.uid}`] = {
+      uid: currentUser.uid,
+      handle: profile.handle,
+      displayName: profile.displayName,
+      color: profileColor(),
+      since
+    };
+    updates[`${PATH}/friendRequests/${currentUser.uid}/${senderUid}`] = null;
+    await update(ref(db), updates);
+    els.friendHandleInput.value = "";
+    setStatus(`You and @${sender.handle} are now friends.`, els.friendsStatus);
+  } catch (error) {
+    setStatus(friendlyError(error), els.friendsStatus);
+  }
+}
+
+async function declineFriendRequest(senderUid) {
+  if (!currentUser || !senderUid || !socialActionAllowed()) return;
+  try {
+    lastSocialActionAt = Date.now();
+    await remove(ref(db, `${PATH}/friendRequests/${currentUser.uid}/${senderUid}`));
+    setStatus("Friend request declined.", els.friendsStatus);
+  } catch (error) {
+    setStatus(friendlyError(error), els.friendsStatus);
+  }
+}
+
+async function removeFriend(friendUid, friend) {
+  if (!currentUser || !friendUid || !confirm(`Remove @${friend.handle || "this user"} from your friends? Existing DMs will remain.`)) return;
+  try {
+    const updates = {};
+    updates[`${PATH}/friends/${currentUser.uid}/${friendUid}`] = null;
+    updates[`${PATH}/friends/${friendUid}/${currentUser.uid}`] = null;
+    await update(ref(db), updates);
+    setStatus("Friend removed. Existing messages were kept.", els.friendsStatus);
+  } catch (error) {
+    setStatus(friendlyError(error), els.friendsStatus);
+  }
+}
+
+async function startDirectMessage(friendUid, friend = {}) {
+  if (!currentUser || !profile || !friendUid || !friends[friendUid]) return;
+  const existing = Object.entries(memberships || {}).find(([, membership]) => membership?.kind === "dm" && membership.peerUid === friendUid);
+  if (existing) {
+    closeModal("friendsModal");
+    selectGroup(existing[0]);
+    return;
+  }
+  try {
+    setStatus("Opening private conversation...", els.friendsStatus);
+    const friendSnap = await get(ref(db, `${PATH}/users/${friendUid}`));
+    const peer = { ...friend, ...(friendSnap.val() || {}) };
+    if (!peer.handle) throw new Error("That friend profile is unavailable.");
+    const groupId = push(ref(db, `${PATH}/groups`)).key;
+    const createdAtClient = Date.now();
+    const group = {
+      kind: "dm",
+      name: "Direct message",
+      description: "Private one-to-one conversation",
+      privacy: "private",
+      ownerUid: currentUser.uid,
+      ownerHandle: profile.handle,
+      dmPeerUid: friendUid,
+      createdAt: serverTimestamp(),
+      createdAtClient,
+      updatedAt: serverTimestamp(),
+      members: {
+        [currentUser.uid]: memberPayload("owner"),
+        [friendUid]: {
+          role: "member",
+          handle: peer.handle,
+          displayName: peer.displayName || peer.handle,
+          color: peer.color || "#64748b",
+          joinedAt: serverTimestamp()
+        }
+      }
+    };
+    await set(ref(db, `${PATH}/groups/${groupId}`), group);
+    const updates = {};
+    updates[`${PATH}/memberships/${currentUser.uid}/${groupId}`] = {
+      name: peer.displayName || peer.handle,
+      privacy: "private",
+      role: "owner",
+      ownerHandle: profile.handle,
+      kind: "dm",
+      peerUid: friendUid,
+      peerHandle: peer.handle,
+      joinedAt: serverTimestamp()
+    };
+    updates[`${PATH}/memberships/${friendUid}/${groupId}`] = {
+      name: profile.displayName,
+      privacy: "private",
+      role: "member",
+      ownerHandle: profile.handle,
+      kind: "dm",
+      peerUid: currentUser.uid,
+      peerHandle: profile.handle,
+      joinedAt: serverTimestamp()
+    };
+    try {
+      await update(ref(db), updates);
+    } catch (error) {
+      await remove(ref(db, `${PATH}/groups/${groupId}`)).catch(() => {});
+      throw error;
+    }
+    closeModal("friendsModal");
+    selectGroup(groupId);
+    toast("Direct message ready", `@${peer.handle}`);
+  } catch (error) {
+    setStatus(friendlyError(error), els.friendsStatus);
+  }
 }
 
 function makeBadge(value, extraClass) {
@@ -3636,6 +4333,8 @@ function selectGroup(id) {
   messageChangesUnsub = null;
   currentGroupId = id;
   currentGroupData = null;
+  currentInviteUseCount = 0;
+  inviteUsageLoadToken += 1;
   activeMessages = [];
   typingUsers = {};
   unseenMessageCount = 0;
@@ -3666,6 +4365,7 @@ function selectGroup(id) {
     }
     currentGroupData = snap.val();
     renderCurrentGroup();
+    loadInviteUseCount(id, currentGroupData);
     renderGroups();
   }, error => setStatus(friendlyError(error)));
 
@@ -3738,6 +4438,8 @@ function resetChat(text = "No group selected.") {
   els.copyInviteBtn.classList.add("hidden");
   els.rotateInviteBtn.classList.add("hidden");
   els.deleteGroupBtn.classList.add("hidden");
+  els.invitePolicyStatus.classList.add("hidden");
+  els.invitePolicyStatus.textContent = "";
   els.messageInput.disabled = true;
   els.messageInput.placeholder = "Write a message…";
   els.messageInput.value = "";
@@ -3758,14 +4460,18 @@ function resetChat(text = "No group selected.") {
 function renderCurrentGroup() {
   const group = currentGroupData;
   if (!group) return;
+  const direct = isDirectMessage(group);
+  const peer = direct ? directMessagePeer(group) : null;
   const memberCount = Object.keys(group.members || {}).length;
   const isOwner = group.ownerUid === currentUser.uid;
   const privacy = group.privacy === "private" ? "Private" : "Public";
-  els.chatTitle.textContent = group.name || "Unnamed group";
-  els.chatSubtitle.textContent = `${privacy} - ${memberCount} member${memberCount === 1 ? "" : "s"} - owner @${group.ownerHandle || "unknown"}`;
-  els.currentGroupIcon.textContent = groupInitial(group.name);
-  els.currentGroupIcon.style.background = group.privacy === "private" ? "#7c3aed" : settings.accent;
-  els.groupDescription.textContent = group.description || "No description.";
+  els.chatTitle.textContent = direct ? (peer?.displayName || "Direct message") : (group.name || "Unnamed group");
+  els.chatSubtitle.textContent = direct
+    ? `Direct message · @${peer?.handle || "unknown"} · ${presence[peer?.uid]?.online ? "online" : "offline"}`
+    : `${privacy} · ${memberCount} member${memberCount === 1 ? "" : "s"} · owner @${group.ownerHandle || "unknown"}`;
+  els.currentGroupIcon.textContent = direct ? initials(peer?.displayName || peer?.handle) : groupInitial(group.name);
+  els.currentGroupIcon.style.background = peer?.color || (group.privacy === "private" ? "#7c3aed" : settings.accent);
+  els.groupDescription.textContent = direct ? `Private conversation with @${peer?.handle || "unknown"}.` : (group.description || "No description.");
   const blocked = isCurrentUserBanned();
   const muted = isCurrentUserMuted();
   const encryptedBlocked = isE2EEnabled() && !hasE2EKey();
@@ -3774,13 +4480,16 @@ function renderCurrentGroup() {
     ? "You are banned from this group."
     : (muted ? "You are muted in this group." : (encryptedBlocked ? "Set E2E passphrase in Group Details." : "Write a message…"));
   els.sendBtn.disabled = blocked || muted || encryptedBlocked;
-  els.leaveBtn.disabled = false;
-  const canInvite = group.privacy === "public" || isOwner;
+  els.leaveBtn.disabled = direct;
+  els.leaveBtn.classList.toggle("hidden", direct);
+  const canInvite = !direct && (group.privacy === "public" || isOwner);
   els.toolbarInviteBtn.classList.toggle("hidden", !canInvite);
   els.inviteUserBtn.classList.toggle("hidden", !canInvite);
-  els.copyInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
-  els.rotateInviteBtn.classList.toggle("hidden", !(isOwner && group.privacy === "private"));
-  els.deleteGroupBtn.classList.toggle("hidden", !isOwner);
+  const canManageInvite = !direct && isOwner && group.privacy === "private";
+  els.copyInviteBtn.classList.toggle("hidden", !canManageInvite);
+  els.rotateInviteBtn.classList.toggle("hidden", !canManageInvite);
+  els.deleteGroupBtn.classList.toggle("hidden", !isOwner || direct);
+  renderInvitePolicyStatus();
   renderE2EControls();
   renderPinnedMessage();
   renderTypingIndicator();
@@ -3917,7 +4626,7 @@ function renderMembers() {
     copy.append(name, meta);
     row.append(avatar, copy);
 
-    if (isOwner && uid !== currentUser.uid) {
+    if (isOwner && !isDirectMessage() && uid !== currentUser.uid) {
       const modActions = document.createElement("div");
       modActions.className = "mod-actions";
       const muteBtn = document.createElement("button");
@@ -3942,7 +4651,7 @@ function renderMembers() {
   });
 }
 
-function memberPayload(role, inviteCode = null) {
+function memberPayload(role, inviteCode = null, inviteSlot = null) {
   const payload = {
     role,
     handle: profile.handle,
@@ -3951,6 +4660,7 @@ function memberPayload(role, inviteCode = null) {
     joinedAt: serverTimestamp()
   };
   if (inviteCode) payload.inviteCode = inviteCode;
+  if (inviteSlot) payload.inviteSlot = String(inviteSlot);
   return payload;
 }
 
@@ -3969,6 +4679,7 @@ async function createGroup() {
     const groupRef = push(ref(db, `${PATH}/groups`));
     const groupId = groupRef.key;
     const inviteCode = privacy === "private" ? randomInviteCode() : null;
+    const invitePolicy = privacy === "private" ? invitePolicyFromInputs(els.createInviteExpiry, els.createInviteMaxUses) : null;
     const group = {
       name,
       description,
@@ -3976,37 +4687,44 @@ async function createGroup() {
       ownerUid: currentUser.uid,
       ownerHandle: profile.handle,
       inviteCode,
+      ...(invitePolicy ? {
+        inviteExpiresAt: invitePolicy.expiresAt,
+        inviteMaxUses: invitePolicy.maxUses
+      } : {}),
       createdAt: serverTimestamp(),
+      createdAtClient: Date.now(),
       updatedAt: serverTimestamp(),
       members: {
         [currentUser.uid]: memberPayload("owner")
       }
     };
-    await set(groupRef, group);
-    await set(ref(db, `${PATH}/memberships/${currentUser.uid}/${groupId}`), {
+    const updates = {};
+    updates[`${PATH}/memberships/${currentUser.uid}/${groupId}`] = {
       name,
       description,
       privacy,
       role: "owner",
       ownerHandle: profile.handle,
       joinedAt: serverTimestamp()
-    });
+    };
     if (privacy === "public") {
-      await set(ref(db, `${PATH}/publicGroups/${groupId}`), {
+      updates[`${PATH}/publicGroups/${groupId}`] = {
         name,
         description,
         privacy,
         ownerUid: currentUser.uid,
         ownerHandle: profile.handle,
         createdAt: serverTimestamp()
-      });
+      };
     } else {
-      await set(ref(db, `${PATH}/invites/${inviteCode}`), {
-        groupId,
-        groupName: name,
-        createdBy: currentUser.uid,
-        createdAt: serverTimestamp()
-      });
+      updates[`${PATH}/invites/${inviteCode}`] = invitePayload(groupId, name, invitePolicy);
+    }
+    await set(groupRef, group);
+    try {
+      await update(ref(db), updates);
+    } catch (error) {
+      await remove(groupRef).catch(() => {});
+      throw error;
     }
     closeModal("createGroupModal");
     els.groupNameInput.value = "";
@@ -4059,17 +4777,35 @@ async function joinPrivateGroupByCode(code, statusTarget = els.statusLine) {
   if (!inviteSnap.exists()) throw new Error("Invite code not found.");
 
   const invite = inviteSnap.val();
+  if (!invite.expiresAt || !invite.maxUses) throw new Error("This legacy invite must be replaced by the group owner.");
+  if (Number(invite.expiresAt) <= Date.now()) throw new Error("This invite has expired. Ask the group owner for a new one.");
+  const inviteSlot = await claimInviteSlot(code, invite);
   const updates = {};
-  updates[`${PATH}/groups/${invite.groupId}/members/${currentUser.uid}`] = memberPayload("member", code);
+  updates[`${PATH}/groups/${invite.groupId}/members/${currentUser.uid}`] = memberPayload("member", code, inviteSlot);
   updates[`${PATH}/memberships/${currentUser.uid}/${invite.groupId}`] = {
     name: invite.groupName || "Private group",
     privacy: "private",
     role: "member",
+    ownerHandle: invite.ownerHandle || "",
     joinedAt: serverTimestamp()
   };
   await update(ref(db), updates);
   selectGroup(invite.groupId);
   return invite;
+}
+
+async function claimInviteSlot(code, invite) {
+  const slots = Object.keys(invite.slots || {}).sort((a, b) => Number(a) - Number(b));
+  if (!slots.length) throw new Error("This invite has no available-use slots. Ask the owner for a new one.");
+  for (const slot of slots) {
+    try {
+      await set(ref(db, `${PATH}/inviteUses/${code}/${slot}`), currentUser.uid);
+      return slot;
+    } catch (error) {
+      if (!String(error?.code || "").includes("permission-denied")) throw error;
+    }
+  }
+  throw new Error("This invite has reached its maximum number of uses.");
 }
 
 async function applyPendingInvite() {
@@ -4124,6 +4860,11 @@ async function sendMessage(event) {
   const text = draftValue.trim();
   const attachmentSnapshot = [...pendingAttachments];
   if (!text && attachmentSnapshot.length === 0) return;
+  const cooldownRemaining = MESSAGE_COOLDOWN_MS - (Date.now() - lastMessageSentAt);
+  if (cooldownRemaining > 0) {
+    setStatus(`Please wait ${Math.ceil(cooldownRemaining / 100) / 10} seconds before sending again.`);
+    return;
+  }
   const groupId = currentGroupId;
   const groupData = currentGroupData;
   const user = currentUser;
@@ -4173,6 +4914,7 @@ async function sendMessage(event) {
       [`${PATH}/messages/${groupId}/${msgRef.key}`]: payload,
       ...attachmentDataUpdates
     });
+    lastMessageSentAt = Date.now();
 
     const notificationUpdates = {};
     Object.keys(mentions).forEach(uid => {
@@ -4836,6 +5578,11 @@ async function sendGroupInvite() {
     setStatus("This private group needs a fresh invite code first.", els.inviteUserStatus);
     return;
   }
+  if (group.privacy === "private" && (inviteIsExpired(group) || inviteIsFull(group))) {
+    setStatus(`This invite is ${inviteIsExpired(group) ? "expired" : "full"}. Create a new invite first.`, els.inviteUserStatus);
+    return;
+  }
+  if (!socialActionAllowed(els.inviteUserStatus)) return;
 
   try {
     els.sendInviteConfirm.disabled = true;
@@ -4865,6 +5612,7 @@ async function sendGroupInvite() {
       createdAtClient: Date.now()
     };
     if (group.privacy === "private") invite.inviteCode = group.inviteCode;
+    invite.actionNonce = await claimSocialAction("invite", targetUid);
     await set(inviteRef, invite);
     closeModal("inviteUserModal");
     toast("Invite sent", `@${handle}`);
@@ -4877,6 +5625,10 @@ async function sendGroupInvite() {
 
 async function copyInvite() {
   if (!currentGroupData?.inviteCode) return;
+  if (inviteIsExpired() || inviteIsFull()) {
+    toast("Invite unavailable", `This invite is ${inviteIsExpired() ? "expired" : "full"}. Create a new one.`);
+    return;
+  }
   try {
     await copyText(inviteLink(currentGroupData.inviteCode));
     toast("Invite link copied", currentGroupData.inviteCode);
@@ -4908,21 +5660,32 @@ async function copyText(text) {
 
 async function rotateInvite() {
   if (!currentGroupData || currentGroupData.ownerUid !== currentUser.uid) return;
-  if (!confirm("Replace the old invite code?")) return;
+  els.rotateInviteExpiry.value = "7";
+  els.rotateInviteMaxUses.value = "10";
+  setStatus("", els.invitePolicyModalStatus);
+  openModal("invitePolicyModal");
+}
+
+async function createReplacementInvite() {
+  if (!currentGroupData || currentGroupData.ownerUid !== currentUser.uid || isDirectMessage()) return;
+  const groupId = currentGroupId;
   const oldCode = currentGroupData.inviteCode;
   const newCode = randomInviteCode();
+  const policy = invitePolicyFromInputs(els.rotateInviteExpiry, els.rotateInviteMaxUses);
   try {
+    els.rotateInviteConfirm.disabled = true;
     const updates = {};
-    updates[`${PATH}/groups/${currentGroupId}/inviteCode`] = newCode;
-    updates[`${PATH}/groups/${currentGroupId}/updatedAt`] = serverTimestamp();
-    updates[`${PATH}/invites/${newCode}`] = {
-      groupId: currentGroupId,
-      groupName: currentGroupData.name,
-      createdBy: currentUser.uid,
-      createdAt: serverTimestamp()
-    };
-    if (oldCode) updates[`${PATH}/invites/${oldCode}`] = null;
+    updates[`${PATH}/groups/${groupId}/inviteCode`] = newCode;
+    updates[`${PATH}/groups/${groupId}/inviteExpiresAt`] = policy.expiresAt;
+    updates[`${PATH}/groups/${groupId}/inviteMaxUses`] = policy.maxUses;
+    updates[`${PATH}/groups/${groupId}/updatedAt`] = serverTimestamp();
+    updates[`${PATH}/invites/${newCode}`] = invitePayload(groupId, currentGroupData.name, policy);
+    if (oldCode) {
+      updates[`${PATH}/invites/${oldCode}`] = null;
+      updates[`${PATH}/inviteUses/${oldCode}`] = null;
+    }
     await update(ref(db), updates);
+    closeModal("invitePolicyModal");
     try {
       await copyText(inviteLink(newCode));
       toast("New invite link copied", newCode);
@@ -4930,7 +5693,9 @@ async function rotateInvite() {
       toast("New invite created", `Code: ${newCode}`);
     }
   } catch (error) {
-    setStatus(friendlyError(error));
+    setStatus(friendlyError(error), els.invitePolicyModalStatus);
+  } finally {
+    els.rotateInviteConfirm.disabled = false;
   }
 }
 
@@ -5019,7 +5784,10 @@ async function deleteGroup() {
       updates[`${PATH}/memberships/${uid}/${groupId}`] = null;
       updates[`${PATH}/readStates/${uid}/${groupId}`] = null;
     });
-    if (currentGroupData.inviteCode) updates[`${PATH}/invites/${currentGroupData.inviteCode}`] = null;
+    if (currentGroupData.inviteCode) {
+      updates[`${PATH}/invites/${currentGroupData.inviteCode}`] = null;
+      updates[`${PATH}/inviteUses/${currentGroupData.inviteCode}`] = null;
+    }
     updates[`${PATH}/messages/${groupId}`] = null;
     updates[`${PATH}/attachmentData/${groupId}`] = null;
     updates[`${PATH}/publicGroups/${groupId}`] = null;
@@ -5082,6 +5850,11 @@ function fillSettingsForm() {
   els.settingsSeconds.checked = Boolean(settings.showSeconds);
   els.settingsDesktopMentions.checked = Boolean(settings.desktopMentions);
   els.settingsSoundMentions.checked = Boolean(settings.soundMentions);
+  els.appCheckStatusLine.textContent = appCheckState === "active"
+    ? "App Check protection is active in this browser."
+    : (appCheckState === "error"
+      ? "App Check could not start. Check the configured reCAPTCHA v3 site key."
+      : "App Check code is ready. Add a free reCAPTCHA v3 site key, deploy, verify traffic, then enable enforcement in Firebase.");
 }
 
 function readSettingsForm() {
@@ -5138,6 +5911,15 @@ async function saveSettings() {
         joinedAt: currentMember.joinedAt || memberships[groupId]?.joinedAt || serverTimestamp()
       };
     });
+    Object.keys(friends || {}).forEach(friendUid => {
+      updates[`${PATH}/friends/${friendUid}/${currentUser.uid}`] = {
+        uid: currentUser.uid,
+        handle: profile.handle,
+        displayName,
+        color,
+        since: friends[friendUid]?.since || Date.now()
+      };
+    });
     if (Object.keys(updates).length) await update(ref(db), updates);
     updateProfileChrome();
     renderMembers();
@@ -5154,10 +5936,26 @@ els.authPassword.addEventListener("keydown", event => {
   if (event.key === "Enter") login();
 });
 els.logoutBtn.addEventListener("click", logout);
-els.newGroupBtn.addEventListener("click", () => openModal("createGroupModal"));
+els.newGroupBtn.addEventListener("click", () => {
+  setStatus("", els.createGroupStatus);
+  els.createInvitePolicyFields.classList.toggle("hidden", els.groupPrivacyInput.value !== "private");
+  openModal("createGroupModal");
+});
 els.joinGroupBtn.addEventListener("click", () => openModal("joinGroupModal"));
+els.friendsBtn.addEventListener("click", () => {
+  setStatus("", els.friendsStatus);
+  renderFriends();
+  openModal("friendsModal");
+});
+els.groupPrivacyInput.addEventListener("change", () => {
+  els.createInvitePolicyFields.classList.toggle("hidden", els.groupPrivacyInput.value !== "private");
+});
 els.createGroupConfirm.addEventListener("click", createGroup);
 els.joinInviteConfirm.addEventListener("click", joinPrivateGroup);
+els.sendFriendRequestBtn.addEventListener("click", sendFriendRequest);
+els.friendHandleInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") sendFriendRequest();
+});
 els.inviteUserBtn.addEventListener("click", openInviteUserModal);
 els.toolbarInviteBtn.addEventListener("click", openInviteUserModal);
 els.sendInviteConfirm.addEventListener("click", sendGroupInvite);
@@ -5175,12 +5973,12 @@ els.groupSearch.addEventListener("input", renderGroups);
 els.messageSearch.addEventListener("input", applyMessageSearch);
 els.messageForm.addEventListener("submit", sendMessage);
 els.attachmentBtn.addEventListener("click", () => els.attachmentInput.click());
-els.attachmentInput.addEventListener("change", () => addPendingAttachments([...els.attachmentInput.files]));
+els.attachmentInput.addEventListener("change", () => queuePendingAttachments(els.attachmentInput.files));
 els.messageInput.addEventListener("paste", event => {
   const files = [...(event.clipboardData?.files || [])];
   if (!files.length) return;
   event.preventDefault();
-  addPendingAttachments(files);
+  queuePendingAttachments(files);
 });
 els.messageForm.addEventListener("dragover", event => {
   event.preventDefault();
@@ -5194,7 +5992,7 @@ els.messageForm.addEventListener("drop", event => {
   els.messageForm.classList.remove("dragging");
   event.preventDefault();
   if (els.attachmentInput.disabled) return;
-  addPendingAttachments([...(event.dataTransfer?.files || [])]);
+  queuePendingAttachments(event.dataTransfer?.files || []);
 });
 els.messageInput.addEventListener("input", () => {
   saveDraft();
@@ -5232,6 +6030,7 @@ els.editMessageInput.addEventListener("keydown", event => {
 els.sendReportBtn.addEventListener("click", sendReport);
 els.copyInviteBtn.addEventListener("click", copyInvite);
 els.rotateInviteBtn.addEventListener("click", rotateInvite);
+els.rotateInviteConfirm.addEventListener("click", createReplacementInvite);
 els.leaveBtn.addEventListener("click", leaveGroup);
 els.deleteGroupBtn.addEventListener("click", deleteGroup);
 els.exportBtn.addEventListener("click", exportMessages);
