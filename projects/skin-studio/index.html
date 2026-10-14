@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Create animated Minecraft skin packs on your computer.">
+  <link rel="canonical" href="https://firecatcher404.github.io/projects/skin-studio/">
+  <meta name="theme-color" content="#101216"><title>Expressionful — Skin Studio</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css">
+  <script defer src="vendor/fflate.js"></script><script defer src="vendor/skinview3d-3.4.2.js"></script>
+  <script defer src="catalog.js"></script><script defer src="demo.js"></script><script defer src="core.js"></script>
+  <script defer src="preview.js"></script><script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Expressionful Skin Studio"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>expressionful<span class="brand-sub">SKIN STUDIO</span></span></a>
+    <div class="top-actions"><span class="local-badge">WEB EDITOR</span><span class="save-state" id="saveState" role="status">Local draft</span><button id="importPack" class="button secondary">Import ZIP</button><button id="reviewExport" class="button primary">Export pack <span aria-hidden="true">↗</span></button></div>
+  </header>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Animation library">
+      <div class="pack-badge"><span class="eyebrow">CURRENT PACK</span><strong id="sidebarPackName">My skin pack</strong><button class="text-button" data-go-tab="pack">Edit pack settings →</button></div>
+      <div class="sidebar-heading"><span class="eyebrow">ANIMATIONS <span id="animationCount" class="count">0</span></span><button id="addAnimation" class="add-button" aria-label="Add animation" title="Add animation">+</button></div>
+      <div id="animationList" class="animation-list"></div>
+      <button id="loadDemo" class="demo-button"><span aria-hidden="true">✦</span><span>Load example pack<small>Explore frames and rules</small></span><span aria-hidden="true">↗</span></button>
+      <p class="local-note"><span class="status-dot"></span><span id="workspaceLocation">Skins stay on this device.</span><br>Drafts stay in this browser.</p>
+    </aside>
+    <main class="main">
+      <div class="page-heading"><div><div class="eyebrow">EXPRESSIONFUL / SKIN PACK EDITOR</div><h1 id="pageTitle">Animate your skin.</h1><p id="pageDescription">Upload frames and see them on your player.</p></div><span class="version-chip">Minecraft 26.2 · Mod 1.2+</span></div>
+      <nav class="tabs" role="tablist" aria-label="Editor steps">
+        <button role="tab" aria-selected="false" aria-controls="panel-pack" tabindex="-1" data-tab="pack" id="tab-pack"><span>1</span> Pack</button>
+        <button role="tab" aria-selected="true" aria-controls="panel-frames" tabindex="0" data-tab="frames" id="tab-frames"><span>2</span> Animations</button>
+        <button role="tab" aria-selected="false" aria-controls="panel-rules" tabindex="-1" data-tab="rules" id="tab-rules"><span>3</span> Rules <b class="count" id="ruleCount">0</b></button>
+        <button role="tab" aria-selected="false" aria-controls="panel-manifest" tabindex="-1" data-tab="manifest" id="tab-manifest"><span>4</span> Export</button>
+      </nav>
+      <section id="panel-pack" role="tabpanel" aria-labelledby="tab-pack" hidden>
+        <div class="pack-grid">
+          <div class="card"><h2>Pack settings</h2><p class="muted">The name and starting appearance of your pack.</p>
+            <label class="field">Pack name<input id="packName" maxlength="80" autocomplete="off"></label>
+            <label class="field">Description<textarea id="packDescription" rows="3" maxlength="160" placeholder="What does your skin pack do?"></textarea></label>
+            <div class="field-pair"><label class="field">Arm model<select id="packModel"><option value="auto">Auto / match player</option><option value="wide">Wide / Steve</option><option value="slim">Slim / Alex</option></select></label><label class="field">Default animation<select id="packDefault"></select></label></div>
+            <p class="help">The default animation plays when no rule matches. Auto uses your Minecraft player's arm model; the preview detects it from the PNG.</p>
+            <button class="button primary" data-go-tab="frames">Edit animation frames →</button>
+          </div>
+          <div class="card getting-started"><span class="eyebrow">A QUICK WAY TO START</span><h2>From skins to a skin pack.</h2>
+            <ol><li><strong>Upload your skins</strong><p>Each animation contains one or more complete 64 × 64 PNG skins. Upload several to make a sequence.</p></li><li><strong>Choose when they play</strong><p>Connect an animation to taking damage, low health, sneaking, random idle moments, or other rules.</p></li><li><strong>Export and play</strong><p>Download a ZIP, put it in your Minecraft instance's <code>skinpacks</code> folder, then select it with K.</p></li></ol>
+            <button id="newPack" class="button secondary">Start a new pack</button>
+          </div>
+        </div>
+      </section>
+      <section id="panel-frames" role="tabpanel" aria-labelledby="tab-frames">
+        <div class="section-heading"><div><h2 id="selectedTitle">idle</h2><p id="selectedSubtitle">Choose an animation on the left, or create one with +.</p></div><div class="inline-actions"><button id="assignRule" class="button small secondary">Add a rule for this</button><button class="button small secondary" id="duplicateAnimation">Duplicate</button><button class="icon-button" id="deleteAnimation" aria-label="Delete selected animation" title="Delete animation">×</button></div></div>
+        <div class="workbench">
+          <div class="preview-panel">
+            <div class="preview-toolbar"><span class="eyebrow">PLAYER PREVIEW</span><div class="segmented"><button id="view3d" aria-pressed="true">3D</button><button id="viewFront" aria-pressed="false">Front</button><button id="viewBack" aria-pressed="false">Back</button><button id="viewTexture" aria-pressed="false">Skin map</button></div></div>
+            <div class="preview-stage" id="previewStage"><span class="stage-label" id="previewModel">3D PLAYER · 64 × 64</span><canvas id="playerPreview" tabindex="0" aria-label="3D player preview. Drag to rotate, scroll to zoom, or use arrow keys to rotate."></canvas><canvas id="skinPreview" width="320" height="320" aria-label="Flat skin texture preview" hidden></canvas><div class="stage-floor"></div><p class="orbit-hint" id="orbitHint">Drag to rotate · Scroll to zoom</p><div class="no-frames" id="noFrames" hidden><strong>This animation needs a skin.</strong><span>Upload your first 64 × 64 PNG to see it here.</span><button class="button primary" data-upload-frames>Upload frames</button></div></div>
+            <div class="preview-options"><label class="check-field"><input type="checkbox" id="outerLayer" checked>Outer skin layer</label><label class="check-field"><input type="checkbox" id="autoRotate">Auto-rotate</label><button id="resetCamera" class="text-button">Reset view</button></div>
+            <p id="previewError" class="help preview-error" role="status" hidden></p>
+            <div class="playback-bar"><button id="playPause" class="play-button" aria-label="Pause preview">Ⅱ</button><input type="range" id="frameScrubber" min="0" max="0" value="0" aria-label="Preview frame"><span id="framePosition">01 / 01</span></div>
+          </div>
+          <div class="animation-settings"><h3>Animation settings</h3><label class="field">Animation name / ID<input id="animationId" maxlength="40" pattern="[a-z0-9_]+" autocomplete="off"></label><div class="field-pair"><label class="field">Frames per second<input id="animationFps" type="number" min="0.1" max="120" step="0.1"></label><label class="field">Frame order<select id="animationPlayback"><option value="forward">Forward</option><option value="reverse">Reverse</option><option value="ping_pong">Ping-pong</option></select></label></div><label class="check-field"><input type="checkbox" id="animationLoop">Repeat continuously</label><p class="settings-note">Turn looping off for reactions that play once, like a wince after damage.</p><div class="section-divider"></div><label class="upload-zone" id="dropZone" tabindex="0"><input id="frameUpload" type="file" accept="image/png,.png" multiple hidden><span class="upload-icon" aria-hidden="true">＋</span><strong>Upload skin frames</strong><span>Drop PNGs or click to browse</span><small>64 × 64 pixels · select multiple files</small></label><p class="help">Frames sort by filename. Use 000.png, 001.png, and so on.</p></div>
+        </div>
+        <div class="timeline-heading"><h3>Frames <span class="count" id="frameCount">0</span></h3><span>Click to pause on a frame · drag to reorder</span></div><div class="filmstrip" id="frameList" aria-label="Animation frames"></div>
+        <div id="frameInspector" class="frame-inspector" hidden><span id="frameName"></span><label>Frame duration <input type="number" id="frameDuration" min="1" max="60000" step="any" placeholder="Use FPS"> ms</label><div class="inline-actions"><button id="moveFrameLeft" class="button small secondary" aria-label="Move frame left">←</button><button id="moveFrameRight" class="button small secondary" aria-label="Move frame right">→</button><button id="replaceFrame" class="button small secondary">Replace</button><button id="duplicateFrame" class="button small secondary">Duplicate frame</button><button id="removeFrame" class="button small danger">Remove</button></div></div>
+      </section>
+      <section id="panel-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
+        <div class="section-heading"><div><h2>When should your skin change?</h2><p>Choose a condition and the animation to play. Advanced controls are optional.</p></div><button class="button primary" id="addRule">+ Add rule</button></div>
+        <div class="rule-presets" aria-label="Quick rule templates"><span>QUICK ADD</span><button data-preset="damage">Take damage</button><button data-preset="hunger">Hunger = 2</button><button data-preset="health">Health = 1</button><button data-preset="speed">Speed effect</button><button data-preset="random">Random idle</button></div>
+        <div id="ruleList" class="rule-list"></div><div class="empty-state" id="noRules" hidden><h3>Your default animation is always ready.</h3><p>Add a rule to play a different animation when something happens.</p></div>
+        <div class="rules-footer"><span>Higher priority wins. Health: 1 HP = half a heart. Hunger: 2 points = one food icon.</span><button id="openReference" class="text-button">Browse all conditions →</button></div>
+      </section>
+      <section id="panel-manifest" role="tabpanel" aria-labelledby="tab-manifest" hidden>
+        <div class="export-grid"><div class="card export-card"><span class="eyebrow">READY FOR MINECRAFT</span><h2>Export your skin pack.</h2><p class="muted">One ZIP with your skins, animations, and rules.</p><div class="export-stats"><div><strong id="exportAnimationCount">0</strong><span>animations</span></div><div><strong id="exportFrameCount">0</strong><span>frames</span></div><div><strong id="exportRuleCount">0</strong><span>rules</span></div></div><p id="exportStatus" class="export-status" role="status"></p><button id="exportPack" class="button primary export-download">Download skin pack ZIP ↓</button><p class="help">You can import this ZIP later to keep editing.</p></div><div class="card install-card"><h2>Add it to Minecraft</h2><ol><li>Install <a href="downloads/expressionful-1.2.0.jar" download>Expressionful 1.2.0</a> and Fabric API for Minecraft 26.2.</li><li>Put the exported ZIP in your instance's <code>skinpacks</code> folder.</li><li>Press <kbd>K</kbd>, click <strong>Refresh</strong>, and select your pack.</li></ol><p class="help">For other players to see it, the server and those players also need the mod. Enable Share in the mod's pack picker.</p></div></div>
+        <details class="json-details"><summary>Advanced: skinpack.json</summary><div class="json-controls"><label class="check-field"><input type="checkbox" id="useAliases">Use readable aliases</label><button id="downloadManifest" class="button small secondary">Download JSON only</button></div><pre id="manifestPreview" tabindex="0" aria-label="Generated skinpack.json"></pre></details>
+      </section>
+      <div class="validation-panel" id="validationPanel" hidden><strong>Fix these before exporting</strong><ul id="validationErrors"></ul></div>
+      <footer class="editor-footer"><span><span class="status-dot"></span><a href="../">← All projects</a> · <a href="downloads/expressionful-1.2.0.jar" download>Get the mod ↓</a></span><span id="packSummary"></span></footer>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <input id="packUpload" type="file" accept=".zip,application/zip" hidden><input id="replaceUpload" type="file" accept="image/png,.png" hidden>
+  <dialog id="animationDialog"><form id="animationForm"><span class="eyebrow">NEW ANIMATION</span><h2>What will you animate?</h2><label class="field">Animation name / ID<input id="newAnimationId" required maxlength="40" pattern="[a-z0-9_]+" placeholder="e.g. hurt, blink, sleepy" autocomplete="off"></label><p class="muted">Use lowercase letters, numbers, and underscores. Add your skin frames next.</p><div class="dialog-actions"><button type="button" class="button secondary" data-close-dialog>Cancel</button><button type="submit" class="button primary">Create animation</button></div></form></dialog>
+  <dialog id="referenceDialog"><div class="reference-content"><div class="section-heading"><div><div class="eyebrow">CONDITION REFERENCE</div><h2>Aliases & attributes</h2></div><button class="icon-button" data-close-dialog aria-label="Close reference">×</button></div><p>Use these in rules or assign them to animations in the JSON <code>aliases</code> section.</p><pre>{ "aliases": {
+  "wasdamaged": "hurt",
+  "hunger == 2": "hungry",
+  "health == 1": "critical",
+  "has_speed": "speedy"
+} }</pre><p><strong>Health uses HP:</strong> 1 HP = half a heart. <code>hearts == 1</code> means 2 HP. <strong>Hunger uses points:</strong> 2 points = one food icon. Use <code>hunger_bars == 2</code> for two icons.</p><h3>Find a condition</h3><input id="referenceSearch" type="search" placeholder="Search damage, sneaking, effects…" aria-label="Search aliases"><div id="referenceList" class="reference-list"></div></div></dialog>
+</body>
+</html>

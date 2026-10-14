@@ -124,6 +124,8 @@
 
     .card:hover::after { opacity: 1; }
 
+    .card[href] { display: block; color: inherit; text-decoration: none; }
+
     .card h2 {
       margin: 0 0 6px;
       font-size: 1.2rem;
@@ -317,11 +319,16 @@
       <div class="category-head">
         <div>
           <h2>Creative Tools</h2>
-          <p>Music, visuals, shaders, and desktop background makers.</p>
+          <p>Skin packs, music, visuals, shaders, and desktop background makers.</p>
         </div>
-        <span class="category-count">3 projects</span>
+        <span class="category-count">4 projects</span>
       </div>
       <div class="category-grid">
+        <a class="card" href="skin-studio/">
+          <h2>Expressionful Skin Studio</h2>
+          <p>Create animated Minecraft skin packs with a 3D preview, frame uploads, rules, and ZIP export.</p>
+        </a>
+
         <div class="card" data-link="shader-lab.html">
           <h2>Shader Lab</h2>
           <p>Edit live WebGL shaders with presets, mouse input, and animated uniforms.</p>

@@ -2,6 +2,12 @@
 
 Static site published through GitHub Pages. The Firebase-backed messenger lives at `message.html`.
 
+## Expressionful Skin Studio
+
+Open [Skin Studio](https://firecatcher404.github.io/projects/skin-studio/) to create animated Minecraft skin packs. It runs entirely in your browser with a dark interface, 3D player preview, frame uploads, rule builder, ZIP import/export, and a draft stored on your device. No server setup or account is required.
+
+Its static files live in `projects/skin-studio/`, including vendored MIT-licensed fflate and skinview3d libraries and the Expressionful 1.2.0 mod download. No uploaded skins or drafts are sent to a backend. Export a ZIP to back up your work or move it between browsers.
+
 ## Messenger backend deployment
 
 The messenger uses Firebase Authentication and Realtime Database for groups, friends, direct messages, read markers, and authenticated on-demand file attachments. The attachment limit is intentionally 1 MB per file (up to three files per message) so the feature works on Firebase's no-cost plan without a Cloud Storage bucket. Oversized JPEG, PNG, and WebP photos up to 12 MB are compressed locally before upload; original files never leave the browser when compression fails.
