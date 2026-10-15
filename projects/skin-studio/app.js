@@ -43,7 +43,7 @@
     },250);
   }
   function updateManifest() {
-    $('manifestPreview').textContent = JSON.stringify(C.manifest(project),null,2);
+    $('manifestPreview').textContent = JSON.stringify($('jsonFile').value === 'skinpack.mcmeta' ? C.metadata(project) : C.manifest(project),null,2);
     const errors = C.validate(project);
     $('validationPanel').hidden = !errors.length || activeTab !== 'manifest';
     $('validationErrors').replaceChildren(...errors.slice(0,8).map(message => { const item = document.createElement('li'); item.textContent = message; return item; }));
@@ -51,6 +51,8 @@
     $('packSummary').textContent = `${project.animations.length} animations · ${frames} frames · ${project.rules.length} rules`;
     $('ruleCount').textContent = project.rules.length;
     $('sidebarPackName').textContent = project.name || 'Untitled pack';
+    $('packIconPreview').hidden = !project.icon; $('packIconPlaceholder').hidden = !!project.icon; $('removePackIcon').hidden = !project.icon;
+    if (project.icon) $('packIconPreview').src = project.icon; else $('packIconPreview').removeAttribute('src');
     $('exportAnimationCount').textContent = project.animations.length;
     $('exportFrameCount').textContent = frames;
     $('exportRuleCount').textContent = project.rules.length;
@@ -101,6 +103,7 @@
     if (!selected()) return;
     const animation = selected(); selectedId = animation.id;
     setValue('packName',project.name); setValue('packDescription',project.description); setValue('packModel',project.model);
+    setValue('packAuthor',project.author); setValue('packVersion',project.packVersion);
     $('useAliases').checked = !!project.useAliases;
     renderAnimations(); renderFrames();
     $('selectedTitle').textContent = animation.id;
@@ -240,6 +243,19 @@
   }
   $('packName').addEventListener('input',()=>{project.name=$('packName').value;changed(false);});
   $('packDescription').addEventListener('input',()=>{project.description=$('packDescription').value;changed(false);});
+  $('packAuthor').addEventListener('input',()=>{project.author=$('packAuthor').value;changed(false);});
+  $('packVersion').addEventListener('input',()=>{project.packVersion=$('packVersion').value;changed(false);});
+  $('choosePackIcon').addEventListener('click',()=>$('packIconUpload').click());
+  $('packIconUpload').addEventListener('change',async event=>{
+    try {
+      const file=event.target.files[0]; if(!file)return;
+      if(file.size>C.LIMITS.file)throw Error('Pack icons must be at most 64 KiB.');
+      const bytes=new Uint8Array(await file.arrayBuffer()); C.validatePng(bytes,true);
+      const data=C.pngData(bytes), image=new Image(); image.src=data; await image.decode();
+      project.icon=data; changed(false); toast('Pack icon updated.');
+    } catch(error){failure(error);} finally{event.target.value='';}
+  });
+  $('removePackIcon').addEventListener('click',()=>{project.icon='';changed(false);});
   $('packModel').addEventListener('change',()=>{project.model=$('packModel').value;changed();});
   $('packDefault').addEventListener('change',()=>{project.fallback=$('packDefault').value;changed();});
   $('useAliases').addEventListener('change',()=>{project.useAliases=$('useAliases').checked;changed(false);});
@@ -305,7 +321,8 @@
   $('importPack').addEventListener('click',()=>$('packUpload').click());
   $('packUpload').addEventListener('change',async event=>{try{const file=event.target.files[0];if(!file)return;const next=C.importZip(new Uint8Array(await file.arrayBuffer()));if(!confirm('Replace the current draft with this skin pack?'))return;loadProject(next);toast('Pack imported. Frames and rules are ready to edit.');}catch(error){failure(error);}finally{event.target.value='';}});
   $('exportPack').addEventListener('click',exportPack);
-  $('downloadManifest').addEventListener('click',()=>download(JSON.stringify(C.manifest(project),null,2)+'\n','skinpack.json','application/json'));
+  $('jsonFile').addEventListener('change',updateManifest);
+  $('downloadManifest').addEventListener('click',()=>download($('manifestPreview').textContent+'\n',$('jsonFile').value,'application/json'));
   $('newPack').addEventListener('click',()=>{if(confirm('Start a new pack? Export your current draft first if you want to keep it.')){loadProject(C.newProject());openTab('pack');}});
   $('loadDemo').addEventListener('click',()=>{if(confirm('Replace the current draft with the example pack?'))loadProject(C.importZip(C.unbase64(ExpressionfulDemo)));});
   $('openReference').addEventListener('click',()=>{reference();$('referenceDialog').showModal();});$('referenceSearch').addEventListener('input',reference);

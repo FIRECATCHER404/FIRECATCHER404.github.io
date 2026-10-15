@@ -40,16 +40,33 @@
   }
   const pngData = bytes => 'data:image/png;base64,' + base64(bytes);
   const pngBytes = data => unbase64(data.slice(data.indexOf(',') + 1));
-  function validatePng(bytes) {
-    if (bytes.length < 33 || bytes.length > LIMITS.file || ![137,80,78,71,13,10,26,10].every((v,i) => bytes[i] === v)) throw Error('Each frame must be a PNG under 64 KiB.');
+  function validatePng(bytes, icon = false) {
+    if (bytes.length < 33 || bytes.length > LIMITS.file || ![137,80,78,71,13,10,26,10].every((v,i) => bytes[i] === v)) throw Error(icon ? 'The pack icon must be a PNG of at most 64 KiB.' : 'Each frame must be a PNG under 64 KiB.');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    if (view.getUint32(8) !== 13 || view.getUint32(12) !== 0x49484452 || view.getUint32(16) !== 64 || view.getUint32(20) !== 64) throw Error('Each skin frame must be exactly 64 × 64 pixels.');
+    const width = view.getUint32(16), height = view.getUint32(20);
+    if (view.getUint32(8) !== 13 || view.getUint32(12) !== 0x49484452 || (icon ? width !== height || width < 16 || width > 256 : width !== 64 || height !== 64)) throw Error(icon ? 'Pack icons must be square PNGs, 16–256 pixels.' : 'Each skin frame must be exactly 64 × 64 pixels.');
   }
   function newProject() {
-    return { version: 1, name: 'My skin pack', description: '', model: 'auto', fallback: 'idle', useAliases: true,
+    return { version: 1, name: 'My skin pack', description: '', author: '', packVersion: '', icon: '', model: 'auto', fallback: 'idle', useAliases: true,
       animations: [{ id: 'idle', fps: 10, loop: true, playback: 'forward', frames: [] }], rules: [] };
   }
   function asList(value) { return value == null ? [] : Array.isArray(value) ? value : [value]; }
+  function metadata(project) {
+    const pack = { pack_format: 1, name: project.name, description: project.description || '' };
+    if (project.author) pack.author = project.author;
+    if (project.packVersion) pack.version = project.packVersion;
+    return { pack };
+  }
+  function readMetadata(bytes) {
+    try {
+      const { pack } = JSON.parse(decode(bytes));
+      if (!pack || pack.pack_format !== 1) throw Error('pack.pack_format must be 1.');
+      for (const [key, max] of Object.entries({name:80,description:160,author:80,version:40})) {
+        if (Object.hasOwn(pack,key) && (typeof pack[key] !== 'string' || pack[key].length > max || key === 'name' && !pack[key].trim())) throw Error(`${key} must be text of at most ${max} characters${key === 'name' ? ' and cannot be blank' : ''}.`);
+      }
+      return pack;
+    } catch (error) { throw Error('Invalid skinpack.mcmeta: ' + error.message); }
+  }
   function choices(rule) {
     if (rule.animation) return [{ animation: rule.animation, weight: 1 }];
     if (Array.isArray(rule.animations)) return rule.animations.map(animation => ({ animation, weight: 1 }));
@@ -95,12 +112,14 @@
     const check = action => { try { action(); } catch (error) { errors.push(error.message); } };
     check(() => {
       if (typeof project.name !== 'string' || !project.name.trim() || project.name.length > 80) throw Error('Give the pack a name (1–80 characters).');
-      if ((project.description || '').length > 160) throw Error('Description must be at most 160 characters.');
+      if (project.description != null && (typeof project.description !== 'string' || project.description.length > 160)) throw Error('Description must be text of at most 160 characters.');
+      for (const [key, label, max] of [['author','Author',80],['packVersion','Pack version',40]]) if (project[key] != null && (typeof project[key] !== 'string' || project[key].length > max)) throw Error(`${label} must be text of at most ${max} characters.`);
       if (!['auto', 'wide', 'slim'].includes(project.model)) throw Error('Choose an arm model.');
       if (!project.animations.length || project.animations.length > LIMITS.animations) throw Error('A pack needs 1–128 animations.');
       if (!project.animations.some(a => a.id === project.fallback)) throw Error('Choose an existing animation as the default.');
     });
     const ids = new Set(); let count = 0, expanded = 0;
+    if (project.icon) check(() => { const bytes = pngBytes(project.icon); validatePng(bytes, true); expanded += bytes.length; });
     for (const a of project.animations) check(() => {
       if (!/^[a-z0-9_]{1,40}$/.test(a.id) || ids.has(a.id)) throw Error(`Animation ID “${a.id}” must be unique, lowercase, and use letters, numbers or underscores.`);
       ids.add(a.id);
@@ -134,13 +153,16 @@
       for (const bounds of [rule.min, rule.max]) for (const [key, value] of Object.entries(bounds || {})) if (!catalog.values.includes(key) || !Number.isFinite(value) || Math.abs(value) > 1e9) throw Error(prefix + 'invalid numeric filter.');
     }));
     const text = JSON.stringify(manifest(project), null, 2);
+    const meta = JSON.stringify(metadata(project), null, 2);
     if (encode(text).length > LIMITS.file) errors.push('The manifest exceeds 64 KiB.');
-    if (expanded + encode(text).length > LIMITS.expanded) errors.push('The expanded pack exceeds 8 MiB.');
+    if (expanded + encode(text).length + encode(meta).length + 2 > LIMITS.expanded) errors.push('The expanded pack exceeds 8 MiB.');
     return [...new Set(errors)];
   }
   function exportZip(project) {
     const errors = validate(project); if (errors.length) throw Error(errors.join('\n'));
     const files = Object.create(null); files['skinpack.json'] = encode(JSON.stringify(manifest(project), null, 2) + '\n');
+    files['skinpack.mcmeta'] = encode(JSON.stringify(metadata(project), null, 2) + '\n');
+    if (project.icon) files['pack.png'] = pngBytes(project.icon);
     for (const a of project.animations) a.frames.forEach((frame,i) => { files[`animations/${a.id}/${String(i).padStart(3,'0')}.png`] = pngBytes(frame.data); });
     const bytes = zip.zipSync(files, { level: 6, mtime: new Date(2026,0,1) });
     if (bytes.length > LIMITS.archive) throw Error('The compressed pack exceeds the mod’s 2 MiB limit.');
@@ -151,14 +173,21 @@
     let expanded = 0, count = 0;
     const files = zip.unzipSync(bytes, { filter: entry => {
       if (entry.name.endsWith('/')) return false;
-      if (++count > LIMITS.frames + 1 || entry.originalSize > LIMITS.file || (expanded += entry.originalSize) > LIMITS.expanded) throw Error('The ZIP exceeds pack limits.');
-      if (!/^(?:skinpack\.json|[^\\:]+\.png)$/.test(entry.name) || entry.name.startsWith('/') || entry.name.split('/').some(s => !s || s === '.' || s === '..')) throw Error('The ZIP contains an unsupported or unsafe file path.');
+      if (++count > LIMITS.frames + 3 || entry.originalSize > LIMITS.file || (expanded += entry.originalSize) > LIMITS.expanded) throw Error('The ZIP exceeds pack limits.');
+      if (!/^(?:skinpack\.(?:json|mcmeta)|[^\\:]+\.png)$/.test(entry.name) || entry.name.startsWith('/') || entry.name.split('/').some(s => !s || s === '.' || s === '..')) throw Error('The ZIP contains an unsupported or unsafe file path.');
       return true;
     } });
     if (!files['skinpack.json']) throw Error('The ZIP needs skinpack.json at its root.');
     const source = JSON.parse(decode(files['skinpack.json']));
     if (![1,2].includes(source.format)) throw Error('Unsupported skin pack format.');
-    const project = { version: 1, name: source.name, description: source.description || '', model: source.model || 'auto', fallback: source.default, useAliases: !!source.aliases, animations: [], rules: source.rules || [] };
+    const meta = files['skinpack.mcmeta'] ? readMetadata(files['skinpack.mcmeta']) : {};
+    const icon = files['pack.png'];
+    delete files['skinpack.mcmeta']; delete files['pack.png'];
+    const skins = Object.entries(files).filter(([name]) => name.endsWith('.png'));
+    if (skins.length > LIMITS.frames) throw Error('The pack exceeds 512 frames.');
+    for (const [, png] of skins) validatePng(png);
+    if (icon) validatePng(icon, true);
+    const project = { version: 1, name: meta.name ?? source.name, description: meta.description ?? source.description ?? '', author: meta.author || '', packVersion: meta.version || '', icon: icon ? pngData(icon) : '', model: source.model || 'auto', fallback: source.default, useAliases: !!source.aliases, animations: [], rules: source.rules || [] };
     if (!Array.isArray(project.rules)) throw Error('rules must be an array.');
     for (const [id, a] of Object.entries(source.animations || {})) {
       const names = a.frames || Object.keys(files).filter(name => name.startsWith(a.folder.replace(/\/$/, '') + '/') && name.endsWith('.png') && !name.slice(a.folder.replace(/\/$/, '').length + 1).includes('/')).sort();
@@ -189,6 +218,6 @@
       else if (rule.animations && Object.hasOwn(rule.animations, oldId)) rule.animations = Object.fromEntries(Object.entries(rule.animations).map(([id,weight])=>[id===oldId?newId:id,weight]));
     }
   }
-  const api = { catalog, LIMITS, normalize, uid, pngData, pngBytes, validatePng, newProject, asList, choices, manifest, validate, exportZip, importZip, renameAnimation, base64, unbase64 };
+  const api = { catalog, LIMITS, normalize, uid, pngData, pngBytes, validatePng, newProject, asList, choices, manifest, metadata, validate, exportZip, importZip, renameAnimation, base64, unbase64 };
   root.ExpressionfulCore = api; if (typeof module !== 'undefined') module.exports = api;
 })(globalThis);
