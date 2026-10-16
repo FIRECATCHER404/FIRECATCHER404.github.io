@@ -4,6 +4,7 @@
   const catalog = root.ExpressionfulCatalog;
   const zip = root.fflate || (typeof require === 'function' ? require('./vendor/fflate.js') : null);
   const LIMITS = { archive: 2 * 1024 * 1024, expanded: 8 * 1024 * 1024, file: 65536, frames: 512, animations: 128, rules: 256 };
+  const WHEEL_PREVIEWS = ['face','head','body','torso','left_arm','right_arm','legs','skin'];
   const compact = value => value.toLowerCase().replace(/[ _-]/g, '');
   const aliases = new Map();
   for (const name of catalog.states) for (const prefix of ['', 'is', 'while']) aliases.set(compact(prefix + name), name);
@@ -48,7 +49,7 @@
   }
   function newProject() {
     return { version: 1, name: 'My skin pack', description: '', author: '', packVersion: '', icon: '', model: 'auto', fallback: 'idle', useAliases: true,
-      animations: [{ id: 'idle', fps: 10, loop: true, playback: 'forward', frames: [] }], rules: [] };
+      animations: [{ id: 'idle', fps: 10, loop: true, playback: 'forward', frames: [] }], rules: [], wheel: [] };
   }
   function asList(value) { return value == null ? [] : Array.isArray(value) ? value : [value]; }
   function metadata(project) {
@@ -101,6 +102,7 @@
     }
     if (Object.keys(shortcut).length) result.aliases = shortcut;
     if (rules.length || !Object.keys(shortcut).length) result.rules = rules;
+    if (Array.isArray(project.wheel) && project.wheel.length) result.wheel = project.wheel.map(({animation,label,preview,yaw,pitch})=>({animation,label,preview,yaw,pitch}));
     return result;
   }
   function range(value, fallback, min, max, label) {
@@ -132,6 +134,18 @@
       }
     });
     if (count > LIMITS.frames) errors.push('The pack exceeds 512 frames.');
+    check(()=>{
+      const wheel=project.wheel === undefined ? [] : project.wheel, used=new Set();
+      if(!Array.isArray(wheel) || wheel.length>128)throw Error('Too many wheel preview settings.');
+      for(const entry of wheel){
+        if(!entry || !ids.has(entry.animation))throw Error('Unknown wheel animation: '+entry?.animation);
+        if(used.has(entry.animation))throw Error('Duplicate wheel preview for animation: '+entry.animation);
+        used.add(entry.animation);
+        if(entry.label!==undefined && (typeof entry.label!=='string' || !entry.label.trim() || entry.label.length>32))throw Error('Wheel labels need 1–32 characters.');
+        if(!WHEEL_PREVIEWS.includes(entry.preview === undefined ? 'head' : entry.preview))throw Error('Choose a valid wheel preview.');
+        for(const [key,min,max] of [['yaw',-180,180],['pitch',-50,50]])if(entry[key]!==undefined && (typeof entry[key]!=='number' || !Number.isFinite(entry[key]) || entry[key]<min || entry[key]>max))throw Error(`Wheel ${key} must be ${min} to ${max}.`);
+      }
+    });
     if (project.rules.length > LIMITS.rules) errors.push('The pack exceeds 256 rules.');
     project.rules.forEach((rule, index) => check(() => {
       const prefix = `Rule ${index + 1}: `;
@@ -187,7 +201,7 @@
     if (skins.length > LIMITS.frames) throw Error('The pack exceeds 512 frames.');
     for (const [, png] of skins) validatePng(png);
     if (icon) validatePng(icon, true);
-    const project = { version: 1, name: meta.name ?? source.name, description: meta.description ?? source.description ?? '', author: meta.author || '', packVersion: meta.version || '', icon: icon ? pngData(icon) : '', model: source.model || 'auto', fallback: source.default, useAliases: !!source.aliases, animations: [], rules: source.rules || [] };
+    const project = { version: 1, name: meta.name ?? source.name, description: meta.description ?? source.description ?? '', author: meta.author || '', packVersion: meta.version || '', icon: icon ? pngData(icon) : '', model: source.model || 'auto', fallback: source.default, useAliases: !!source.aliases, animations: [], rules: source.rules || [], wheel: Object.hasOwn(source,'wheel') ? source.wheel : [] };
     if (!Array.isArray(project.rules)) throw Error('rules must be an array.');
     for (const [id, a] of Object.entries(source.animations || {})) {
       const names = a.frames || Object.keys(files).filter(name => name.startsWith(a.folder.replace(/\/$/, '') + '/') && name.endsWith('.png') && !name.slice(a.folder.replace(/\/$/, '').length + 1).includes('/')).sort();
@@ -212,12 +226,17 @@
     if (!/^[a-z0-9_]{1,40}$/.test(newId) || project.animations.some(a => a.id === newId && a.id !== oldId)) throw Error('Use a unique lowercase animation ID.');
     project.animations.find(a => a.id === oldId).id = newId;
     if (project.fallback === oldId) project.fallback = newId;
+    for (const entry of project.wheel || []) if(entry.animation===oldId)entry.animation=newId;
     for (const rule of project.rules) {
       if (rule.animation === oldId) rule.animation = newId;
       if (Array.isArray(rule.animations)) rule.animations = rule.animations.map(id => id === oldId ? newId : id);
       else if (rule.animations && Object.hasOwn(rule.animations, oldId)) rule.animations = Object.fromEntries(Object.entries(rule.animations).map(([id,weight])=>[id===oldId?newId:id,weight]));
     }
   }
-  const api = { catalog, LIMITS, normalize, uid, pngData, pngBytes, validatePng, newProject, asList, choices, manifest, metadata, validate, exportZip, importZip, renameAnimation, base64, unbase64 };
+  function wheelEntries(project) {
+    const overrides=new Map((project.wheel || []).map(entry=>[entry.animation,entry]));
+    return project.animations.slice(0,16).map((animation,index)=>({label:animation.id,preview:'head',yaw:30,pitch:-5,...overrides.get(animation.id),animation:animation.id,slot:index+1}));
+  }
+  const api = { catalog, LIMITS, WHEEL_PREVIEWS, wheelEntries, normalize, uid, pngData, pngBytes, validatePng, newProject, asList, choices, manifest, metadata, validate, exportZip, importZip, renameAnimation, base64, unbase64 };
   root.ExpressionfulCore = api; if (typeof module !== 'undefined') module.exports = api;
 })(globalThis);

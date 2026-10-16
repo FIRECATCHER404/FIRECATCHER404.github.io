@@ -8,6 +8,7 @@
   const pretty = value => value.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
   let project, selectedId, selectedFrame = 0, view = '3d', playing = true, started = performance.now(), activeTab = 'frames', draggedFrame = -1;
   let database, saveTimer, toastTimer;
+  let wheelSlot=1;
   const images = new Map();
   const preview = new ExpressionfulPlayerPreview($('playerPreview'),$('previewStage'));
   if (!preview.available) view = 'texture';
@@ -109,14 +110,15 @@
     $('selectedTitle').textContent = animation.id;
     $('selectedSubtitle').textContent = `${animation.frames.length} frames · ${animation.loop ? 'Looping' : 'Plays once'} · ${pretty(animation.playback || 'forward')}`;
     setValue('animationId',animation.id); setValue('animationFps',animation.fps); setValue('animationPlayback',animation.playback || 'forward'); $('animationLoop').checked = animation.loop;
-    renderRules(); updateManifest(); drawPreview();
+    renderRules(); renderWheel(); updateManifest(); drawPreview();
   }
   function openTab(name) {
-    if (!['pack','frames','rules','manifest'].includes(name)) return;
+    if (!['pack','frames','rules','wheel','manifest'].includes(name)) return;
     activeTab = name;
     document.querySelectorAll('[data-tab]').forEach(button => { button.setAttribute('aria-selected',button.dataset.tab === name);button.tabIndex = button.dataset.tab === name ? 0 : -1; });
-    for (const key of ['pack','frames','rules','manifest']) $('panel-' + key).hidden = key !== name;
+    for (const key of ['pack','frames','rules','wheel','manifest']) $('panel-' + key).hidden = key !== name;
     const copy = {pack:['Make it your pack.','Set a name, arm model, and default animation.'],frames:['Animate your skin.','Upload frames and see them on your player.'],rules:['Give each moment a look.','Choose when each animation should play.'],manifest:['Take your pack into Minecraft.','Review, download, and add it to your game.']};
+    copy.wheel=['Put expressions at your fingertips.','Your animations fill the wheel automatically. Customize their previews here.'];
     $('pageTitle').textContent = copy[name][0]; $('pageDescription').textContent = copy[name][1];
     updateManifest();
     drawPreview();
@@ -156,6 +158,7 @@
       $('framePosition').textContent = `${String(selected().frames.length ? selectedFrame+1 : 0).padStart(2,'0')} / ${String(selected().frames.length).padStart(2,'0')}`;
       document.querySelectorAll('[data-frame]').forEach(button=>button.classList.toggle('selected',Number(button.dataset.frame) === selectedFrame));
       drawPreview();
+      if(activeTab==='wheel')ExpressionfulWheelPreview.draw($('wheelPreview'),project,wheelSlot,now,getImage);
     }
     requestAnimationFrame(animate);
   }
@@ -235,6 +238,28 @@
     catch (error) { openTab('manifest'); $('validationPanel').scrollIntoView({behavior:'smooth',block:'nearest'}); failure(error); }
   }
   function loadProject(value) { project=value; selectedId=project.animations[0].id; images.clear(); resetPlayback(); render(); scheduleSave(); }
+  function renderWheel(){
+    const entries=C.wheelEntries(project);if(wheelSlot>entries.length)wheelSlot=1;
+    const entry=entries[wheelSlot-1];
+    $('wheelSlotTitle').textContent=entry ? pretty(entry.animation) : 'Expression preview';
+    $('wheelCount').textContent=project.animations.length>16 ? `Showing the first 16 of ${project.animations.length} animations, in pack order.` : `${entries.length} expression${entries.length===1?'':'s'} from your pack. Add or remove animations in the Animations tab; the wheel resizes automatically.`;
+    $('wheelPreview').setAttribute('aria-label',`${entries.length}-expression wheel preview`);
+    setValue('wheelLabel',entry?.label ?? entry?.animation ?? '');setValue('wheelPreviewType',entry?.preview ?? 'head');
+    setValue('wheelYaw',entry?.yaw ?? 30);setValue('wheelPitch',entry?.pitch ?? -5);
+    for(const key of ['wheelLabel','wheelPreviewType','wheelYaw','wheelPitch','clearWheelSlot'])$(key).disabled=!entry;
+    const flat=['face','skin'].includes(entry?.preview);$('wheelYaw').disabled=!entry||flat;$('wheelPitch').disabled=!entry||flat;
+    $('wheelSlotButtons').innerHTML=entries.map(entry=>`<button data-wheel-slot="${entry.slot}" aria-pressed="${entry.slot===wheelSlot}" title="${escape(entry.animation)}">${escape(entry.label)}</button>`).join('');
+  }
+  $('wheelSlotButtons').addEventListener('click',event=>{const button=event.target.closest('[data-wheel-slot]');if(button){wheelSlot=Number(button.dataset.wheelSlot);renderWheel();}});
+  $('wheelPreview').addEventListener('click',event=>{const r=event.target.getBoundingClientRect(),slot=ExpressionfulWheelPreview.hit((event.clientX-r.left)*480/r.width,(event.clientY-r.top)*360/r.height,C.wheelEntries(project).length);if(slot){wheelSlot=slot;renderWheel();}});
+  for(const [id,key] of [['wheelLabel','label'],['wheelPreviewType','preview'],['wheelYaw','yaw'],['wheelPitch','pitch']])$(id).addEventListener(id==='wheelPreviewType'?'change':'input',()=>{
+    const animation=C.wheelEntries(project)[wheelSlot-1]?.animation;if(!animation)return;
+    project.wheel ??=[];let entry=project.wheel.find(e=>e.animation===animation);
+    if(!entry){entry={animation};project.wheel.push(entry);}
+    entry[key]=['yaw','pitch'].includes(key)?Number($(id).value):$(id).value;
+    renderWheel();changed(false);
+  });
+  $('clearWheelSlot').addEventListener('click',()=>{const animation=C.wheelEntries(project)[wheelSlot-1]?.animation;project.wheel=(project.wheel || []).filter(e=>e.animation!==animation);changed();});
   function uniqueId(base) { let id=base.slice(0,40), number=2; while(project.animations.some(a=>a.id===id)) { const suffix='_'+number++; id=base.slice(0,40-suffix.length)+suffix; } return id; }
   function reference() {
     const query=$('referenceSearch').value.toLowerCase();
@@ -292,7 +317,7 @@
   $('addAnimation').addEventListener('click',()=>{if(project.animations.length>=128)return failure(Error('Animation limit reached.'));$('newAnimationId').value='';$('animationDialog').showModal();$('newAnimationId').focus();});
   $('animationForm').addEventListener('submit',event=>{event.preventDefault();const id=$('newAnimationId').value.trim();if(project.animations.some(a=>a.id===id))return failure(Error('That animation ID already exists.'));project.animations.push({id,fps:10,loop:false,playback:'forward',frames:[]});selectedId=id;resetPlayback();$('animationDialog').close();changed();openTab('frames');});
   $('duplicateAnimation').addEventListener('click',()=>{if(project.animations.length>=128)return failure(Error('Animation limit reached.'));const copy=JSON.parse(JSON.stringify(selected()));copy.id=uniqueId(copy.id+'_copy');copy.frames.forEach(f=>f.key=C.uid());project.animations.push(copy);selectedId=copy.id;resetPlayback();changed();});
-  $('deleteAnimation').addEventListener('click',()=>{if(project.animations.length===1)return failure(Error('Keep at least one animation in your pack.'));if(!confirm('Delete this animation and remove its rule assignments?'))return;const id=selectedId;project.animations=project.animations.filter(a=>a.id!==id);project.rules=project.rules.filter(rule=>{const remaining=C.choices(rule).filter(t=>t.animation!==id);if(!remaining.length)return false;setChoices(rule,remaining);return true;});if(project.fallback===id)project.fallback=project.animations[0].id;selectedId=project.animations[0].id;resetPlayback();changed();});
+  $('deleteAnimation').addEventListener('click',()=>{if(project.animations.length===1)return failure(Error('Keep at least one animation in your pack.'));if(!confirm('Delete this animation and remove its rule assignments?'))return;const id=selectedId;project.animations=project.animations.filter(a=>a.id!==id);project.wheel=(project.wheel || []).filter(e=>e.animation!==id);project.rules=project.rules.filter(rule=>{const remaining=C.choices(rule).filter(t=>t.animation!==id);if(!remaining.length)return false;setChoices(rule,remaining);return true;});if(project.fallback===id)project.fallback=project.animations[0].id;selectedId=project.animations[0].id;resetPlayback();changed();});
   document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>openTab(button.dataset.tab)));
   document.querySelectorAll('[data-go-tab]').forEach(button=>button.addEventListener('click',()=>openTab(button.dataset.goTab)));
   document.querySelectorAll('.no-frames [data-upload-frames]').forEach(button=>button.addEventListener('click',()=>$('frameUpload').click()));

@@ -5,10 +5,10 @@
   <meta name="description" content="Create animated Minecraft skin packs on your computer.">
   <link rel="canonical" href="https://firecatcher404.github.io/projects/skin-studio/">
   <meta name="theme-color" content="#101216"><title>Expressionful — Skin Studio</title>
-  <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="wheel.css?v=1.4.0">
   <script defer src="vendor/fflate.js"></script><script defer src="vendor/skinview3d-3.4.2.js"></script>
-  <script defer src="catalog.js"></script><script defer src="demo.js"></script><script defer src="core.js"></script>
-  <script defer src="preview.js"></script><script defer src="app.js"></script>
+  <script defer src="catalog.js"></script><script defer src="demo.js?v=1.4.0"></script><script defer src="core.js?v=1.4.0"></script>
+  <script defer src="preview.js"></script><script defer src="wheel.js?v=1.4.0"></script><script defer src="app.js?v=1.4.0"></script>
 </head>
 <body>
   <header class="topbar">
@@ -29,7 +29,8 @@
         <button role="tab" aria-selected="false" aria-controls="panel-pack" tabindex="-1" data-tab="pack" id="tab-pack"><span>1</span> Pack</button>
         <button role="tab" aria-selected="true" aria-controls="panel-frames" tabindex="0" data-tab="frames" id="tab-frames"><span>2</span> Animations</button>
         <button role="tab" aria-selected="false" aria-controls="panel-rules" tabindex="-1" data-tab="rules" id="tab-rules"><span>3</span> Rules <b class="count" id="ruleCount">0</b></button>
-        <button role="tab" aria-selected="false" aria-controls="panel-manifest" tabindex="-1" data-tab="manifest" id="tab-manifest"><span>4</span> Export</button>
+        <button role="tab" aria-selected="false" aria-controls="panel-wheel" tabindex="-1" data-tab="wheel" id="tab-wheel"><span>4</span> Wheel</button>
+        <button role="tab" aria-selected="false" aria-controls="panel-manifest" tabindex="-1" data-tab="manifest" id="tab-manifest"><span>5</span> Export</button>
       </nav>
       <section id="panel-pack" role="tabpanel" aria-labelledby="tab-pack" hidden>
         <div class="pack-grid">
@@ -68,6 +69,17 @@
         <div class="rule-presets" aria-label="Quick rule templates"><span>QUICK ADD</span><button data-preset="damage">Take damage</button><button data-preset="hunger">Hunger = 2</button><button data-preset="health">Health = 1</button><button data-preset="speed">Speed effect</button><button data-preset="random">Random idle</button></div>
         <div id="ruleList" class="rule-list"></div><div class="empty-state" id="noRules" hidden><h3>Your default animation is always ready.</h3><p>Add a rule to play a different animation when something happens.</p></div>
         <div class="rules-footer"><span>Higher priority wins. Health: 1 HP = half a heart. Hunger: 2 points = one food icon.</span><button id="openReference" class="text-button">Browse all conditions →</button></div>
+      </section>
+      <section id="panel-wheel" role="tabpanel" aria-labelledby="tab-wheel" hidden>
+        <div class="section-heading"><div><h2>Your expression wheel</h2><p>Every animation in your pack becomes an expression. Press J in Minecraft to play one.</p></div></div>
+        <div class="wheel-workbench"><div class="card wheel-stage"><canvas id="wheelPreview" width="960" height="720" aria-label="Expression wheel preview"></canvas><div id="wheelSlotButtons" class="wheel-slot-buttons" aria-label="Choose expression"></div><p id="wheelCount" class="help"></p></div>
+          <div class="card wheel-settings"><h2 id="wheelSlotTitle">Expression preview</h2><p class="muted">Click an expression to customize its thumbnail.</p>
+            <label class="field">Label<input id="wheelLabel" maxlength="32" autocomplete="off" placeholder="e.g. Look around"></label>
+            <label class="field">Preview<select id="wheelPreviewType"><option value="head">3D head</option><option value="face">Flat face</option><option value="body">Full 3D player</option><option value="torso">3D torso</option><option value="left_arm">3D left arm</option><option value="right_arm">3D right arm</option><option value="legs">3D legs</option><option value="skin">Skin map</option></select></label>
+            <div class="field-pair"><label class="field">Turn angle (°)<input id="wheelYaw" type="number" min="-180" max="180" step="1"></label><label class="field">Tilt angle (°)<input id="wheelPitch" type="number" min="-50" max="50" step="1"></label></div>
+            <p class="help">The preview uses this animation's skin frames. Body-part choices change the wheel thumbnail; the expression still changes your full skin. Requires Expressionful 1.4 or newer.</p><button id="clearWheelSlot" class="button small secondary">Reset preview</button>
+          </div>
+        </div>
       </section>
       <section id="panel-manifest" role="tabpanel" aria-labelledby="tab-manifest" hidden>
         <div class="export-grid"><div class="card export-card"><span class="eyebrow">READY FOR MINECRAFT</span><h2>Export your skin pack.</h2><p class="muted">One ZIP with your skins, animations, and rules.</p><div class="export-stats"><div><strong id="exportAnimationCount">0</strong><span>animations</span></div><div><strong id="exportFrameCount">0</strong><span>frames</span></div><div><strong id="exportRuleCount">0</strong><span>rules</span></div></div><p id="exportStatus" class="export-status" role="status"></p><button id="exportPack" class="button primary export-download">Download skin pack ZIP ↓</button><p class="help">You can import this ZIP later to keep editing.</p></div><div class="card install-card"><h2>Add it to Minecraft</h2><ol><li>Install <a href="downloads/">Expressionful</a> and Fabric API for your Minecraft version.</li><li>Put the exported ZIP in your instance's <code>skinpacks</code> folder.</li><li>Press <kbd>K</kbd>, select your pack, then click <strong>Apply and close</strong>. You can also drag the ZIP into that menu.</li></ol><p class="help">For other players to see it, the server and those players also need the mod. Enable Share my skin in the mod's Settings screen.</p></div></div>
