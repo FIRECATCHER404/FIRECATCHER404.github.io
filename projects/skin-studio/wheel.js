@@ -74,11 +74,11 @@
       const angle=(slot-1)*Math.PI*2/count,gap=count===1?0:.009,start=angle-Math.PI/count-Math.PI/2+gap,end=angle+Math.PI/count-Math.PI/2-gap,entry=entries[slot-1];
       ctx.beginPath();ctx.arc(X,Y,OUTER,start,end);ctx.arc(X,Y,INNER,end,start,true);ctx.closePath();ctx.fillStyle=slot===selected?'#48633a':'#29313c';ctx.fill();
       const box=bounds(slot,count);
-      const a=project.animations.find(animation=>animation.id===entry.animation);if(a?.frames.length){const index=ExpressionfulCore.frameAt(a,elapsed,true);thumbnail(ctx,getImage(a.frames[index]),entry,box.x,box.y,box.size,project.model==='slim');}
+      const a=project.animations.find(animation=>animation.id===entry.animation);if(a?.frames.length){const index=ExpressionfulCore.frameAt(entry.playback==='continuous'?{...a,loop:true}:a,elapsed,true);thumbnail(ctx,getImage(a.frames[index]),entry,box.x,box.y,box.size,project.model==='slim');}
     }
     const entry=entries[selected-1];ctx.fillStyle='#edf1f5';ctx.font='bold 12px system-ui';
-    let label=entry?.label || entry?.animation || 'Expressions';while(ctx.measureText(label).width>108)label=label.slice(0,-2)+'…';
-    ctx.fillText(label,X,Y-9);ctx.font='10px system-ui';ctx.fillStyle='#9daebe';ctx.fillText('Click to edit preview',X,Y+11);
+    let label=entry?.label || entry?.animation || (count?'Expressions':'Add an expression');while(ctx.measureText(label).width>108)label=label.slice(0,-2)+'…';
+    ctx.fillText(label,X,Y-9);ctx.font='10px system-ui';ctx.fillStyle='#9daebe';ctx.fillText(count?'Click to edit':'Use Add to wheel',X,Y+11);
   }
   root.ExpressionfulWheelPreview={draw,hit,thumbnail,bounds};
 })(globalThis);

@@ -5,10 +5,10 @@
   <meta name="description" content="Create animated Minecraft skin packs on your computer.">
   <link rel="canonical" href="https://firecatcher404.github.io/projects/skin-studio/">
   <meta name="theme-color" content="#101216"><title>Expressionful — Skin Studio</title>
-  <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css?v=1.5.0"><link rel="stylesheet" href="wheel.css?v=1.5.0">
+  <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css?v=1.6.0"><link rel="stylesheet" href="wheel.css?v=1.6.0">
   <script defer src="vendor/fflate.js"></script><script defer src="vendor/skinview3d-3.4.2.js"></script>
-  <script defer src="catalog.js"></script><script defer src="demo.js?v=1.5.0"></script><script defer src="core.js?v=1.5.0"></script>
-  <script defer src="preview.js"></script><script defer src="wheel.js?v=1.5.0"></script><script defer src="app.js?v=1.5.0"></script>
+  <script defer src="catalog.js"></script><script defer src="demo.js?v=1.6.0"></script><script defer src="core.js?v=1.6.0"></script>
+  <script defer src="preview.js"></script><script defer src="wheel.js?v=1.6.0"></script><script defer src="app.js?v=1.6.0"></script>
 </head>
 <body>
   <header class="topbar">
@@ -71,13 +71,17 @@
         <div class="rules-footer"><span>Higher priority wins. Health: 1 HP = half a heart. Hunger: 2 points = one food icon.</span><button id="openReference" class="text-button">Browse all conditions →</button></div>
       </section>
       <section id="panel-wheel" role="tabpanel" aria-labelledby="tab-wheel" hidden>
-        <div class="section-heading"><div><h2>Your expression wheel</h2><p>Every animation in your pack becomes an expression. Press J in Minecraft to play one.</p></div></div>
+        <div class="section-heading"><div><h2>Your expression wheel</h2><p>Add the animations you want to select with J in Minecraft.</p></div></div>
+        <div class="wheel-add"><label class="field">Animation to add<select id="wheelAddAnimation"></select></label><button id="addWheelExpression" class="button primary">Add to wheel</button></div>
         <div class="wheel-workbench"><div class="card wheel-stage"><canvas id="wheelPreview" width="960" height="720" aria-label="Expression wheel preview"></canvas><div id="wheelSlotButtons" class="wheel-slot-buttons" aria-label="Choose expression"></div><p id="wheelCount" class="help"></p></div>
-          <div class="card wheel-settings"><h2 id="wheelSlotTitle">Expression preview</h2><p class="muted">Click an expression to customize its thumbnail.</p>
+          <div class="card wheel-settings"><h2 id="wheelSlotTitle">Expression settings</h2><p class="muted">Choose an expression to edit its playback and preview.</p>
+            <label class="field">Animation<select id="wheelAnimation"></select></label>
+            <label class="field">Playback<select id="wheelPlayback"><option value="once">Play once</option><option value="continuous">Play continuously until stopped</option></select></label>
+            <p class="help">Continuous playback stops when you reopen a skin menu, select another expression, or an automatic rule takes over. It uses the animation's loop-start frame.</p>
             <label class="field">Label<input id="wheelLabel" maxlength="32" autocomplete="off" placeholder="e.g. Look around"></label>
             <label class="field">Preview<select id="wheelPreviewType"><option value="head">3D head</option><option value="face">Flat face</option><option value="body">Full 3D player</option><option value="torso">3D torso</option><option value="left_arm">3D left arm</option><option value="right_arm">3D right arm</option><option value="legs">3D legs</option><option value="skin">Skin map</option></select></label>
             <div class="field-pair"><label class="field">Turn angle (°)<input id="wheelYaw" type="number" min="-180" max="180" step="1"></label><label class="field">Tilt angle (°)<input id="wheelPitch" type="number" min="-50" max="50" step="1"></label></div>
-            <p class="help">The preview uses this animation's skin frames. Body-part choices change the wheel thumbnail; the expression still changes your full skin. Requires Expressionful 1.4 or newer.</p><button id="clearWheelSlot" class="button small secondary">Reset preview</button>
+            <p class="help">Body-part choices change the thumbnail; the expression changes your full skin. Requires Expressionful 1.6 or newer.</p><div class="inline-actions"><button id="moveWheelEarlier" class="icon-button" title="Move earlier" aria-label="Move expression earlier">←</button><button id="moveWheelLater" class="icon-button" title="Move later" aria-label="Move expression later">→</button><button id="clearWheelSlot" class="button small secondary">Reset preview</button><button id="removeWheelExpression" class="button small secondary">Remove from wheel</button></div>
           </div>
         </div>
       </section>

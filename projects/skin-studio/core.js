@@ -103,7 +103,7 @@
     }
     if (Object.keys(shortcut).length) result.aliases = shortcut;
     if (rules.length || !Object.keys(shortcut).length) result.rules = rules;
-    if (Array.isArray(project.wheel) && project.wheel.length) result.wheel = project.wheel.map(({animation,label,preview,yaw,pitch})=>({animation,label,preview,yaw,pitch}));
+    if (Array.isArray(project.wheel) && project.wheel.length) result.wheel = project.wheel.map(({animation,label,preview,yaw,pitch,playback})=>({animation,label,preview,yaw,pitch,playback}));
     return result;
   }
   function range(value, fallback, min, max, label) {
@@ -138,11 +138,12 @@
     if (count > LIMITS.frames) errors.push('The pack exceeds 512 frames.');
     check(()=>{
       const wheel=project.wheel === undefined ? [] : project.wheel, used=new Set();
-      if(!Array.isArray(wheel) || wheel.length>128)throw Error('Too many wheel preview settings.');
+      if(!Array.isArray(wheel) || wheel.length>16)throw Error('The wheel supports at most 16 expressions.');
       for(const entry of wheel){
         if(!entry || !ids.has(entry.animation))throw Error('Unknown wheel animation: '+entry?.animation);
         if(used.has(entry.animation))throw Error('Duplicate wheel preview for animation: '+entry.animation);
         used.add(entry.animation);
+        if(!['once','continuous'].includes(entry.playback===undefined?'once':entry.playback))throw Error('Wheel playback must be once or continuous.');
         if(entry.label!==undefined && (typeof entry.label!=='string' || !entry.label.trim() || entry.label.length>32))throw Error('Wheel labels need 1–32 characters.');
         if(!WHEEL_PREVIEWS.includes(entry.preview === undefined ? 'head' : entry.preview))throw Error('Choose a valid wheel preview.');
         for(const [key,min,max] of [['yaw',-180,180],['pitch',-50,50]])if(entry[key]!==undefined && (typeof entry[key]!=='number' || !Number.isFinite(entry[key]) || entry[key]<min || entry[key]>max))throw Error(`Wheel ${key} must be ${min} to ${max}.`);
@@ -236,10 +237,7 @@
     }
   }
   function wheelEntries(project) {
-    const overrides=new Map((project.wheel || []).map(entry=>[entry.animation,entry]));
-    // Match JSON object order, including integer-like animation IDs.
-    const animations=Object.values(Object.fromEntries(project.animations.map(animation=>[animation.id,animation])));
-    return animations.slice(0,16).map((animation,index)=>({label:animation.id,preview:'head',yaw:30,pitch:-5,...overrides.get(animation.id),animation:animation.id,slot:index+1}));
+    return (project.wheel || []).slice(0,16).map((entry,index)=>({label:entry.animation,preview:'head',yaw:30,pitch:-5,playback:'once',...entry,slot:index+1}));
   }
   function timeline(animation) {
     const order=animation.frames.map((_,i)=>i);

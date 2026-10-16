@@ -122,7 +122,7 @@
     document.querySelectorAll('[data-tab]').forEach(button => { button.setAttribute('aria-selected',button.dataset.tab === name);button.tabIndex = button.dataset.tab === name ? 0 : -1; });
     for (const key of ['pack','frames','rules','wheel','manifest']) $('panel-' + key).hidden = key !== name;
     const copy = {pack:['Make it your pack.','Set a name, arm model, and default animation.'],frames:['Animate your skin.','Upload frames and see them on your player.'],rules:['Give each moment a look.','Choose when each animation should play.'],manifest:['Take your pack into Minecraft.','Review, download, and add it to your game.']};
-    copy.wheel=['Put expressions at your fingertips.','Your animations fill the wheel automatically. Customize their previews here.'];
+    copy.wheel=['Put expressions at your fingertips.','Choose the animations you want on the wheel and how they play.'];
     $('pageTitle').textContent = copy[name][0]; $('pageDescription').textContent = copy[name][1];
     updateManifest();
     drawPreview();
@@ -242,25 +242,43 @@
   function renderWheel(){
     const entries=C.wheelEntries(project);if(wheelSlot>entries.length)wheelSlot=1;
     const entry=entries[wheelSlot-1];
-    $('wheelSlotTitle').textContent=entry ? pretty(entry.animation) : 'Expression preview';
-    $('wheelCount').textContent=project.animations.length>16 ? `Showing the first 16 of ${project.animations.length} animations, in pack order.` : `${entries.length} expression${entries.length===1?'':'s'} from your pack. Add or remove animations in the Animations tab; the wheel resizes automatically.`;
+    $('wheelSlotTitle').textContent=entry ? pretty(entry.animation) : 'Choose an expression';
+    $('wheelCount').textContent=`${entries.length} / 16 expressions. Only animations you add appear here, clockwise in the order shown.`;
+    const unused=project.animations.filter(a=>!entries.some(e=>e.animation===a.id));
+    $('wheelAddAnimation').innerHTML=options(unused.length?unused.map(a=>({value:a.id,label:pretty(a.id)})):[{value:'',label:'All animations are already on the wheel'}],$('wheelAddAnimation').value);
+    $('wheelAddAnimation').disabled=entries.length>=16||!unused.length;
+    $('addWheelExpression').disabled=entries.length>=16||!unused.length;
+    $('wheelAnimation').innerHTML=options(entry?project.animations.filter(a=>a.id===entry.animation||!entries.some(e=>e.animation===a.id)).map(a=>({value:a.id,label:pretty(a.id)})):[{value:'',label:'Add an expression to get started'}],entry?.animation || '');
+    setValue('wheelPlayback',entry?.playback || 'once');
     $('wheelPreview').setAttribute('aria-label',`${entries.length}-expression wheel preview`);
     setValue('wheelLabel',entry?.label ?? entry?.animation ?? '');setValue('wheelPreviewType',entry?.preview ?? 'head');
     setValue('wheelYaw',entry?.yaw ?? 30);setValue('wheelPitch',entry?.pitch ?? -5);
-    for(const key of ['wheelLabel','wheelPreviewType','wheelYaw','wheelPitch','clearWheelSlot'])$(key).disabled=!entry;
+    for(const key of ['wheelAnimation','wheelPlayback','wheelLabel','wheelPreviewType','wheelYaw','wheelPitch','clearWheelSlot','removeWheelExpression'])$(key).disabled=!entry;
+    $('moveWheelEarlier').disabled=!entry||wheelSlot<=1;$('moveWheelLater').disabled=!entry||wheelSlot>=entries.length;
     const flat=['face','skin'].includes(entry?.preview);$('wheelYaw').disabled=!entry||flat;$('wheelPitch').disabled=!entry||flat;
     $('wheelSlotButtons').innerHTML=entries.map(entry=>`<button data-wheel-slot="${entry.slot}" aria-pressed="${entry.slot===wheelSlot}" title="${escape(entry.animation)}">${escape(entry.label)}</button>`).join('');
   }
   $('wheelSlotButtons').addEventListener('click',event=>{const button=event.target.closest('[data-wheel-slot]');if(button){wheelSlot=Number(button.dataset.wheelSlot);renderWheel();}});
+  $('addWheelExpression').addEventListener('click',()=>{
+    const animation=$('wheelAddAnimation').value;project.wheel ??=[];
+    if(!animation||project.wheel.length>=16||project.wheel.some(e=>e.animation===animation))return;
+    project.wheel.push({animation,label:pretty(animation).slice(0,32),preview:'head',playback:'once',yaw:30,pitch:-5});wheelSlot=project.wheel.length;wheelStarted=performance.now();changed();
+  });
+  $('wheelAnimation').addEventListener('change',()=>{
+    const entry=project.wheel?.[wheelSlot-1],animation=$('wheelAnimation').value;if(!entry||!animation)return;
+    if(entry.label===entry.animation||entry.label===pretty(entry.animation))entry.label=pretty(animation).slice(0,32);
+    entry.animation=animation;wheelStarted=performance.now();changed();
+  });
+  $('wheelPlayback').addEventListener('change',()=>{const entry=project.wheel?.[wheelSlot-1];if(entry){entry.playback=$('wheelPlayback').value;wheelStarted=performance.now();changed();}});
   $('wheelPreview').addEventListener('click',event=>{const r=event.target.getBoundingClientRect(),slot=ExpressionfulWheelPreview.hit((event.clientX-r.left)*480/r.width,(event.clientY-r.top)*360/r.height,C.wheelEntries(project).length);if(slot){wheelSlot=slot;renderWheel();}});
   for(const [id,key] of [['wheelLabel','label'],['wheelPreviewType','preview'],['wheelYaw','yaw'],['wheelPitch','pitch']])$(id).addEventListener(id==='wheelPreviewType'?'change':'input',()=>{
-    const animation=C.wheelEntries(project)[wheelSlot-1]?.animation;if(!animation)return;
-    project.wheel ??=[];let entry=project.wheel.find(e=>e.animation===animation);
-    if(!entry){entry={animation};project.wheel.push(entry);}
+    const entry=project.wheel?.[wheelSlot-1];if(!entry)return;
     entry[key]=['yaw','pitch'].includes(key)?Number($(id).value):$(id).value;
     renderWheel();changed(false);
   });
-  $('clearWheelSlot').addEventListener('click',()=>{const animation=C.wheelEntries(project)[wheelSlot-1]?.animation;project.wheel=(project.wheel || []).filter(e=>e.animation!==animation);changed();});
+  $('clearWheelSlot').addEventListener('click',()=>{const entry=project.wheel?.[wheelSlot-1];if(entry){for(const key of ['label','preview','yaw','pitch'])delete entry[key];changed();}});
+  $('removeWheelExpression').addEventListener('click',()=>{project.wheel?.splice(wheelSlot-1,1);wheelSlot=Math.max(1,Math.min(wheelSlot,project.wheel?.length || 1));wheelStarted=performance.now();changed();});
+  for(const [id,direction] of [['moveWheelEarlier',-1],['moveWheelLater',1]])$(id).addEventListener('click',()=>{const from=wheelSlot-1,to=from+direction;if(to<0||to>=(project.wheel?.length || 0))return;[project.wheel[from],project.wheel[to]]=[project.wheel[to],project.wheel[from]];wheelSlot=to+1;changed();});
   function uniqueId(base) { let id=base.slice(0,40), number=2; while(project.animations.some(a=>a.id===id)) { const suffix='_'+number++; id=base.slice(0,40-suffix.length)+suffix; } return id; }
   function reference() {
     const query=$('referenceSearch').value.toLowerCase();
