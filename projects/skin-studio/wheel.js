@@ -2,6 +2,32 @@
 (function(root){
   'use strict';
   const X=240,Y=179,INNER=59,OUTER=142,RADIUS=103;
+  const PADDING=3,layouts=new Map();
+  function fits(x,y,size,angle,count){
+    const cx=x+size/2-X,cy=y+size/2-Y,half=size/2;
+    if(Math.hypot(Math.abs(cx)+half,Math.abs(cy)+half)>OUTER-PADDING)return false;
+    if(Math.hypot(Math.max(0,Math.abs(cx)-half),Math.max(0,Math.abs(cy)-half))<INNER+PADDING)return false;
+    if(count>1)for(const side of [-1,1]){const boundary=angle+side*Math.PI/count,nx=-side*Math.cos(boundary),ny=-side*Math.sin(boundary);if(cx*nx+cy*ny-half*(Math.abs(nx)+Math.abs(ny))<PADDING)return false;}
+    return true;
+  }
+  function bounds(slot,count){
+    count=Math.min(16,count);if(count<=0||slot<1||slot>count)return {x:X,y:Y,size:0};
+    if(!layouts.has(count)){
+      const entries=[];
+      for(let index=1;index<=count;index++){
+        const angle=(index-1)*Math.PI*2/count,sx=Math.sin(angle),sy=-Math.cos(angle);let best={x:X,y:Y,size:0},bestDistance=Infinity;
+        for(let radius=INNER+PADDING;radius<=OUTER-PADDING;radius++){
+          let low=0,high=OUTER-INNER;
+          while(low<high){const size=Math.floor((low+high+1)/2),x=Math.round(X+sx*radius-size/2),y=Math.round(Y+sy*radius-size/2);if(fits(x,y,size,angle,count))low=size;else high=size-1;}
+          const distance=Math.abs(radius-(INNER+OUTER)/2);
+          if(low>best.size||low===best.size&&distance<bestDistance){best={x:Math.round(X+sx*radius-low/2),y:Math.round(Y+sy*radius-low/2),size:low};bestDistance=distance;}
+        }
+        entries.push(best);
+      }
+      layouts.set(count,entries);
+    }
+    return layouts.get(count)[slot-1];
+  }
   function hit(x,y,count){count=Math.min(16,count);const dx=x-X,dy=y-Y,r=Math.hypot(dx,dy);return !count||r<INNER||r>OUTER?0:((Math.floor((Math.atan2(dx,-dy)+Math.PI/count)*count/(Math.PI*2))%count+count)%count)+1;}
   function thumbnail(ctx,image,entry,x,y,size,slim){
     if(!image?.complete||!image.naturalWidth)return;
@@ -47,12 +73,12 @@
     for(let slot=1;slot<=count;slot++){
       const angle=(slot-1)*Math.PI*2/count,gap=count===1?0:.009,start=angle-Math.PI/count-Math.PI/2+gap,end=angle+Math.PI/count-Math.PI/2-gap,entry=entries[slot-1];
       ctx.beginPath();ctx.arc(X,Y,OUTER,start,end);ctx.arc(X,Y,INNER,end,start,true);ctx.closePath();ctx.fillStyle=slot===selected?'#48633a':'#29313c';ctx.fill();
-      const x=X+Math.sin(angle)*RADIUS,y=Y-Math.cos(angle)*RADIUS;
-      const a=project.animations.find(animation=>animation.id===entry.animation);if(a?.frames.length){const sequence=a.frames.map((_,i)=>i);if(a.playback==='reverse')sequence.reverse();if(a.playback==='ping_pong'&&sequence.length>1)sequence.push(...sequence.slice(1,-1).reverse());const duration=sequence.map(i=>a.frames[i].ms??1000/a.fps),total=duration.reduce((s,v)=>s+v,0);let t=elapsed%total,index=0;while(index<sequence.length-1&&t>=duration[index])t-=duration[index++];thumbnail(ctx,getImage(a.frames[sequence[index]]),entry,x-14,y-14,28,project.model==='slim');}
+      const box=bounds(slot,count);
+      const a=project.animations.find(animation=>animation.id===entry.animation);if(a?.frames.length){const sequence=a.frames.map((_,i)=>i);if(a.playback==='reverse')sequence.reverse();if(a.playback==='ping_pong'&&sequence.length>1)sequence.push(...sequence.slice(1,-1).reverse());const duration=sequence.map(i=>a.frames[i].ms??1000/a.fps),total=duration.reduce((s,v)=>s+v,0);let t=elapsed%total,index=0;while(index<sequence.length-1&&t>=duration[index])t-=duration[index++];thumbnail(ctx,getImage(a.frames[sequence[index]]),entry,box.x,box.y,box.size,project.model==='slim');}
     }
     const entry=entries[selected-1];ctx.fillStyle='#edf1f5';ctx.font='bold 12px system-ui';
     let label=entry?.label || entry?.animation || 'Expressions';while(ctx.measureText(label).width>108)label=label.slice(0,-2)+'…';
     ctx.fillText(label,X,Y-9);ctx.font='10px system-ui';ctx.fillStyle='#9daebe';ctx.fillText('Click to edit preview',X,Y+11);
   }
-  root.ExpressionfulWheelPreview={draw,hit,thumbnail};
+  root.ExpressionfulWheelPreview={draw,hit,thumbnail,bounds};
 })(globalThis);
