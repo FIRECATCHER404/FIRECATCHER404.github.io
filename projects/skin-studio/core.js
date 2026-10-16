@@ -235,7 +235,9 @@
   }
   function wheelEntries(project) {
     const overrides=new Map((project.wheel || []).map(entry=>[entry.animation,entry]));
-    return project.animations.slice(0,16).map((animation,index)=>({label:animation.id,preview:'head',yaw:30,pitch:-5,...overrides.get(animation.id),animation:animation.id,slot:index+1}));
+    // Match JSON object order, including integer-like animation IDs.
+    const animations=Object.values(Object.fromEntries(project.animations.map(animation=>[animation.id,animation])));
+    return animations.slice(0,16).map((animation,index)=>({label:animation.id,preview:'head',yaw:30,pitch:-5,...overrides.get(animation.id),animation:animation.id,slot:index+1}));
   }
   const api = { catalog, LIMITS, WHEEL_PREVIEWS, wheelEntries, normalize, uid, pngData, pngBytes, validatePng, newProject, asList, choices, manifest, metadata, validate, exportZip, importZip, renameAnimation, base64, unbase64 };
   root.ExpressionfulCore = api; if (typeof module !== 'undefined') module.exports = api;
