@@ -74,7 +74,7 @@
       const angle=(slot-1)*Math.PI*2/count,gap=count===1?0:.009,start=angle-Math.PI/count-Math.PI/2+gap,end=angle+Math.PI/count-Math.PI/2-gap,entry=entries[slot-1];
       ctx.beginPath();ctx.arc(X,Y,OUTER,start,end);ctx.arc(X,Y,INNER,end,start,true);ctx.closePath();ctx.fillStyle=slot===selected?'#48633a':'#29313c';ctx.fill();
       const box=bounds(slot,count);
-      const a=project.animations.find(animation=>animation.id===entry.animation);if(a?.frames.length){const sequence=a.frames.map((_,i)=>i);if(a.playback==='reverse')sequence.reverse();if(a.playback==='ping_pong'&&sequence.length>1)sequence.push(...sequence.slice(1,-1).reverse());const duration=sequence.map(i=>a.frames[i].ms??1000/a.fps),total=duration.reduce((s,v)=>s+v,0);let t=elapsed%total,index=0;while(index<sequence.length-1&&t>=duration[index])t-=duration[index++];thumbnail(ctx,getImage(a.frames[sequence[index]]),entry,box.x,box.y,box.size,project.model==='slim');}
+      const a=project.animations.find(animation=>animation.id===entry.animation);if(a?.frames.length){const index=ExpressionfulCore.frameAt(a,elapsed,true);thumbnail(ctx,getImage(a.frames[index]),entry,box.x,box.y,box.size,project.model==='slim');}
     }
     const entry=entries[selected-1];ctx.fillStyle='#edf1f5';ctx.font='bold 12px system-ui';
     let label=entry?.label || entry?.animation || 'Expressions';while(ctx.measureText(label).width>108)label=label.slice(0,-2)+'…';

@@ -8,7 +8,7 @@
   const pretty = value => value.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
   let project, selectedId, selectedFrame = 0, view = '3d', playing = true, started = performance.now(), activeTab = 'frames', draggedFrame = -1;
   let database, saveTimer, toastTimer;
-  let wheelSlot=1;
+  let wheelSlot=1, wheelStarted=performance.now();
   const images = new Map();
   const preview = new ExpressionfulPlayerPreview($('playerPreview'),$('previewStage'));
   if (!preview.available) view = 'texture';
@@ -108,12 +108,16 @@
     $('useAliases').checked = !!project.useAliases;
     renderAnimations(); renderFrames();
     $('selectedTitle').textContent = animation.id;
-    $('selectedSubtitle').textContent = `${animation.frames.length} frames · ${animation.loop ? 'Looping' : 'Plays once'} · ${pretty(animation.playback || 'forward')}`;
+    $('selectedSubtitle').textContent = `${animation.frames.length} frames · ${animation.loop ? animation.loop_from ? 'Looping from frame '+animation.loop_from : 'Looping' : 'Plays once'} · ${pretty(animation.playback || 'forward')}`;
     setValue('animationId',animation.id); setValue('animationFps',animation.fps); setValue('animationPlayback',animation.playback || 'forward'); $('animationLoop').checked = animation.loop;
+    $('animationLoopFrom').innerHTML=options([{value:'',label:'Beginning of playback (no intro)'},...animation.frames.map((frame,index)=>({value:String(index+1),label:`Frame ${index+1} — ${frame.name}`}))],animation.loop_from==null?'':String(animation.loop_from));
+    $('animationLoopFrom').disabled=!animation.loop||!animation.frames.length;
+    $('loopFromHelp').textContent=animation.loop ? 'Frames before this in playback order play once. Ping-pong stays within the repeating section.' : 'Enable Repeat continuously to choose where the repeating section begins.';
     renderRules(); renderWheel(); updateManifest(); drawPreview();
   }
   function openTab(name) {
     if (!['pack','frames','rules','wheel','manifest'].includes(name)) return;
+    if(name==='wheel'&&activeTab!=='wheel')wheelStarted=performance.now();
     activeTab = name;
     document.querySelectorAll('[data-tab]').forEach(button => { button.setAttribute('aria-selected',button.dataset.tab === name);button.tabIndex = button.dataset.tab === name ? 0 : -1; });
     for (const key of ['pack','frames','rules','wheel','manifest']) $('panel-' + key).hidden = key !== name;
@@ -122,18 +126,6 @@
     $('pageTitle').textContent = copy[name][0]; $('pageDescription').textContent = copy[name][1];
     updateManifest();
     drawPreview();
-  }
-  function frameAt(animation, elapsed) {
-    if (!animation.frames.length) return 0;
-    let sequence = animation.frames.map((_,i)=>i);
-    if (animation.playback === 'reverse') sequence.reverse();
-    if (animation.playback === 'ping_pong' && sequence.length > 1) sequence.push(...sequence.slice(1,-1).reverse());
-    const durations = sequence.map(i => animation.frames[i].ms ?? 1000 / animation.fps);
-    const total = durations.reduce((a,b)=>a+b,0);
-    if (animation.loop) elapsed %= total;
-    else if (elapsed >= total) return animation.playback === 'ping_pong' ? 0 : sequence.at(-1);
-    for (let i=0;i<sequence.length;i++) { if (elapsed < durations[i]) return sequence[i]; elapsed -= durations[i]; }
-    return sequence.at(-1);
   }
   function drawPreview() {
     const is3d = view !== 'texture' && preview.available;
@@ -151,18 +143,27 @@
   function animate(now) {
     if (project) {
       if (playing) {
-        const next = frameAt(selected(),now-started);
+        const next = C.frameAt(selected(),now-started);
         if (next !== selectedFrame) { selectedFrame = next; updateInspector(); }
       }
       $('frameScrubber').value = selectedFrame;
       $('framePosition').textContent = `${String(selected().frames.length ? selectedFrame+1 : 0).padStart(2,'0')} / ${String(selected().frames.length).padStart(2,'0')}`;
       document.querySelectorAll('[data-frame]').forEach(button=>button.classList.toggle('selected',Number(button.dataset.frame) === selectedFrame));
       drawPreview();
-      if(activeTab==='wheel')ExpressionfulWheelPreview.draw($('wheelPreview'),project,wheelSlot,now,getImage);
+      if(activeTab==='wheel')ExpressionfulWheelPreview.draw($('wheelPreview'),project,wheelSlot,now-wheelStarted,getImage);
     }
     requestAnimationFrame(animate);
   }
   function pauseAt(index) { playing = false; selectedFrame = index; $('playPause').textContent = '▶'; $('playPause').setAttribute('aria-label','Play preview'); updateInspector(); drawPreview(); }
+  function editFrames(edit) {
+    const animation=selected(),anchor=animation.loop_from ? animation.frames[animation.loop_from-1] : null;
+    edit(animation.frames);
+    if(anchor){
+      const index=animation.frames.indexOf(anchor);
+      if(!animation.frames.length)delete animation.loop_from;
+      else animation.loop_from=index<0 ? Math.min(animation.loop_from,animation.frames.length) : index+1;
+    }
+  }
   function conditionType(rule) {
     const name = C.asList(rule.when)[0] || 'always', normalized = C.normalize(name) || '';
     if (/^[a-z_]+\s*(?:==|!=|<=|>=|=|<|>)/.test(name) || /^[a-z_]+(?:==|!=|<=|>=|<|>)/.test(normalized)) return 'attribute';
@@ -237,7 +238,7 @@
     try { const bytes = C.exportZip(project); download(bytes,(project.name.trim().replace(/[^a-z0-9_-]+/gi,'-') || 'skin-pack')+'.zip','application/zip'); toast('Skin pack exported. Put the ZIP in Minecraft’s skinpacks folder.'); }
     catch (error) { openTab('manifest'); $('validationPanel').scrollIntoView({behavior:'smooth',block:'nearest'}); failure(error); }
   }
-  function loadProject(value) { project=value; selectedId=project.animations[0].id; images.clear(); resetPlayback(); render(); scheduleSave(); }
+  function loadProject(value) { wheelStarted=performance.now(); project=value; selectedId=project.animations[0].id; images.clear(); resetPlayback(); render(); scheduleSave(); }
   function renderWheel(){
     const entries=C.wheelEntries(project);if(wheelSlot>entries.length)wheelSlot=1;
     const entry=entries[wheelSlot-1];
@@ -288,6 +289,7 @@
   $('animationFps').addEventListener('change',()=>{const fps=Number($('animationFps').value);if(fps<.1||fps>120||!Number.isFinite(fps)){failure(Error('FPS must be 0.1–120.'));$('animationFps').value=selected().fps;return;}selected().fps=fps;resetPlayback();changed();});
   $('animationPlayback').addEventListener('change',()=>{selected().playback=$('animationPlayback').value;resetPlayback();changed();});
   $('animationLoop').addEventListener('change',()=>{selected().loop=$('animationLoop').checked;resetPlayback();changed();});
+  $('animationLoopFrom').addEventListener('change',()=>{if($('animationLoopFrom').value)selected().loop_from=Number($('animationLoopFrom').value);else delete selected().loop_from;resetPlayback();changed();});
   $('frameDuration').addEventListener('change',()=>{const frame=selected().frames[selectedFrame];if(!$('frameDuration').value)delete frame.ms;else{const ms=Number($('frameDuration').value);if(ms<1||ms>60000){failure(Error('Frame duration must be 1–60000 ms.'));return;}frame.ms=ms;}changed();});
   $('frameDuration').addEventListener('focus',()=>pauseAt(selectedFrame));
   $('playPause').addEventListener('click',()=>{if(playing)pauseAt(selectedFrame);else resetPlayback();});
@@ -300,15 +302,15 @@
   $('frameUpload').addEventListener('change',event=>uploadFrames(event.target.files));
   $('replaceUpload').addEventListener('change',event=>uploadFrames(event.target.files,true));
   $('replaceFrame').addEventListener('click',()=>$('replaceUpload').click());
-  $('duplicateFrame').addEventListener('click',()=>{if(project.animations.reduce((n,a)=>n+a.frames.length,0)>=512)return failure(Error('Frame limit reached.'));selected().frames.splice(selectedFrame+1,0,{...selected().frames[selectedFrame],key:C.uid()});selectedFrame++;pauseAt(selectedFrame);changed();});
-  $('removeFrame').addEventListener('click',()=>{selected().frames.splice(selectedFrame,1);selectedFrame=Math.max(0,selectedFrame-1);pauseAt(selectedFrame);changed();});
-  function moveFrame(direction){const frames=selected().frames,index=selectedFrame+direction;if(index<0||index>=frames.length)return;[frames[index],frames[selectedFrame]]=[frames[selectedFrame],frames[index]];pauseAt(index);changed();}
+  $('duplicateFrame').addEventListener('click',()=>{if(project.animations.reduce((n,a)=>n+a.frames.length,0)>=512)return failure(Error('Frame limit reached.'));editFrames(frames=>frames.splice(selectedFrame+1,0,{...frames[selectedFrame],key:C.uid()}));selectedFrame++;pauseAt(selectedFrame);changed();});
+  $('removeFrame').addEventListener('click',()=>{editFrames(frames=>frames.splice(selectedFrame,1));selectedFrame=Math.max(0,selectedFrame-1);pauseAt(selectedFrame);changed();});
+  function moveFrame(direction){const index=selectedFrame+direction;if(index<0||index>=selected().frames.length)return;editFrames(frames=>{[frames[index],frames[selectedFrame]]=[frames[selectedFrame],frames[index]];});pauseAt(index);changed();}
   $('moveFrameLeft').addEventListener('click',()=>moveFrame(-1));$('moveFrameRight').addEventListener('click',()=>moveFrame(1));
   $('frameList').addEventListener('click',event=>{const frame=event.target.closest('[data-frame]');if(frame)pauseAt(Number(frame.dataset.frame));if(event.target.closest('[data-upload-frames]'))$('frameUpload').click();});
   $('frameList').addEventListener('dragstart',event=>{const card=event.target.closest('[data-frame]');if(card){draggedFrame=Number(card.dataset.frame);event.dataTransfer.setData('text/plain',String(draggedFrame));event.dataTransfer.effectAllowed='move';}});
   $('frameList').addEventListener('dragend',()=>{draggedFrame=-1;});
   $('frameList').addEventListener('dragover',event=>event.preventDefault());
-  $('frameList').addEventListener('drop',event=>{event.preventDefault();const card=event.target.closest('[data-frame]');if(!card||draggedFrame<0)return;const target=Number(card.dataset.frame),[frame]=selected().frames.splice(draggedFrame,1);selected().frames.splice(target,0,frame);draggedFrame=-1;pauseAt(target);changed();});
+  $('frameList').addEventListener('drop',event=>{event.preventDefault();const card=event.target.closest('[data-frame]');if(!card||draggedFrame<0)return;const target=Number(card.dataset.frame);editFrames(frames=>{const [frame]=frames.splice(draggedFrame,1);frames.splice(target,0,frame);});draggedFrame=-1;pauseAt(target);changed();});
   $('dropZone').addEventListener('dragover',event=>{event.preventDefault();$('dropZone').classList.add('drag-over');});
   $('dropZone').addEventListener('dragleave',()=>$('dropZone').classList.remove('drag-over'));
   $('dropZone').addEventListener('drop',event=>{event.preventDefault();$('dropZone').classList.remove('drag-over');uploadFrames(event.dataTransfer.files);});

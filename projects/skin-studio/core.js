@@ -78,6 +78,7 @@
     for (const animation of project.animations) {
       const definition = { frames: animation.frames.map((frame, i) => `animations/${animation.id}/${String(i).padStart(3, '0')}.png`), fps: animation.fps, loop: !!animation.loop, playback: animation.playback || 'forward' };
       if (animation.frames.some(frame => frame.ms != null)) definition.frame_ms = animation.frames.map(frame => frame.ms ?? 1000 / animation.fps);
+      if (animation.loop_from != null) definition.loop_from = animation.loop_from;
       result.animations[animation.id] = definition;
     }
     const rules = [], shortcut = Object.create(null);
@@ -128,6 +129,7 @@
       if (!a.frames.length) throw Error(`Upload at least one frame for “${a.id}”.`);
       if (!Number.isFinite(a.fps) || a.fps < .1 || a.fps > 120) throw Error(`“${a.id}” FPS must be 0.1–120.`);
       if (!['forward','reverse','ping_pong'].includes(a.playback || 'forward')) throw Error(`Invalid playback for “${a.id}”.`);
+      if (Object.hasOwn(a,'loop_from') && (!Number.isInteger(a.loop_from) || a.loop_from < 1 || a.loop_from > a.frames.length)) throw Error(`“${a.id}” loop_from must be a frame number from 1 to ${a.frames.length}.`);
       for (const frame of a.frames) {
         const bytes = pngBytes(frame.data); validatePng(bytes); count++; expanded += bytes.length;
         if (frame.ms != null && (!Number.isFinite(frame.ms) || frame.ms < 1 || frame.ms > 60000)) throw Error('Frame duration must be 1–60000 ms.');
@@ -206,7 +208,7 @@
     for (const [id, a] of Object.entries(source.animations || {})) {
       const names = a.frames || Object.keys(files).filter(name => name.startsWith(a.folder.replace(/\/$/, '') + '/') && name.endsWith('.png') && !name.slice(a.folder.replace(/\/$/, '').length + 1).includes('/')).sort();
       if (!Array.isArray(names) || (a.frame_ms && (!Array.isArray(a.frame_ms) || a.frame_ms.length !== names.length))) throw Error('Each frame needs exactly one duration in frame_ms.');
-      project.animations.push({ id, fps: a.fps ?? 10, loop: !!a.loop, playback: a.playback || 'forward', frames: names.map((name,i) => {
+      project.animations.push({ id, fps: a.fps ?? 10, loop: !!a.loop, playback: a.playback || 'forward', ...(Object.hasOwn(a,'loop_from') ? {loop_from:a.loop_from} : {}), frames: names.map((name,i) => {
         if (!files[name]) throw Error('Missing frame: ' + name); validatePng(files[name]);
         return { key: uid(), name: name.split('/').pop(), data: pngData(files[name]), ...(a.frame_ms ? { ms: a.frame_ms[i] } : {}) };
       }) });
@@ -239,6 +241,27 @@
     const animations=Object.values(Object.fromEntries(project.animations.map(animation=>[animation.id,animation])));
     return animations.slice(0,16).map((animation,index)=>({label:animation.id,preview:'head',yaw:30,pitch:-5,...overrides.get(animation.id),animation:animation.id,slot:index+1}));
   }
-  const api = { catalog, LIMITS, WHEEL_PREVIEWS, wheelEntries, normalize, uid, pngData, pngBytes, validatePng, newProject, asList, choices, manifest, metadata, validate, exportZip, importZip, renameAnimation, base64, unbase64 };
+  function timeline(animation) {
+    const order=animation.frames.map((_,i)=>i);
+    if(animation.playback==='reverse')order.reverse();
+    const start=animation.loop && animation.loop_from!=null ? Math.max(0,order.indexOf(animation.loop_from-1)) : 0;
+    const intro=order.slice(0,start),cycle=order.slice(start);
+    if(animation.playback==='ping_pong'&&cycle.length>1)cycle.push(...cycle.slice(1,-1).reverse());
+    const duration=indices=>indices.reduce((total,i)=>total+(animation.frames[i].ms??1000/animation.fps),0);
+    return {intro,cycle,introMs:duration(intro),cycleMs:duration(cycle)};
+  }
+  function frameAt(animation,elapsed,repeatPreview=false) {
+    if(!animation.frames.length)return 0;
+    const t=timeline(animation);elapsed=Math.max(0,elapsed);let sequence;
+    if(elapsed<t.introMs)sequence=t.intro;
+    else{
+      sequence=t.cycle;elapsed-=t.introMs;
+      if(animation.loop||repeatPreview)elapsed%=t.cycleMs;
+      else if(elapsed>=t.cycleMs)return animation.playback==='ping_pong'?0:sequence.at(-1);
+    }
+    for(const index of sequence){const ms=animation.frames[index].ms??1000/animation.fps;if(elapsed<ms)return index;elapsed-=ms;}
+    return sequence.at(-1);
+  }
+  const api = { catalog, LIMITS, WHEEL_PREVIEWS, wheelEntries, timeline, frameAt, normalize, uid, pngData, pngBytes, validatePng, newProject, asList, choices, manifest, metadata, validate, exportZip, importZip, renameAnimation, base64, unbase64 };
   root.ExpressionfulCore = api; if (typeof module !== 'undefined') module.exports = api;
 })(globalThis);
