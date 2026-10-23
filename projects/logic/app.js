@@ -31,7 +31,7 @@
     theme: preferences.theme, simSpeed: preferences.simSpeed, simBatch: preferences.simBatch, simulationPending: false, simulationSeen: new Set(),
     ioSelection: false, relayGroupId: '', relayDrafts: new Map(), relayOrders: new Map()
   };
-  let saveTimer, toastTimer, animation, simulationTimer, simulationFrame, restoring = false, pendingSettings, pendingReplacement, pendingGroup;
+  let saveTimer, toastTimer, animation, simulationTimer, simulationFrame, restoring = false, pendingSettings, pendingReplacement, pendingGroup, dropMotion = null;
   let relayOptionsKey = '', relayOrderKey = '';
   const pointers = new Map();
   const hex = v => '#' + (v || 0).toString(16).padStart(6, '0').toUpperCase();
@@ -375,7 +375,20 @@
     if (hasOutput(n)) list.push({ x: .92, y: .5, kind: 'out', index: 0, side: 1 });
     return list;
   }
-  function portPoint(n, port) { return worldToScreen(n.x, n.y, port.x, port.y); }
+  function nodePose(n, time = performance.now()) {
+    let dx = 0, dy = 0, lift = 0;
+    const drag = state.drag;
+    if (drag?.kind === 'move' && drag.moved && state.selected.has(n.id)) {
+      dx = drag.freeX || 0; dy = drag.freeY || 0;
+      lift = 1 - (1 - Math.min(1, (time - drag.liftStart) / 90)) ** 3;
+    } else if (dropMotion?.ids.has(n.id)) {
+      const t = Math.min(1, (time - dropMotion.start) / 160), remaining = (1 - t) ** 3;
+      dx = dropMotion.dx * remaining; dy = dropMotion.dy * remaining; lift = dropMotion.lift * remaining;
+    }
+    const base = worldToScreen(n.x, n.y), size = cellSize() * (1 + .06 * lift);
+    return { x: base.x + dx + (cellSize() - size) / 2, y: base.y + dy + (cellSize() - size) / 2 - 3 * lift, size, lift };
+  }
+  function portPoint(n, port) { const p = nodePose(n); return { x: p.x + port.x * p.size, y: p.y + port.y * p.size }; }
   function hit(x, y) {
     const w = screenToWorld(x, y), c = state.circuit, s = cellSize();
     if (s < 8) { const n = c.at(state.layer, w.x, w.y); return n ? { node: n } : null; }
@@ -464,28 +477,32 @@
     ctx.restore();
   }
   function drawNode(n, ghost = false, preview = false, dx = 0n, dy = 0n) {
-    const s = cellSize(), p = worldToScreen(n.x + dx, n.y + dy);
+    const pose = !ghost && !preview ? nodePose(n) : null;
+    const s = pose?.size || cellSize(), p = pose ? { x: pose.x, y: pose.y } : worldToScreen(n.x + dx, n.y + dy);
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x + s < 0 || p.y + s < 0 || p.x > state.width || p.y > state.height) return;
     const value = state.circuit.values.get(n.id) || 0;
     const rgb = n.type === 'RGB';
     const luminance = rgb ? (value >> 16) * .299 + ((value >> 8) & 255) * .587 + (value & 255) * .114 : 0;
     const selected = state.selected.has(n.id) && !ghost, color = rgb ? hex(value) : value ? COLORS.on : COLORS.text;
     ctx.save(); if (ghost) ctx.globalAlpha = .15; if (preview) ctx.globalAlpha = .5;
+    if (pose?.lift) { ctx.shadowColor = `rgba(0,0,0,${.18 * pose.lift})`; ctx.shadowBlur = 12 * pose.lift; ctx.shadowOffsetY = 5 * pose.lift; }
     const inset = .08 * s, size = .84 * s;
     if (rgb) {
       // Adjacent cells share the same rounded device-pixel edge. Filling whole
       // pixels avoids hairline seams at fractional zoom/pan and high DPI.
       const ratio = Math.min(devicePixelRatio || 1, 2);
-      const end = worldToScreen(n.x + dx + 1n, n.y + dy + 1n);
-      const left = Math.round(p.x * ratio) / ratio, top = Math.round(p.y * ratio) / ratio;
-      const right = Math.round(end.x * ratio) / ratio, bottom = Math.round(end.y * ratio) / ratio;
+      const end = pose?.lift ? { x: p.x + s, y: p.y + s } : worldToScreen(n.x + dx + 1n, n.y + dy + 1n);
+      const left = pose?.lift ? p.x : Math.round(p.x * ratio) / ratio, top = pose?.lift ? p.y : Math.round(p.y * ratio) / ratio;
+      const right = pose?.lift ? end.x : Math.round(end.x * ratio) / ratio, bottom = pose?.lift ? end.y : Math.round(end.y * ratio) / ratio;
       ctx.fillStyle = color; ctx.fillRect(left, top, right - left, bottom - top);
     } else {
       ctx.fillStyle = s < 9 ? color : value ? COLORS.on : COLORS.bg;
       ctx.strokeStyle = COLORS.line; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.roundRect(p.x + inset, p.y + inset, size, size, .055 * s); ctx.fill();
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = ctx.shadowOffsetY = 0;
       if (s >= 9) ctx.stroke();
     }
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = ctx.shadowOffsetY = 0;
     if (s < 9) { ctx.restore(); return; }
     if (selected) { ctx.strokeStyle = rgb ? luminance > 145 ? '#222222' : '#ffffff' : COLORS.text; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.strokeRect(p.x + .035 * s, p.y + .035 * s, .93 * s, .93 * s); ctx.setLineDash([]); }
     if (s >= 27) {
@@ -547,11 +564,9 @@
       const on = !!c.values.get(w.from); ctx.strokeStyle = on ? COLORS.on : COLORS.line; ctx.lineWidth = Math.max(1, Math.min(2, cellSize() * .02));
       drawCurve(g); ctx.stroke();
     }
-    visibleNodes(state.layer).forEach(n => drawNode(n));
-    if (state.drag?.kind === 'move' && state.drag.moved) {
-      const { dx, dy } = state.drag;
-      for (const id of state.selected) { const n = c.nodes.get(id); if (n) drawNode(n, false, true, dx, dy); }
-    }
+    const floating = state.drag?.kind === 'move' && state.drag.moved ? state.selected : dropMotion?.ids;
+    visibleNodes(state.layer).forEach(n => { if (!floating?.has(n.id)) drawNode(n); });
+    for (const id of floating || []) { const n = c.nodes.get(id); if (n?.layer === state.layer) drawNode(n); }
     if (state.placing && state.pointer.y > 72) { const w = screenToWorld(state.pointer.x, state.pointer.y); drawNode({ ...state.placing, id: 'preview', x: w.x, y: w.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 }, false, true); }
     if (state.wire) {
       const n = c.nodes.get(state.wire.node), port = state.wire.port;
@@ -572,6 +587,8 @@
       ctx.fillStyle = COLORS.panel; ctx.strokeStyle = COLORS.line; ctx.lineWidth = 1; ctx.fillRect(p.x - tw / 2 - 8, p.y - 31, tw + 16, 23); ctx.strokeRect(p.x - tw / 2 - 8, p.y - 31, tw + 16, 23); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = COLORS.text; ctx.fillText(text, p.x, p.y - 19);
     }
     const percent = state.camera.scale * 100; $('zoom-value').textContent = percent < .01 ? percent.toExponential(1) + '%' : Math.round(percent) + '%';
+    if (dropMotion && performance.now() - dropMotion.start >= 160) dropMotion = null;
+    if (dropMotion || state.drag?.kind === 'move' && state.drag.moved && performance.now() - state.drag.liftStart < 90) render();
   }
   function render() { if (!animation) animation = requestAnimationFrame(draw); }
   function toggleInput(n) { if (n.type !== 'INPUT') return; edit(() => state.circuit.updateNode(n.id, { on: !n.on })); }
@@ -675,7 +692,8 @@
     if (h?.node) {
       if (event.shiftKey) { if (state.selected.has(h.node.id)) state.selected.delete(h.node.id); else state.selected.add(h.node.id); }
       else if (!state.selected.has(h.node.id)) state.selected = new Set([h.node.id]);
-      state.drag = { kind: 'move', start: { x, y }, origin: screenToWorld(x, y), dx: 0n, dy: 0n, moved: false };
+      dropMotion = null;
+      state.drag = { kind: 'move', start: { x, y }, origin: screenToWorld(x, y), dx: 0n, dy: 0n, freeX: 0, freeY: 0, moved: false, liftStart: performance.now() };
     } else {
       const before = new Set(state.selected); if (!event.shiftKey) state.selected.clear(); state.drag = { kind: 'select', start: { x, y }, before: event.shiftKey ? before : new Set() };
     }
@@ -691,7 +709,11 @@
     }
     const w = screenToWorld(x, y); $('cursor-position').textContent = `X ${shorten(w.x)} · Y ${shorten(w.y)}`;
     if (drag?.kind === 'pan') { pan(x - drag.last.x, y - drag.last.y); drag.last = { x, y }; return; }
-    if (drag?.kind === 'move') { drag.moved ||= Math.hypot(x - drag.start.x, y - drag.start.y) > 3; drag.dx = w.x - drag.origin.x; drag.dy = w.y - drag.origin.y; render(); }
+    if (drag?.kind === 'move') {
+      if (!drag.moved && Math.hypot(x - drag.start.x, y - drag.start.y) > 3) { drag.moved = true; drag.liftStart = performance.now(); }
+      drag.freeX = x - drag.start.x; drag.freeY = y - drag.start.y;
+      drag.dx = BigInt(Math.round(drag.freeX / cellSize())); drag.dy = BigInt(Math.round(drag.freeY / cellSize())); render();
+    }
     else if (drag?.kind === 'select') {
       if (drag.io) {
         drag.moved ||= Math.hypot(x - drag.start.x, y - drag.start.y) > 4;
@@ -717,7 +739,12 @@
         if (drag.hit?.node) { const id = drag.hit.node.id; if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id); }
       }
     }
-    if (!canceled && drag?.kind === 'move' && drag.moved && (drag.dx || drag.dy)) edit(() => state.circuit.moveNodes(state.selected, drag.dx, drag.dy));
+    if (!canceled && drag?.kind === 'move' && drag.moved) {
+      let committed = !drag.dx && !drag.dy;
+      if (drag.dx || drag.dy) edit(() => { state.circuit.moveNodes(state.selected, drag.dx, drag.dy); committed = true; });
+      const lift = 1 - (1 - Math.min(1, (performance.now() - drag.liftStart) / 90)) ** 3;
+      dropMotion = { ids: new Set(state.selected), dx: drag.freeX - (committed ? Number(drag.dx) * cellSize() : 0), dy: drag.freeY - (committed ? Number(drag.dy) * cellSize() : 0), lift, start: performance.now() };
+    }
     if (!canceled && drag?.kind === 'wire') {
       if (drag.moved) {
         if (!finishWire(hit(event.clientX, event.clientY)) && state.wire?.detached) { const id = state.wire.detached; edit(() => state.circuit.disconnect(id)); }
