@@ -1,0 +1,919 @@
+{
+  "format": "logic-studio",
+  "version": 1,
+  "name": "RGB lights · Relay color mixer",
+  "nextId": 106,
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-5",
+      "y": "-3",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": true,
+      "label": "R7"
+    },
+    {
+      "id": "n2",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-5",
+      "y": "-2",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": true,
+      "label": "R6"
+    },
+    {
+      "id": "n3",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-5",
+      "y": "-1",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": true,
+      "label": "R5"
+    },
+    {
+      "id": "n4",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-5",
+      "y": "0",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": true,
+      "label": "R4"
+    },
+    {
+      "id": "n5",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-5",
+      "y": "1",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": true,
+      "label": "R3"
+    },
+    {
+      "id": "n6",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-5",
+      "y": "2",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": true,
+      "label": "R2"
+    },
+    {
+      "id": "n7",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-5",
+      "y": "3",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": true,
+      "label": "R1"
+    },
+    {
+      "id": "n8",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-5",
+      "y": "4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": true,
+      "label": "R0"
+    },
+    {
+      "id": "n10",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-3",
+      "y": "-3",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "G7"
+    },
+    {
+      "id": "n11",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-3",
+      "y": "-2",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "G6"
+    },
+    {
+      "id": "n12",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-3",
+      "y": "-1",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "G5"
+    },
+    {
+      "id": "n13",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-3",
+      "y": "0",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "G4"
+    },
+    {
+      "id": "n14",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-3",
+      "y": "1",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "G3"
+    },
+    {
+      "id": "n15",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-3",
+      "y": "2",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "G2"
+    },
+    {
+      "id": "n16",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-3",
+      "y": "3",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "G1"
+    },
+    {
+      "id": "n17",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-3",
+      "y": "4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "G0"
+    },
+    {
+      "id": "n19",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-1",
+      "y": "-3",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "B7"
+    },
+    {
+      "id": "n20",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-1",
+      "y": "-2",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "B6"
+    },
+    {
+      "id": "n21",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-1",
+      "y": "-1",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "B5"
+    },
+    {
+      "id": "n22",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-1",
+      "y": "0",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "B4"
+    },
+    {
+      "id": "n23",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-1",
+      "y": "1",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "B3"
+    },
+    {
+      "id": "n24",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-1",
+      "y": "2",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "B2"
+    },
+    {
+      "id": "n25",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-1",
+      "y": "3",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "B1"
+    },
+    {
+      "id": "n26",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-1",
+      "y": "4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "B0"
+    },
+    {
+      "id": "n28",
+      "type": "RGBTUNNEL",
+      "layer": 0,
+      "x": "3",
+      "y": "0",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Light 1 bus"
+    },
+    {
+      "id": "n29",
+      "type": "RGB",
+      "layer": 1,
+      "x": "3",
+      "y": "0",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Light 1 · RGB"
+    },
+    {
+      "id": "n54",
+      "type": "RGBTUNNEL",
+      "layer": 0,
+      "x": "6",
+      "y": "0",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Light 2 bus"
+    },
+    {
+      "id": "n55",
+      "type": "RGB",
+      "layer": 1,
+      "x": "6",
+      "y": "0",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Light 2 · BRG"
+    },
+    {
+      "id": "n80",
+      "type": "RGBTUNNEL",
+      "layer": 0,
+      "x": "9",
+      "y": "0",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Light 3 bus"
+    },
+    {
+      "id": "n81",
+      "type": "RGB",
+      "layer": 1,
+      "x": "9",
+      "y": "0",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Light 3 · GBR"
+    }
+  ],
+  "wires": [
+    {
+      "id": "w30",
+      "from": "n1",
+      "to": "n28",
+      "port": 0
+    },
+    {
+      "id": "w31",
+      "from": "n2",
+      "to": "n28",
+      "port": 1
+    },
+    {
+      "id": "w32",
+      "from": "n3",
+      "to": "n28",
+      "port": 2
+    },
+    {
+      "id": "w33",
+      "from": "n4",
+      "to": "n28",
+      "port": 3
+    },
+    {
+      "id": "w34",
+      "from": "n5",
+      "to": "n28",
+      "port": 4
+    },
+    {
+      "id": "w35",
+      "from": "n6",
+      "to": "n28",
+      "port": 5
+    },
+    {
+      "id": "w36",
+      "from": "n7",
+      "to": "n28",
+      "port": 6
+    },
+    {
+      "id": "w37",
+      "from": "n8",
+      "to": "n28",
+      "port": 7
+    },
+    {
+      "id": "w38",
+      "from": "n10",
+      "to": "n28",
+      "port": 8
+    },
+    {
+      "id": "w39",
+      "from": "n11",
+      "to": "n28",
+      "port": 9
+    },
+    {
+      "id": "w40",
+      "from": "n12",
+      "to": "n28",
+      "port": 10
+    },
+    {
+      "id": "w41",
+      "from": "n13",
+      "to": "n28",
+      "port": 11
+    },
+    {
+      "id": "w42",
+      "from": "n14",
+      "to": "n28",
+      "port": 12
+    },
+    {
+      "id": "w43",
+      "from": "n15",
+      "to": "n28",
+      "port": 13
+    },
+    {
+      "id": "w44",
+      "from": "n16",
+      "to": "n28",
+      "port": 14
+    },
+    {
+      "id": "w45",
+      "from": "n17",
+      "to": "n28",
+      "port": 15
+    },
+    {
+      "id": "w46",
+      "from": "n19",
+      "to": "n28",
+      "port": 16
+    },
+    {
+      "id": "w47",
+      "from": "n20",
+      "to": "n28",
+      "port": 17
+    },
+    {
+      "id": "w48",
+      "from": "n21",
+      "to": "n28",
+      "port": 18
+    },
+    {
+      "id": "w49",
+      "from": "n22",
+      "to": "n28",
+      "port": 19
+    },
+    {
+      "id": "w50",
+      "from": "n23",
+      "to": "n28",
+      "port": 20
+    },
+    {
+      "id": "w51",
+      "from": "n24",
+      "to": "n28",
+      "port": 21
+    },
+    {
+      "id": "w52",
+      "from": "n25",
+      "to": "n28",
+      "port": 22
+    },
+    {
+      "id": "w53",
+      "from": "n26",
+      "to": "n28",
+      "port": 23
+    },
+    {
+      "id": "w56",
+      "from": "n19",
+      "to": "n54",
+      "port": 0
+    },
+    {
+      "id": "w57",
+      "from": "n20",
+      "to": "n54",
+      "port": 1
+    },
+    {
+      "id": "w58",
+      "from": "n21",
+      "to": "n54",
+      "port": 2
+    },
+    {
+      "id": "w59",
+      "from": "n22",
+      "to": "n54",
+      "port": 3
+    },
+    {
+      "id": "w60",
+      "from": "n23",
+      "to": "n54",
+      "port": 4
+    },
+    {
+      "id": "w61",
+      "from": "n24",
+      "to": "n54",
+      "port": 5
+    },
+    {
+      "id": "w62",
+      "from": "n25",
+      "to": "n54",
+      "port": 6
+    },
+    {
+      "id": "w63",
+      "from": "n26",
+      "to": "n54",
+      "port": 7
+    },
+    {
+      "id": "w64",
+      "from": "n1",
+      "to": "n54",
+      "port": 8
+    },
+    {
+      "id": "w65",
+      "from": "n2",
+      "to": "n54",
+      "port": 9
+    },
+    {
+      "id": "w66",
+      "from": "n3",
+      "to": "n54",
+      "port": 10
+    },
+    {
+      "id": "w67",
+      "from": "n4",
+      "to": "n54",
+      "port": 11
+    },
+    {
+      "id": "w68",
+      "from": "n5",
+      "to": "n54",
+      "port": 12
+    },
+    {
+      "id": "w69",
+      "from": "n6",
+      "to": "n54",
+      "port": 13
+    },
+    {
+      "id": "w70",
+      "from": "n7",
+      "to": "n54",
+      "port": 14
+    },
+    {
+      "id": "w71",
+      "from": "n8",
+      "to": "n54",
+      "port": 15
+    },
+    {
+      "id": "w72",
+      "from": "n10",
+      "to": "n54",
+      "port": 16
+    },
+    {
+      "id": "w73",
+      "from": "n11",
+      "to": "n54",
+      "port": 17
+    },
+    {
+      "id": "w74",
+      "from": "n12",
+      "to": "n54",
+      "port": 18
+    },
+    {
+      "id": "w75",
+      "from": "n13",
+      "to": "n54",
+      "port": 19
+    },
+    {
+      "id": "w76",
+      "from": "n14",
+      "to": "n54",
+      "port": 20
+    },
+    {
+      "id": "w77",
+      "from": "n15",
+      "to": "n54",
+      "port": 21
+    },
+    {
+      "id": "w78",
+      "from": "n16",
+      "to": "n54",
+      "port": 22
+    },
+    {
+      "id": "w79",
+      "from": "n17",
+      "to": "n54",
+      "port": 23
+    },
+    {
+      "id": "w82",
+      "from": "n10",
+      "to": "n80",
+      "port": 0
+    },
+    {
+      "id": "w83",
+      "from": "n11",
+      "to": "n80",
+      "port": 1
+    },
+    {
+      "id": "w84",
+      "from": "n12",
+      "to": "n80",
+      "port": 2
+    },
+    {
+      "id": "w85",
+      "from": "n13",
+      "to": "n80",
+      "port": 3
+    },
+    {
+      "id": "w86",
+      "from": "n14",
+      "to": "n80",
+      "port": 4
+    },
+    {
+      "id": "w87",
+      "from": "n15",
+      "to": "n80",
+      "port": 5
+    },
+    {
+      "id": "w88",
+      "from": "n16",
+      "to": "n80",
+      "port": 6
+    },
+    {
+      "id": "w89",
+      "from": "n17",
+      "to": "n80",
+      "port": 7
+    },
+    {
+      "id": "w90",
+      "from": "n19",
+      "to": "n80",
+      "port": 8
+    },
+    {
+      "id": "w91",
+      "from": "n20",
+      "to": "n80",
+      "port": 9
+    },
+    {
+      "id": "w92",
+      "from": "n21",
+      "to": "n80",
+      "port": 10
+    },
+    {
+      "id": "w93",
+      "from": "n22",
+      "to": "n80",
+      "port": 11
+    },
+    {
+      "id": "w94",
+      "from": "n23",
+      "to": "n80",
+      "port": 12
+    },
+    {
+      "id": "w95",
+      "from": "n24",
+      "to": "n80",
+      "port": 13
+    },
+    {
+      "id": "w96",
+      "from": "n25",
+      "to": "n80",
+      "port": 14
+    },
+    {
+      "id": "w97",
+      "from": "n26",
+      "to": "n80",
+      "port": 15
+    },
+    {
+      "id": "w98",
+      "from": "n1",
+      "to": "n80",
+      "port": 16
+    },
+    {
+      "id": "w99",
+      "from": "n2",
+      "to": "n80",
+      "port": 17
+    },
+    {
+      "id": "w100",
+      "from": "n3",
+      "to": "n80",
+      "port": 18
+    },
+    {
+      "id": "w101",
+      "from": "n4",
+      "to": "n80",
+      "port": 19
+    },
+    {
+      "id": "w102",
+      "from": "n5",
+      "to": "n80",
+      "port": 20
+    },
+    {
+      "id": "w103",
+      "from": "n6",
+      "to": "n80",
+      "port": 21
+    },
+    {
+      "id": "w104",
+      "from": "n7",
+      "to": "n80",
+      "port": 22
+    },
+    {
+      "id": "w105",
+      "from": "n8",
+      "to": "n80",
+      "port": 23
+    }
+  ],
+  "signals": [
+    [
+      "n1",
+      1
+    ],
+    [
+      "n2",
+      1
+    ],
+    [
+      "n3",
+      1
+    ],
+    [
+      "n4",
+      1
+    ],
+    [
+      "n5",
+      1
+    ],
+    [
+      "n6",
+      1
+    ],
+    [
+      "n7",
+      1
+    ],
+    [
+      "n8",
+      1
+    ],
+    [
+      "n28",
+      16711680
+    ],
+    [
+      "n29",
+      16711680
+    ],
+    [
+      "n54",
+      65280
+    ],
+    [
+      "n55",
+      65280
+    ],
+    [
+      "n80",
+      255
+    ],
+    [
+      "n81",
+      255
+    ]
+  ],
+  "groups": [
+    {
+      "id": "g9",
+      "title": "Red channel",
+      "type": "INPUT",
+      "nodeIds": [
+        "n1",
+        "n2",
+        "n3",
+        "n4",
+        "n5",
+        "n6",
+        "n7",
+        "n8"
+      ]
+    },
+    {
+      "id": "g18",
+      "title": "Green channel",
+      "type": "INPUT",
+      "nodeIds": [
+        "n10",
+        "n11",
+        "n12",
+        "n13",
+        "n14",
+        "n15",
+        "n16",
+        "n17"
+      ]
+    },
+    {
+      "id": "g27",
+      "title": "Blue channel",
+      "type": "INPUT",
+      "nodeIds": [
+        "n19",
+        "n20",
+        "n21",
+        "n22",
+        "n23",
+        "n24",
+        "n25",
+        "n26"
+      ]
+    }
+  ],
+  "editor": {
+    "layer": 1,
+    "camera": {
+      "x": "6",
+      "y": "0",
+      "ox": -53.76,
+      "oy": -53.76,
+      "scale": 1.12
+    },
+    "ghost": false,
+    "running": true
+  }
+}
