@@ -1,4 +1,4 @@
-# Logic Studio 2.2.3 / RGB-16
+# Logic Studio 2.2.4 / RGB-16
 
 Run **Open 16-bit Computer.cmd** locally or **Open RGB-16.cmd** from the portable ZIP, import `computer-16-bit.logic.json`, or choose **Controls & examples → Programmable 16-bit / 128×128 screen**. The Windows ZIP includes the same file. The browser example is available through the sidebar help tool.
 

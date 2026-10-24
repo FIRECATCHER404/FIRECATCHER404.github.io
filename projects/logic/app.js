@@ -479,6 +479,18 @@
     }
     ctx.restore();
   }
+  function displaySelection(n,p,s) {
+    // Keep selection marks outside the color and away from adjoining displays.
+    const extent=nodeSize(n),step=s/extent,c=state.circuit;
+    const display=(x,y)=>['RGB','SCREEN'].includes(c.at(n.layer,x,y)?.type);
+    ctx.strokeStyle='#75ac62';ctx.lineWidth=1;ctx.beginPath();
+    for(let k=0;k<extent;k++){const a=k*step,b=(k+1)*step,t=BigInt(k),e=BigInt(extent);
+      if(!display(n.x-1n,n.y+t)){ctx.moveTo(p.x-2,p.y+a);ctx.lineTo(p.x-2,p.y+b);}
+      if(!display(n.x+e,n.y+t)){ctx.moveTo(p.x+s+2,p.y+a);ctx.lineTo(p.x+s+2,p.y+b);}
+      if(!display(n.x+t,n.y-1n)){ctx.moveTo(p.x+a,p.y-2);ctx.lineTo(p.x+b,p.y-2);}
+      if(!display(n.x+t,n.y+e)){ctx.moveTo(p.x+a,p.y+s+2);ctx.lineTo(p.x+b,p.y+s+2);}
+    }ctx.stroke();
+  }
   function drawNode(n, ghost = false, preview = false, dx = 0n, dy = 0n) {
     const pose = !ghost && !preview ? nodePose(n) : null;
     const s = pose?.size || cellSize()*(nodeSize(n)), p = pose ? { x: pose.x, y: pose.y } : worldToScreen(n.x + dx, n.y + dy);
@@ -489,7 +501,7 @@
     const selected = state.selected.has(n.id) && !ghost, color = rgb ? hex(value) : value ? COLORS.on : COLORS.text;
     ctx.save(); if (ghost) ctx.globalAlpha = .15; if (preview) ctx.globalAlpha = .5;
     if (pose?.lift) { ctx.shadowColor = `rgba(0,0,0,${.18 * pose.lift})`; ctx.shadowBlur = 12 * pose.lift; ctx.shadowOffsetY = 5 * pose.lift; }
-    if(n.type==='SCREEN'){LogicScreens.draw(ctx,state.circuit,n,p,s);if(selected){ctx.strokeStyle='#75ac62';ctx.lineWidth=2;ctx.strokeRect(p.x+1,p.y+1,s-2,s-2);}if(n.screenPixels!==1){ctx.fillStyle=COLORS.text;ctx.font='11px Arial';ctx.textAlign='left';ctx.fillText(n.label||'128 × 128 / RGB565',p.x,p.y-12);}ctx.restore();return;}
+    if(n.type==='SCREEN'){const end=pose?.lift?{x:p.x+s,y:p.y+s}:worldToScreen(n.x+BigInt(nodeSize(n)),n.y+BigInt(nodeSize(n)));LogicScreens.draw(ctx,state.circuit,n,p,s,end);if(selected)displaySelection(n,p,s);if(n.screenPixels!==1){ctx.fillStyle=COLORS.text;ctx.font='11px Arial';ctx.textAlign='left';ctx.fillText(n.label||'128 × 128 / RGB565',p.x,p.y-12);}ctx.restore();return;}
     const inset = .08 * s, size = .84 * s;
     if (rgb) {
       // Adjacent cells share the same rounded device-pixel edge. Filling whole
@@ -508,7 +520,8 @@
     }
     ctx.shadowColor = 'transparent'; ctx.shadowBlur = ctx.shadowOffsetY = 0;
     if (s < 9) { ctx.restore(); return; }
-    if (selected) { ctx.strokeStyle = rgb ? luminance > 145 ? '#222222' : '#ffffff' : COLORS.text; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.strokeRect(p.x + .035 * s, p.y + .035 * s, .93 * s, .93 * s); ctx.setLineDash([]); }
+    if(selected&&rgb)displaySelection(n,p,s);
+    if (selected&&!rgb) { ctx.strokeStyle = COLORS.text; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.strokeRect(p.x + .035 * s, p.y + .035 * s, .93 * s, .93 * s); ctx.setLineDash([]); }
     if (s >= 27) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       if (n.type === 'RGB') {
