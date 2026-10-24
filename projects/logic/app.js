@@ -4,9 +4,9 @@
   const { Circuit, inputCount, hasOutput, example } = Logic;
   const $ = id => document.getElementById(id);
   const canvas = $('canvas'), ctx = canvas.getContext('2d');
-  const CELL = 96;
+  const CELL = 96;const wireRenderer=new LogicWires.Renderer();const portCache=new Map();
   const requestedExample = new URL(location.href).searchParams.get('example');
-  const initialExample = ['rgb-lights', 'graphical-computer'].includes(requestedExample) ? requestedExample : null;
+  const initialExample = ['rgb-lights','graphical-computer','computer-v2','computer16'].includes(requestedExample) ? requestedExample : null;
   const STORE = initialExample ? `logic-studio-example-${initialExample}-v1` : 'logic-studio-v1';
   const COLORS = { bg: '#ffffff', grid: '#eeeeee', on: '#c5efad', off: '#777777', text: '#222222', muted: '#777777', line: '#777777', panel: '#f6f6f6' };
   let preferences = { theme: 'light', simSpeed: 50, simBatch: 1 };
@@ -20,7 +20,8 @@
       components.push({ type, inputs: 2, extendible: true, name: `${type} (EXTENDIBLE INPUT)`, category: 'gates' });
     }
   }
-  for (const type of ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER']) components.push({ type, name: type, category: type.startsWith('RGB') ? 'color' : 'io' });
+  for (const type of ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN']) components.push({ type, name: type, category: type.startsWith('RGB')||type==='SCREEN' ? 'color' : 'io' });
+  for(const type of ['RAM','ROM'])components.push({type,addressBits:16,name:type+' (64K)',category:'io'});
   document.querySelector('.tiny-badge').textContent = components.length;
   const state = {
     circuit: example(initialExample === 'rgb-lights' ? 'rgb-lights' : 'adder'), layer: initialExample === 'rgb-lights' ? 1 : 0, camera: { x: 0n, y: 0n, ox: 0, oy: 0, scale: 1 },
@@ -29,7 +30,7 @@
     ghost: false, history: [], future: [], clipboard: null, activeFilter: 'all', dirty: true,
     width: innerWidth, height: innerHeight, lastSimulation: { stable: true }, modified: false,
     theme: preferences.theme, simSpeed: preferences.simSpeed, simBatch: preferences.simBatch, simulationPending: false, simulationSeen: new Set(),
-    ioSelection: false, relayGroupId: '', relayDrafts: new Map(), relayOrders: new Map()
+    wireMode:'auto',ioSelection: false, relayGroupId: '', relayDrafts: new Map(), relayOrders: new Map()
   };
   let saveTimer, toastTimer, animation, simulationTimer, simulationFrame, restoring = false, pendingSettings, pendingReplacement, pendingGroup, dropMotion = null;
   let relayOptionsKey = '', relayOrderKey = '';
@@ -85,7 +86,7 @@
   }
   function toast(message) { $('toast').textContent = message; $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 3500); }
   function snapshot() {
-    return JSON.stringify({ ...state.circuit.toJSON(), editor: { layer: state.layer, camera: { ...state.camera, x: String(state.camera.x), y: String(state.camera.y) }, ghost: state.ghost, running: state.running, simSpeed: state.simSpeed, simBatch: state.simBatch } });
+    return JSON.stringify({ ...state.circuit.toJSON(), editor: { layer: state.layer, camera: { ...state.camera, x: String(state.camera.x), y: String(state.camera.y) }, ghost: state.ghost, running: state.running, simSpeed: state.simSpeed, simBatch: state.simBatch,wireMode:state.wireMode } });
   }
   function checkpoint() {
     state.history.push(snapshot());
@@ -100,7 +101,7 @@
       state.layer = Number.isInteger(data.editor.layer) ? Math.max(0, Math.min(255, data.editor.layer)) : 0;
       const cam = data.editor.camera;
       if (cam && /^-?\d{1,1024}$/.test(cam.x) && /^-?\d{1,1024}$/.test(cam.y) && Number.isFinite(cam.scale) && cam.scale >= 1e-200 && cam.scale <= 32 && Number.isFinite(cam.ox) && Number.isFinite(cam.oy) && Math.abs(cam.ox) < 1e7 && Math.abs(cam.oy) < 1e7) state.camera = { x: BigInt(cam.x), y: BigInt(cam.y), ox: cam.ox, oy: cam.oy, scale: cam.scale };
-      state.ghost = !!data.editor.ghost; state.running = data.editor.running !== false;
+      state.wireMode=["auto","all","selection","hidden"].includes(data.editor.wireMode)?data.editor.wireMode:"auto";state.ghost = !!data.editor.ghost; state.running = data.editor.running !== false;
       if (Number.isInteger(data.editor.simSpeed) && data.editor.simSpeed >= 0 && data.editor.simSpeed <= 60000) state.simSpeed = data.editor.simSpeed;
       if (Number.isInteger(data.editor.simBatch) && data.editor.simBatch >= 1 && data.editor.simBatch <= 256) state.simBatch = data.editor.simBatch;
       else if (initialExample === 'graphical-computer' || data.name === 'Graphical 8-bit computer - RGB-8') state.simBatch = 64;
@@ -112,7 +113,7 @@
   function saveSoon() {
     if (restoring) return;
     state.modified = true; $('save-state').textContent = 'Saving…';
-    if (!hasPulses() || !saveTimer) { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 350); }
+    if (!hasPulses() || !saveTimer) { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow,state.circuit.largeMemory?3000:350); }
   }
   function saveNow() {
     clearTimeout(saveTimer); saveTimer = null;
@@ -171,8 +172,8 @@
       else desc += `Signal ${c.values.get(n.id) || 0}${n.type === 'INPUT' ? ` · switch ${n.on ? 'on' : 'off'}` : ''}`;
       $('selected-description').textContent = desc; $('selected-description').style.whiteSpace = 'pre-line';
       if (n.type === 'INPUT') addAction('Toggle', () => toggleInput(n));
-      if (n.extendible || ['TUNNEL', 'RGBTUNNEL'].includes(n.type)) addAction('Settings', () => settings(n));
-      if (['TUNNEL', 'RGBTUNNEL'].includes(n.type)) addAction('Follow ↗', () => { setLayer(n.layer + n.direction); focusAt(n.x, n.y); });
+      if (n.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN'].includes(n.type)) addAction('Settings', () => settings(n));
+      if (['TUNNEL','RGBTUNNEL'].includes(n.type)) addAction('Follow ↗', () => { setLayer(n.layer + n.direction); focusAt(n.x, n.y); });
     } else { $('selected-type').textContent = `${chosen.length} components`; $('selected-description').textContent = 'Drag to move together. Copy, paste, or delete the selection.'; }
     addAction('Delete', removeSelected);
     const io = c.selectIO(state.selected);
@@ -300,7 +301,7 @@
   }
   function renderLibrary() {
     const query = $('search').value.trim().toUpperCase(), list = $('component-list'); list.replaceChildren();
-    const symbols = { INPUT: '01', OUTPUT: '◉', TUNNEL: '⇅', RGB: '◈', RGBTUNNEL: '▦' };
+    const symbols = { INPUT: '01', OUTPUT: '◉', TUNNEL: '⇅', RGB: '◈', RGBTUNNEL: '▦', RAM: 'M', ROM: 'R', SCREEN: '▣' };
     let lastGroup, count = 0;
     for (const spec of components) {
       if ((state.activeFilter !== 'all' && spec.category !== state.activeFilter) || (query && !spec.name.includes(query))) continue;
@@ -316,7 +317,7 @@
       }
       else icon.textContent = symbols[spec.type];
       const label = document.createElement('span'); label.className = 'component-name'; label.textContent = spec.type;
-      const detail = document.createElement('span'); detail.className = 'component-detail'; detail.textContent = spec.type === 'PULSE' ? 'generator' : spec.type === 'REGISTER' ? '1 bit' : spec.extendible ? '2–16 in' : spec.type === 'RGBTUNNEL' ? '24 in' : spec.inputs > 2 ? `${spec.inputs} in` : '';
+      const detail = document.createElement('span'); detail.className = 'component-detail'; detail.textContent = ['RAM','ROM'].includes(spec.type)?(spec.addressBits===16?'64K × 1':'256 × 1'):spec.type==='SCREEN'?'128×128':spec.type === 'PULSE' ? 'generator' : spec.type === 'REGISTER' ? '1 bit' : spec.extendible ? '2–16 in' : spec.type === 'RGBTUNNEL' ? '24 in' : spec.inputs > 2 ? `${spec.inputs} in` : '';
       const plus = document.createElement('span'); plus.className = 'component-plus'; plus.textContent = '+';
       b.append(icon, label, detail, plus); b.onclick = () => { state.placing = state.placing === spec ? null : spec; state.wire = null; state.drag = null; updateUI(); renderLibrary(); render(); canvas.focus(); };
       list.append(b); count++;
@@ -350,7 +351,7 @@
     const nodes = [...(state.circuit.layers.get(state.layer)?.values() || [])];
     if (!nodes.length) { state.camera = { x: 0n, y: 0n, ox: 0, oy: 0, scale: 1 }; render(); return; }
     let minX = nodes[0].x, maxX = minX, minY = nodes[0].y, maxY = minY;
-    nodes.forEach(n => { if (n.x < minX) minX = n.x; if (n.x > maxX) maxX = n.x; if (n.y < minY) minY = n.y; if (n.y > maxY) maxY = n.y; });
+    nodes.forEach(n => { if (n.x < minX) minX = n.x; if(n.x+(n.type==='SCREEN'?7n:0n)>maxX)maxX=n.x+(n.type==='SCREEN'?7n:0n); if (n.y < minY) minY = n.y; if(n.y+(n.type==='SCREEN'?7n:0n)>maxY)maxY=n.y+(n.type==='SCREEN'?7n:0n); });
     const libraryVisible = $('library').classList.contains('tool-open') && !document.body.classList.contains('library-hidden');
     const left = libraryVisible ? $('library').getBoundingClientRect().right + 35 : 40;
     const control = $('relay-panel').classList.contains('tool-open') ? $('relay-panel') : document.querySelector('.right-panels');
@@ -365,7 +366,7 @@
     state.camera.ox = centerX - state.width / 2 - cx * cellSize(); state.camera.oy = (state.height - availableH) / 2 + availableH / 2 - state.height / 2 - cy * cellSize(); render(); saveSoon();
   }
   function ports(n) {
-    const count = inputCount(n), list = [];
+    const count = inputCount(n), key=n.type+':'+count;if(portCache.has(key))return portCache.get(key);const list = [];
     if (n.type === 'RGBTUNNEL') {
       for (let i = 0; i < 24; i++) {
         const side = Math.floor(i / 6), f = .18 + (i % 6) * .128;
@@ -373,7 +374,7 @@
       }
     } else for (let i = 0; i < count; i++) list.push({ x: .08, y: .17 + .66 * ((i + .5) / count), kind: 'in', index: i, side: 3 });
     if (hasOutput(n)) list.push({ x: .92, y: .5, kind: 'out', index: 0, side: 1 });
-    return list;
+    portCache.set(key,list);return list;
   }
   function nodePose(n, time = performance.now()) {
     let dx = 0, dy = 0, lift = 0;
@@ -385,8 +386,8 @@
       const t = Math.min(1, (time - dropMotion.start) / 160), remaining = (1 - t) ** 3;
       dx = dropMotion.dx * remaining; dy = dropMotion.dy * remaining; lift = dropMotion.lift * remaining;
     }
-    const base = worldToScreen(n.x, n.y), size = cellSize() * (1 + .06 * lift);
-    return { x: base.x + dx + (cellSize() - size) / 2, y: base.y + dy + (cellSize() - size) / 2 - 3 * lift, size, lift };
+    const base=worldToScreen(n.x,n.y),normalSize=cellSize()*(n.type==='SCREEN'?8:1),size=normalSize*(1+.06*lift);
+    return { x: base.x + dx + (normalSize - size) / 2, y: base.y + dy + (normalSize - size) / 2 - 3 * lift, size, lift };
   }
   function portPoint(n, port) { const p = nodePose(n); return { x: p.x + port.x * p.size, y: p.y + port.y * p.size }; }
   function hit(x, y) {
@@ -454,9 +455,9 @@
     if (nx > 0n && ny > 0n && nx * ny < BigInt(Math.min(40000, nodes.size * 3))) {
       const found = [];
       for (let x = a.x; x <= b.x; x++) for (let y = a.y; y <= b.y; y++) { const n = nodes.get(`${x}:${y}`); if (n) found.push(n); }
-      return found;
+      for(const id of state.circuit.screens||[]){const n=state.circuit.nodes.get(id);if(n.layer===layer&&n.x+8n>=a.x&&n.x<=b.x&&n.y+8n>=a.y&&n.y<=b.y&&!found.includes(n))found.push(n);}return found;
     }
-    return [...nodes.values()].filter(n => n.x >= a.x && n.x <= b.x && n.y >= a.y && n.y <= b.y);
+    return [...nodes.values()].filter(n => n.x+(n.type==='SCREEN'?7n:0n) >= a.x && n.x <= b.x && n.y + (n.type==='SCREEN'?7n:0n) >= a.y && n.y <= b.y);
   }
   function drawGroups() {
     const s = cellSize(); if (s < 8) return;
@@ -464,7 +465,7 @@
     for (const group of state.circuit.groups.values()) {
       const nodes = state.circuit.groupNodes(group.id); if (!nodes.length || nodes[0].layer !== state.layer) continue;
       let minX = nodes[0].x, maxX = minX, minY = nodes[0].y, maxY = minY;
-      for (const n of nodes) { if (n.x < minX) minX = n.x; if (n.x > maxX) maxX = n.x; if (n.y < minY) minY = n.y; if (n.y > maxY) maxY = n.y; }
+      for (const n of nodes) { if (n.x < minX) minX = n.x; if(n.x+(n.type==='SCREEN'?7n:0n)>maxX)maxX=n.x+(n.type==='SCREEN'?7n:0n); if (n.y < minY) minY = n.y; if(n.y+(n.type==='SCREEN'?7n:0n)>maxY)maxY=n.y+(n.type==='SCREEN'?7n:0n); }
       const a = worldToScreen(minX, minY, .015, -.18), b = worldToScreen(maxX, maxY, .985, .985);
       if (![a.x, a.y, b.x, b.y].every(Number.isFinite) || b.x < 0 || b.y < 0 || a.x > state.width || a.y > state.height) continue;
       ctx.setLineDash([3, 4]); ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y); ctx.setLineDash([]);
@@ -478,7 +479,7 @@
   }
   function drawNode(n, ghost = false, preview = false, dx = 0n, dy = 0n) {
     const pose = !ghost && !preview ? nodePose(n) : null;
-    const s = pose?.size || cellSize(), p = pose ? { x: pose.x, y: pose.y } : worldToScreen(n.x + dx, n.y + dy);
+    const s = pose?.size || cellSize()*(n.type==='SCREEN'?8:1), p = pose ? { x: pose.x, y: pose.y } : worldToScreen(n.x + dx, n.y + dy);
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x + s < 0 || p.y + s < 0 || p.x > state.width || p.y > state.height) return;
     const value = state.circuit.values.get(n.id) || 0;
     const rgb = n.type === 'RGB';
@@ -486,6 +487,7 @@
     const selected = state.selected.has(n.id) && !ghost, color = rgb ? hex(value) : value ? COLORS.on : COLORS.text;
     ctx.save(); if (ghost) ctx.globalAlpha = .15; if (preview) ctx.globalAlpha = .5;
     if (pose?.lift) { ctx.shadowColor = `rgba(0,0,0,${.18 * pose.lift})`; ctx.shadowBlur = 12 * pose.lift; ctx.shadowOffsetY = 5 * pose.lift; }
+    if(n.type==='SCREEN'){LogicScreens.draw(ctx,state.circuit,n,p,s);if(selected){ctx.strokeStyle='#75ac62';ctx.lineWidth=2;ctx.strokeRect(p.x+1,p.y+1,s-2,s-2);}ctx.fillStyle=COLORS.text;ctx.font='11px Arial';ctx.textAlign='left';ctx.fillText(n.label||'128 × 128 / RGB565',p.x,p.y-12);ctx.restore();return;}
     const inset = .08 * s, size = .84 * s;
     if (rgb) {
       // Adjacent cells share the same rounded device-pixel edge. Filling whole
@@ -518,9 +520,11 @@
         ctx.fillText(n.type === 'RGBTUNNEL' ? 'RGB BUS' : n.type, p.x + s * .5, p.y + s * (symbol ? .165 : .38));
         if (['INPUT', 'OUTPUT'].includes(n.type)) {
           ctx.font = `${s * .23}px Arial,sans-serif`; ctx.fillStyle = ink; ctx.fillText(String(value), p.x + s * .5, p.y + s * .65);
-        } else if (['TUNNEL', 'RGBTUNNEL'].includes(n.type)) {
+        } else if (['TUNNEL','RGBTUNNEL'].includes(n.type)) {
           ctx.fillStyle = ink; ctx.font = `${s * .24}px Arial,sans-serif`; ctx.fillText(n.direction === 1 ? '↑' : '↓', p.x + s * .5, p.y + s * .61);
           ctx.font = `${s * .075}px Consolas,monospace`; ctx.fillText(`L${String(n.layer + n.direction + 1).padStart(3, '0')}`, p.x + s * .5, p.y + s * .8);
+        } else if (n.type === 'RAM' || n.type === 'ROM') {
+          ctx.font=`${s*.1}px Arial,sans-serif`;ctx.fillText((n.addressBits===16?'64K':'256')+' × 1',p.x+s*.5,p.y+s*.59);ctx.font=`${s*.075}px Consolas,monospace`;ctx.fillText('A='+c.memoryAddress(n).toString(16).toUpperCase().padStart(n.addressBits===16?4:2,'0')+'  Q='+value,p.x+s*.5,p.y+s*.75);
         } else if (n.type === 'PULSE' || n.type === 'REGISTER') {
           GateSymbols.draw(ctx, n.type, inputCount(n), p.x, p.y, s, ink);
           ctx.fillStyle = ink;
@@ -555,15 +559,7 @@
     if (state.ghost) for (const layer of [state.layer - 1, state.layer + 1]) visibleNodes(layer).forEach(n => drawNode(n, true));
     drawGroups();
     const c = state.circuit;
-    for (const w of c.wires.values()) {
-      if (c.nodes.get(w.from).layer !== state.layer) continue;
-      if (w.id === state.wire?.detached) continue;
-      const g = wireGeometry(w), padding = 200;
-      if (Math.max(g.a.x, g.b.x) < -padding || Math.min(g.a.x, g.b.x) > width + padding || Math.max(g.a.y, g.b.y) < -padding || Math.min(g.a.y, g.b.y) > height + padding) continue;
-      if (![g.a.x, g.a.y, g.b.x, g.b.y].every(Number.isFinite)) continue;
-      const on = !!c.values.get(w.from); ctx.strokeStyle = on ? COLORS.on : COLORS.line; ctx.lineWidth = Math.max(1, Math.min(2, cellSize() * .02));
-      drawCurve(g); ctx.stroke();
-    }
+    wireRenderer.draw(ctx,c,state,{cellSize,screenToWorld,wireGeometry},COLORS);
     const floating = state.drag?.kind === 'move' && state.drag.moved ? state.selected : dropMotion?.ids;
     visibleNodes(state.layer).forEach(n => { if (!floating?.has(n.id)) drawNode(n); });
     for (const id of floating || []) { const n = c.nodes.get(id); if (n?.layer === state.layer) drawNode(n); }
@@ -608,10 +604,11 @@
     };
     if (h) {
       if (!state.selected.has(h.node.id)) { state.selected = new Set([h.node.id]); updateUI(); render(); }
+      item('Copy', 'Ctrl+C', () => copy());item('Full copy', 'Ctrl+Shift+C', () => copy(true));
       if (h.node.type === 'INPUT') item('Toggle input', 'Enter', () => toggleInput(h.node));
       if (['INPUT', 'OUTPUT'].includes(h.node.type)) item('Group / title…', 'G', () => groupDialog());
-      if (h.node.extendible || ['TUNNEL', 'RGBTUNNEL'].includes(h.node.type)) item('Settings…', '', () => settings(h.node));
-      if (['TUNNEL', 'RGBTUNNEL'].includes(h.node.type)) item('Follow to adjacent layer', '↗', () => { setLayer(h.node.layer + h.node.direction); focusAt(h.node.x, h.node.y); });
+      if (h.node.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN'].includes(h.node.type)) item('Settings…', '', () => settings(h.node));
+      if (['TUNNEL','RGBTUNNEL'].includes(h.node.type)) item('Follow to adjacent layer', '↗', () => { setLayer(h.node.layer + h.node.direction); focusAt(h.node.x, h.node.y); });
       if (h.port?.kind === 'in') {
         const w = state.circuit.incoming.get(h.node.id)[h.port.index]; if (w) item('Disconnect input', '', () => edit(() => state.circuit.disconnect(w.id)));
       }
@@ -625,7 +622,9 @@
   function settings(n, placing = false) {
     pendingSettings = { node: n, placing }; $('settings-title').textContent = placing ? `Place ${n.type}` : `Edit ${n.type}`;
     const fields = $('settings-fields'); fields.replaceChildren();
-    if (n.extendible) {
+    if(['RAM','ROM'].includes(n.type)){const bits=1<<(n.addressBits||8);$('settings-note').textContent=`${bits} × 1 memory plane. Address pins A0–A${(n.addressBits||8)-1}. Packed hex lists bits in address order, most significant bit first.`;const label=document.createElement('label');label.className='field';label.textContent='Packed memory hex';const input=document.createElement('textarea');input.id='setting-memory';input.rows=5;let hex='';for(let a=0;a<bits;a+=4){let v=0;for(let b=0;b<4;b++)v=(v<<1)|state.circuit.memoryBit(n,a+b);hex+=v.toString(16);}input.value=hex.toUpperCase();label.append(input);fields.append(label);
+    }else if(n.type==='SCREEN'){$('settings-note').textContent='Displays 16384 RGB565 words from sixteen 64K RAM planes.';for(const [id,title,value]of [['setting-prefix','RAM plane prefix',n.screenPrefix||'DATA'],['setting-base','Base address (hex)',(n.screenBase??49152).toString(16).toUpperCase()]]){const l=document.createElement('label');l.className='field';l.textContent=title;const input=document.createElement('input');input.id=id;input.value=value;l.append(input);fields.append(l);}
+    }else if (n.extendible) {
       $('settings-note').textContent = 'Choose how many inputs this gate should have. Unconnected inputs are off.';
       const label = document.createElement('label'); label.className = 'field'; label.textContent = 'Number of inputs (2–16)';
       const input = document.createElement('input'); input.id = 'setting-inputs'; input.type = 'number'; input.min = '2'; input.max = '16'; input.step = '1'; input.required = true; input.value = n.inputs || 2; label.append(input); fields.append(label);
@@ -643,7 +642,7 @@
   $('settings-form').onsubmit = e => {
     e.preventDefault(); if (!pendingSettings) return;
     const { node, placing } = pendingSettings;
-    const changes = node.extendible ? { inputs: Number($('setting-inputs').value) } : { direction: Number($('setting-direction').value) };
+    let changes = node.extendible ? { inputs: Number($('setting-inputs').value) } : { direction: Number($('setting-direction')?.value||1) };if(['RAM','ROM'].includes(node.type)){const h=$('setting-memory').value.replace(/\s/g,'');if(!/^[0-9a-f]+$/i.test(h)||h.length!==(1<<(node.addressBits||8))/4){toast('Use exactly '+((1<<(node.addressBits||8))/4)+' packed hex digits.');return;}changes={memory:[...h].map(c=>parseInt(c,16).toString(2).padStart(4,'0')).join('')};}if(node.type==='SCREEN'){const h=$('setting-base').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(h)){toast('Use a hex base address 0000–C000.');return;}changes={screenPrefix:$('setting-prefix').value.trim(),screenBase:parseInt(h,16)};}
     let success = false;
     edit(() => { if (placing) { const n = state.circuit.addNode({ ...node, ...changes }); state.selected = new Set([n.id]); } else state.circuit.updateNode(node.id, changes); success = true; });
     if (success) { $('settings-dialog').close(); pendingSettings = null; }
@@ -769,7 +768,7 @@
     else if (ctrl && key === 'y') { e.preventDefault(); undo(true); }
     else if (ctrl && key === 's') { e.preventDefault(); saveNow(); toast('Saved locally. Export for a portable copy.'); }
     else if (ctrl && key === 'a') { e.preventDefault(); state.selected = new Set([...(state.circuit.layers.get(state.layer)?.values() || [])].map(n => n.id)); updateUI(); render(); }
-    else if (ctrl && key === 'c') { e.preventDefault(); copy(); }
+    else if (ctrl && key === 'c') { e.preventDefault(); copy(e.shiftKey); }
     else if (ctrl && key === 'v') { e.preventDefault(); paste(); }
     else if (e.code === 'Space') { e.preventDefault(); state.space = true; document.body.classList.add('space-held'); canvas.style.cursor = 'grab'; }
     else if (key === 'delete' || key === 'backspace') { e.preventDefault(); removeSelected(); }
@@ -790,19 +789,20 @@
   });
   document.addEventListener('keyup', e => { if (e.code === 'Space') { state.space = false; document.body.classList.remove('space-held'); canvas.style.cursor = ''; } });
   window.addEventListener('blur', () => { state.space = false; state.drag = null; pointers.clear(); document.body.classList.remove('space-held', 'dragging'); render(); });
-  function copy() {
+  function copy(full = false) {
     const ids = new Set(state.selected); if (!ids.size) return;
-    state.clipboard = { nodes: [...ids].map(id => state.circuit.nodes.get(id)).filter(Boolean).map(n => ({ ...n })), signals: new Map([...ids].map(id => [id, state.circuit.values.get(id) || 0])), wires: [...state.circuit.wires.values()].filter(w => ids.has(w.from) && ids.has(w.to)).map(w => ({ ...w })) };
+    state.clipboard = { nodes: [...ids].map(id => state.circuit.nodes.get(id)).filter(Boolean).map(n => ({ ...n })), signals: new Map([...ids].map(id => [id, state.circuit.values.get(id) || 0])), wires: [...state.circuit.wires.values()].filter(w => ids.has(w.from) && ids.has(w.to)).map(w => ({ ...w })), externalInputs: full ? [...state.circuit.wires.values()].filter(w => !ids.has(w.from) && ids.has(w.to)).map(w => ({...w})) : [] };
     toast(`Copied ${ids.size} component${ids.size === 1 ? '' : 's'}`);
   }
   function paste() {
     if (!state.clipboard) return;
     const c = state.circuit, clip = state.clipboard, before = snapshot(), ids = new Map(), added = [];
     let offset = 1n;
-    while (clip.nodes.some(n => c.at(state.layer, n.x + offset, n.y + offset))) offset++;
+    while (clip.nodes.some(n => {const size=n.type==='SCREEN'?8:1;for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(c.at(state.layer,n.x+offset+BigInt(x),n.y+offset+BigInt(y)))return true;return false;})) offset++;
     try {
       for (const n of clip.nodes) { const copy = c.addNode({ ...n, id: undefined, x: n.x + offset, y: n.y + offset, layer: state.layer, direction: state.layer === 255 ? -1 : state.layer === 0 ? 1 : n.direction }); c.values.set(copy.id, clip.signals.get(n.id) || 0); ids.set(n.id, copy.id); added.push(copy.id); }
       for (const w of clip.wires) c.connect(ids.get(w.from), ids.get(w.to), w.port);
+      for(const w of clip.externalInputs||[]){const source=c.nodes.get(w.from),to=ids.get(w.to);if(source&&to&&source.layer===state.layer&&hasOutput(source))c.connect(w.from,to,w.port);}
       state.selected = new Set(added); state.history.push(before); state.future = []; changed();
     } catch (error) { restore(before); toast(error.message); }
   }
@@ -820,44 +820,28 @@
     e.target.value = '';
   };
   function programError(message) { $('program-error').textContent = message; $('program-error').hidden = !message; }
-  function openProgram() {
-    programError(''); $('program-load').disabled = false;
-    try {
-      $('program-bytes').value = LogicProgram.format(LogicProgram.read(state.circuit));
-      $('program-note').textContent = [...state.circuit.groups.values()].some(g => g.title === '01 RUN') ? 'Current ROM. After loading, turn the RUN input on, or use the circuit’s STEP input.' : 'Current ROM. After loading, use the circuit’s SAMPLE and COMMIT clock controls.';
-    }
-    catch (error) { $('program-bytes').value = ''; $('program-load').disabled = true; $('program-note').textContent = error.message; }
-    $('program-dialog').showModal(); $('program-bytes').focus();
-  }
-  $('program-open').onclick = () => $('program-file').click();
-  $('program-file').onchange = async e => {
-    const file = e.target.files[0]; if (!file) return;
-    try {
-      if (file.size > 4096) throw new Error('The program is too long for this 16-byte ROM.');
-      const bytes = file.name.toLowerCase().endsWith('.bin') ? Array.from(new Uint8Array(await file.arrayBuffer())) : LogicProgram.parse(await file.text());
-      if (!bytes.length || bytes.length > 16) throw new Error('A binary program must contain 1–16 bytes.');
-      $('program-bytes').value = LogicProgram.format(bytes); programError(''); $('program-note').textContent = `${file.name} · ${bytes.length} bytes ready. Click Load & reset.`;
-    } catch (error) { programError(error.message); }
-    e.target.value = '';
-  };
-  $('program-form').onsubmit = e => {
-    e.preventDefault();
-    try {
-      const loaded = LogicProgram.load(state.circuit, LogicProgram.parse($('program-bytes').value));
-      edit(() => { state.circuit = loaded.circuit; state.simSpeed = 0; state.selected.clear(); state.wire = null; state.drag = null; });
-      $('program-dialog').close(); toast(`${loaded.length} program bytes loaded. CPU reset; ${loaded.runStopped ? 'RUN is off' : 'clock inputs are low'}.`);
-    } catch (error) { programError(error.message); }
-  };
+  const programBits=()=>LogicProgram.wordBits(state.circuit);
+  const programFormat=values=>programBits()===16?LogicAssembler16.formatWords(values):LogicProgram.format(values);
+  const programParse=()=>{const text=$('program-bytes').value;if($('program-mode').value==='asm')return programBits()===16?LogicAssembler16.assemble16(text).words:LogicAssembler.assemble(text).bytes;return programBits()===16?LogicAssembler16.parseWords(text):LogicProgram.parse(text,LogicProgram.capacity(state.circuit));};
+  function openProgram(){programError('');$('program-load').disabled=false;$('program-mode').value='hex';$('program-assemble').disabled=!LogicProgram.isV2(state.circuit);try{$('program-bytes').value=programFormat(LogicProgram.read(state.circuit));$('program-note').textContent=programBits()===16?'64K words, 0000–FFFF. Two words per instruction. Binary files use little-endian 16-bit words. Loading stops RUN and resets RAM.':`ROM holds ${LogicProgram.capacity(state.circuit)} bytes. Loading stops RUN and resets the computer.`;}catch(error){$('program-bytes').value='';$('program-load').disabled=true;$('program-note').textContent=error.message;}$('program-dialog').showModal();$('program-bytes').focus();}
+  $('program-open').onclick=()=>$('program-file').click();
+  $('program-assemble').onclick=()=>{try{$('program-mode').value='asm';const values=programParse();$('program-bytes').value=programFormat(values);$('program-mode').value='hex';programError('');}catch(error){programError(error.message);}};
+  $('program-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1048576)throw Error('Program file is too large.');if(file.name.toLowerCase().endsWith('.bin')&&file.size>LogicProgram.capacity(state.circuit)*(programBits()===16?2:1))throw Error('Program exceeds this ROM.');if(file.name.toLowerCase().endsWith('.asm')){$('program-mode').value='asm';$('program-bytes').value=await file.text();}else{let values;if(file.name.toLowerCase().endsWith('.bin')){const bytes=new Uint8Array(await file.arrayBuffer());if(programBits()===16){if(bytes.length%2)throw Error('16-bit binaries need an even byte count.');values=Array.from({length:bytes.length/2},(_,i)=>bytes[i*2]|bytes[i*2+1]<<8);}else values=Array.from(bytes);}else values=programBits()===16?LogicAssembler16.parseWords(await file.text()):LogicProgram.parse(await file.text(),LogicProgram.capacity(state.circuit));if(!values.length||values.length>LogicProgram.capacity(state.circuit))throw Error('Program exceeds this ROM.');$('program-mode').value='hex';$('program-bytes').value=programFormat(values);}programError('');}catch(error){programError(error.message);}e.target.value='';};
+  $('program-form').onsubmit=e=>{e.preventDefault();try{const loaded=LogicProgram.load(state.circuit,programParse());edit(()=>{state.circuit=loaded.circuit;state.simSpeed=0;state.selected.clear();state.wire=null;state.drag=null;});$('program-dialog').close();toast(`${loaded.length} program ${programBits()===16?'words':'bytes'} loaded. CPU reset; RUN is off.`);}catch(error){programError(error.message);}};
+  let memoryPage=0;
+  function refreshMemory(){try{const c=state.circuit,values=LogicProgram.memory(c),bits=programBits(),hex=n=>n.toString(16).padStart(bits===16?4:2,'0').toUpperCase();memoryPage=Math.max(0,Math.min(values.length-256,memoryPage))&~255;let text='      '+Array.from({length:16},(_,i)=>hex(i)).join(' ')+'\n';for(let a=memoryPage;a<memoryPage+256;a+=16)text+=hex(a)+': '+values.slice(a,a+16).map(hex).join(' ')+'\n';$('memory-grid').value=text;$('memory-note').textContent=bits===16?'64K words / 128 KiB. Screen RAM is C000–FFFF (RGB565).':'256 bytes.';$('memory-error').textContent='';}catch(error){$('memory-grid').value='';$('memory-error').textContent=error.message;}}
+  $('memory-open').onclick=()=>{setDrawer(false);refreshMemory();$('memory-dialog').showModal();};$('memory-go').onclick=()=>{const h=$('memory-page').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(h)){ $('memory-error').textContent='Use a hex page address.';return;}memoryPage=parseInt(h,16);refreshMemory();};$('memory-write').onclick=()=>{try{const a=$('memory-address').value.trim(),v=$('memory-value').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(a)||!/^[0-9a-f]{1,4}$/i.test(v))throw Error('Use hexadecimal addresses and values.');let ok=false;edit(()=>{LogicProgram.writeMemory(state.circuit,parseInt(a,16),parseInt(v,16));ok=true;});if(ok)refreshMemory();}catch(error){$('memory-error').textContent=error.message;}};
+  async function loadComputerExample(name){const global=name==='computer16'?'LogicComputer16':name==='computer-v2'?'LogicComputerV2':'LogicGraphicalComputer';if(window[global])return window[global];return await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='examples/'+name+'.js';script.onload=()=>resolve(window[global]);script.onerror=()=>reject(Error('Computer example is missing'));document.head.append(script);});}
   function requestReplacement(which) {
     const names = { 'rgb': 'RGB bus', 'rgb-lights': 'RGB lights', 'tunnel': 'layer tunnel', 'adder': 'half adder' };
     pendingReplacement = which; $('confirm-title').textContent = which === 'blank' ? 'Start a blank circuit?' : `Open the ${names[which] || 'half adder'} example?`;
     $('confirm-replace').textContent = which === 'blank' ? 'Start new' : 'Open example';
     $('help-dialog').close(); $('confirm-dialog').showModal();
   }
-  $('confirm-dialog').addEventListener('close', () => {
+  $('confirm-dialog').addEventListener('close', async () => {
     if ($('confirm-dialog').returnValue === 'export') { exportFile(); $('confirm-dialog').showModal(); return; }
     if ($('confirm-dialog').returnValue !== 'replace') return;
-    checkpoint(); state.circuit = pendingReplacement === 'blank' ? new Circuit() : example(pendingReplacement);
+    let imported;try{if(['computer-v2','computer16','graphical-computer'].includes(pendingReplacement))imported=await loadComputerExample(pendingReplacement);}catch(error){toast(error.message);return;}checkpoint(); state.circuit = imported?Circuit.fromJSON(imported):pendingReplacement === 'blank' ? new Circuit() : example(pendingReplacement);
     stopTicks(); state.simulationPending = false; state.simulationSeen.clear();
     state.layer = pendingReplacement === 'rgb-lights' ? 1 : 0; state.selected.clear(); state.wire = null; state.placing = null; state.running = true; state.ioSelection = false; state.relayDrafts.clear(); state.relayOrders.clear(); state.relayGroupId = ''; relayOrderKey = '';
     $('project-name').value = state.circuit.name; state.lastSimulation = state.circuit.settle(); fit(); changed(false); renderLibrary();
@@ -877,7 +861,7 @@
   $('preferences-form').onsubmit = e => {
     e.preventDefault(); const speed = Number($('sim-speed').value), batch = Number($('sim-batch').value), theme = $('theme-select').value;
     if (!Number.isInteger(speed) || speed < 0 || speed > 60000 || !Number.isInteger(batch) || batch < 1 || batch > 256 || !['light', 'dark'].includes(theme)) return;
-    state.simSpeed = speed; state.simBatch = batch; state.theme = theme; applyTheme();
+    state.simSpeed = speed; state.simBatch = batch; state.theme = theme;state.wireMode=$('wire-mode').value;applyTheme();
     try { localStorage.setItem('logic-studio-preferences-v1', JSON.stringify({ simSpeed: speed, simBatch: batch, theme })); } catch { toast('Settings could not be saved in this browser.'); }
     if (state.running && (state.simulationPending || hasPulses())) requestSimulation();
     $('preferences-dialog').close(); updateUI(); render(); saveSoon();
@@ -909,7 +893,7 @@
   function openTool(name, force) {
     if (name === 'program') { setDrawer(false); openProgram(); return; }
     if (name === 'help') { setDrawer(false); $('help-dialog').showModal(); return; }
-    if (name === 'settings') { setDrawer(false); $('sim-speed').value = state.simSpeed; $('sim-batch').value = state.simBatch; $('theme-select').value = state.theme; $('preferences-dialog').showModal(); return; }
+    if (name === 'settings') { setDrawer(false); $('sim-speed').value = state.simSpeed; $('sim-batch').value = state.simBatch; $('theme-select').value = state.theme; $('wire-mode').value=state.wireMode; $('preferences-dialog').showModal(); return; }
     const elements = toolElements[name]; if (!elements) return;
     const open = force ?? !elements[0].classList.contains('tool-open'); elements.forEach(el => el.classList.toggle('tool-open', open));
     if (open && name === 'relay') openTool('control', false);
@@ -948,15 +932,10 @@
   try { const saved = localStorage.getItem(STORE); if (saved) { restoring = true; restore(saved); loaded = true; } }
   catch { toast('The saved circuit could not be restored. Import an exported copy if needed.'); }
   finally { restoring = false; }
-  if (!loaded && initialExample === 'graphical-computer') {
+  if (!loaded && ['graphical-computer','computer-v2','computer16'].includes(initialExample)) {
     try {
       // A local script works on file:// without a server or blocked JSON fetch.
-      const data = await new Promise((resolve, reject) => {
-        const script = document.createElement('script'); script.src = 'examples/graphical-computer.js';
-        script.onload = () => resolve(window.LogicGraphicalComputer);
-        script.onerror = () => reject(new Error('The graphical computer example file is missing.'));
-        document.head.append(script);
-      });
+      const data=await loadComputerExample(initialExample);
       restoring = true; restore(JSON.stringify(data)); loaded = true;
       delete window.LogicGraphicalComputer;
     } catch (error) { toast(error.message); }
@@ -965,5 +944,6 @@
   $('project-name').value = state.circuit.name; document.body.dataset.tool = state.tool;
   renderLibrary(); updateUI(); if (!loaded) fit(); render(); scheduleTick();
   // Read-only hooks for integration checks and diagnostics; all editing uses the UI/model.
-  window.logicStudio = { get circuit() { return state.circuit; }, get state() { return state; }, screenToWorld, worldToScreen, ports, portPoint, fit, render, snapshot };
+  $('wire-mode').value=state.wireMode;
+  window.logicStudio = { get circuit() { return state.circuit; }, get state() { return state; }, screenToWorld, worldToScreen, ports, portPoint, fit, render, snapshot,wireMetrics:()=>({...wireRenderer.metrics}) };
 })();

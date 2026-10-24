@@ -7,17 +7,19 @@
   'use strict';
   const MAX_LAYERS = 256;
   const GATES = ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR'];
-  const SPECIAL = ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER'];
+  const SPECIAL = ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN'];
   const key = (layer, x, y) => `${layer}:${x}:${y}`;
   const comparePosition = (a, b) => a.x < b.x ? -1 : a.x > b.x ? 1 : a.y < b.y ? -1 : a.y > b.y ? 1 : a.id.localeCompare(b.id);
   function inputCount(node) {
-    if (['INPUT', 'RGB', 'PULSE'].includes(node.type)) return 0;
+    if (['INPUT', 'RGB', 'PULSE', 'SCREEN'].includes(node.type)) return 0;
     if (node.type === 'REGISTER') return 2;
+    if (node.type === 'RAM') return (node.addressBits || 8) + 4 + (node.addressBits === 16 ? 1 : 0);
+    if (node.type === 'ROM') return node.addressBits || 8;
     if (node.type === 'RGBTUNNEL') return 24;
     if (['NOT', 'OUTPUT', 'TUNNEL'].includes(node.type)) return 1;
     return node.inputs;
   }
-  function hasOutput(node) { return !['OUTPUT', 'RGB', 'RGBTUNNEL'].includes(node.type); }
+  function hasOutput(node) { return !['OUTPUT', 'RGB', 'RGBTUNNEL', 'SCREEN'].includes(node.type); }
   function gate(type, bits) {
     switch (type) {
       case 'AND': return +bits.every(Boolean);
@@ -36,7 +38,6 @@
     return BigInt(value);
   }
   function validateNode(data) {
-    if (data && ['RAM', 'ROM'].includes(data.type)) throw new Error('RAM and ROM chips require the desktop edition.');
     if (!data || ![...GATES, ...SPECIAL].includes(data.type)) throw new Error('Unknown node type.');
     const layer = data.layer ?? 0;
     if (!Number.isInteger(layer) || layer < 0 || layer >= MAX_LAYERS) throw new Error('Layers must be between 1 and 256.');
@@ -49,13 +50,20 @@
     if (['TUNNEL', 'RGBTUNNEL'].includes(data.type) &&
         (![1, -1].includes(direction) || layer + direction < 0 || layer + direction >= MAX_LAYERS)) throw new Error('The tunnel must target an adjacent layer between 1 and 256.');
     if (data.type === 'REGISTER' && data.clock !== undefined && ![0, 1].includes(data.clock)) throw new Error('Invalid register clock state.');
-    return {
+    const addressBits = data.addressBits ?? 8;if (![8,16].includes(addressBits)) throw new Error('Memory uses 8 or 16 address bits.');const memory = data.memory ?? '0'.repeat(1 << addressBits);
+    if (['RAM', 'ROM'].includes(data.type) && (typeof memory !== 'string' || memory.length !== (1 << addressBits) || /[^01]/.test(memory))) throw new Error('Memory components hold exactly 256 binary bits.');
+    if (data.type === 'RAM' && data.clock !== undefined && ![0, 1].includes(data.clock)) throw new Error('Invalid memory clock state.');
+    const n = {
       id: String(data.id ?? ''), type: data.type, layer,
       x: integerCoordinate(data.x ?? 0), y: integerCoordinate(data.y ?? 0),
       inputs, extendible: !!data.extendible, direction,
       on: !!data.on, label: typeof data.label === 'string' ? data.label.slice(0, 80) : '',
-      ...(data.type === 'REGISTER' ? { clock: data.clock ?? 0 } : {})
+      ...(data.type === 'REGISTER' ? { clock: data.clock ?? 0 } : {}),
+      ...(['RAM', 'ROM'].includes(data.type) ? { memory, ...(addressBits !== 8 ? { addressBits } : {}), ...(data.type === 'RAM' ? { clock: data.clock ?? 0 } : {}) } : {})
     };
+    if(n.type==='SCREEN'){n.screenBase=data.screenBase??49152;n.screenPrefix=data.screenPrefix??'DATA';if(!Number.isInteger(n.screenBase)||n.screenBase<0||n.screenBase>49152||typeof n.screenPrefix!=='string'||!n.screenPrefix||n.screenPrefix.length>80)throw new Error('Invalid screen memory region.');}
+    if(['RAM','ROM'].includes(n.type)&&addressBits===16){Object.defineProperty(n,'storage',{value:Uint8Array.from(memory,c=>+(c==='1')),writable:true});Object.defineProperty(n,'memory',{enumerable:true,get(){return Array.from(this.storage).join('');},set(value){this.storage=Uint8Array.from(value,c=>+(c==='1'));}});if(data.memoryHex!==undefined){if(typeof data.memoryHex!=='string'||!/^[0-9a-f]{16384}$/i.test(data.memoryHex))throw new Error('Invalid packed 64K memory plane.');for(let a=0;a<16384;a++){const v=parseInt(data.memoryHex[a],16);for(let b=0;b<4;b++)n.storage[a*4+b]=(v>>(3-b))&1;}}n.memoryVersion=0;}
+    return n;
   }
   class Circuit {
     constructor() {
@@ -99,17 +107,19 @@
     }
     rebuild() {
       this.needsSettle = true;
-      this.positions = new Map(); this.layers = new Map(); this.incoming = new Map(); this.dependents = new Map();
-      this.pulses = new Set(); this.registers = new Set();
+      this.largeMemory=[...this.nodes.values()].some(n=>n.addressBits===16);this.topologyVersion=(this.topologyVersion||0)+1;this.wireLayers=new Map();this.screens=new Set();this.positions = new Map(); this.layers = new Map(); this.incoming = new Map(); this.dependents = new Map();
+      this.pulses = new Set(); this.registers = new Set(); this.memories = new Set();
       for (const n of this.nodes.values()) {
         if (n.type === 'PULSE') this.pulses.add(n.id);
         if (n.type === 'REGISTER') this.registers.add(n.id);
-        this.positions.set(key(n.layer, n.x, n.y), n);
+        if (n.type === 'RAM') this.memories.add(n.id);if(n.type==='SCREEN')this.screens.add(n.id);
+        if(n.type==='SCREEN')for(let y=0n;y<8n;y++)for(let x=0n;x<8n;x++){const k=key(n.layer,n.x+x,n.y+y);if(this.positions.has(k))throw new Error('Screen overlaps another component.');this.positions.set(k,n);}else{const k=key(n.layer,n.x,n.y);if(this.positions.has(k))throw new Error('That grid square is occupied.');this.positions.set(k,n);}
         if (!this.layers.has(n.layer)) this.layers.set(n.layer, new Map());
         this.layers.get(n.layer).set(`${n.x}:${n.y}`, n);
         this.incoming.set(n.id, []); this.dependents.set(n.id, new Set());
       }
       for (const w of this.wires.values()) {
+        const l=this.nodes.get(w.from).layer;if(!this.wireLayers.has(l))this.wireLayers.set(l,[]);this.wireLayers.get(l).push(w);
         this.incoming.get(w.to)[w.port] = w;
         this.dependents.get(w.from).add(w.to);
       }
@@ -186,10 +196,11 @@
       const w = this.incoming.get(id)?.[port]; return w ? +!!values.get(w.from) : 0;
     }
     evaluate(n, values = this.values) {
-      if (n.type === 'INPUT') return +n.on;
+      if(n.type==='SCREEN')return 0;if (n.type === 'INPUT') return +n.on;
       // Sequential outputs hold during combinational propagation. Only an
       // explicit frame flips pulses; registers are sampled in parallel below.
       if (n.type === 'PULSE' || n.type === 'REGISTER') return values.get(n.id) || 0;
+      if (n.type === 'RAM' || n.type === 'ROM') return this.memoryBit(n,this.memoryAddress(n,values));
       if (n.type === 'RGBTUNNEL') {
         let color = 0; for (let i = 0; i < 24; i++) color = (color << 1) | this.bit(n.id, i, values);
         return color;
@@ -217,6 +228,13 @@
       const clock = this.bit(n.id, 1, values);
       return { clock, value: clock && !n.clock ? this.bit(n.id, 0, values) : values.get(n.id) || 0 };
     }
+    memoryAddress(n, values = this.values) {
+      let address = 0; for (let bit = 0; bit < (n.addressBits||8); bit++) address |= this.bit(n.id, bit, values) << bit;
+      return address;
+    }
+    memoryBit(n,address){return n.storage?n.storage[address]:+(n.memory[address]==='1');}
+    sampleMemory(n,values=this.values){const k=n.addressBits||8,clock=this.bit(n.id,k+2,values),rise=clock&&!n.clock;return {clock,address:this.memoryAddress(n,values),data:this.bit(n.id,k,values),clear:!!(rise&&this.bit(n.id,k+3,values)),write:!!(rise&&this.bit(n.id,k+1,values)),fill:!!(k===16&&rise&&this.bit(n.id,k+4,values))};}
+    commitMemory(n,s){n.clock=s.clock;let changed=false;if(n.storage){if(s.clear){changed=n.storage.some(Boolean);if(changed)n.storage.fill(0);}else if(s.fill){for(let a=49152;a<65536;a++)if(n.storage[a]!==s.data){changed=true;break;}if(changed)n.storage.fill(s.data,49152);}else if(s.write&&n.storage[s.address]!==s.data){n.storage[s.address]=s.data;changed=true;}if(changed)n.memoryVersion++;}else{let m=n.memory;if(s.clear)m='0'.repeat(256);else if(s.write&&m[s.address]!==String(s.data))m=m.slice(0,s.address)+s.data+m.slice(s.address+1);changed=m!==n.memory;n.memory=m;}return changed;}
     settle(seed) {
       const queue = seed ? [...seed] : [...this.nodes.keys()]; const queued = new Set(queue);
       const limit = Math.max(4096, this.nodes.size * 64); let head = 0, changes = 0;
@@ -235,6 +253,7 @@
         // Settle D and CLK first, then capture all registers together. A chain
         // of registers sharing a clock therefore advances exactly one stage.
         const samples = [...this.registers].map(id => { const n = this.nodes.get(id); return [n, this.sampleRegister(n)]; });
+        const memorySamples = [...this.memories].map(id => { const n = this.nodes.get(id); return [n, this.sampleMemory(n)]; });
         let captured = false;
         for (const [n, sample] of samples) {
           n.clock = sample.clock;
@@ -242,6 +261,9 @@
             this.values.set(n.id, sample.value); changes++; captured = true; enqueueDependents(n.id);
           }
         }
+        // Sample RAM with the same old address/data/clock as CPU registers.
+        // Commit storage only after every sequential element has sampled.
+        for (const [n,sample] of memorySamples)if(this.commitMemory(n,sample)){changes++;captured=true;if(!queued.has(n.id)){queued.add(n.id);queue.push(n.id);}}
         if (!captured) break;
       }
       const stable = head === queue.length && changes < limit;
@@ -251,15 +273,16 @@
     }
     step() {
       const next = new Map(); let changes = 0;
-      const clocks = [];
+      const clocks = [], memorySamples = [];
       for (const n of this.nodes.values()) {
         let value;
         if (n.type === 'PULSE') value = 1 - (this.values.get(n.id) || 0);
         else if (n.type === 'REGISTER') { const sample = this.sampleRegister(n); value = sample.value; clocks.push([n, sample.clock]); }
-        else value = this.evaluate(n);
+        else { value = this.evaluate(n); if (n.type === 'RAM') memorySamples.push([n, this.sampleMemory(n)]); }
         next.set(n.id, value); if (value !== (this.values.get(n.id) || 0)) changes++;
       }
       for (const [n, clock] of clocks) n.clock = clock;
+      for(const [n,sample]of memorySamples)if(this.commitMemory(n,sample))changes++;
       this.values = next; this.needsSettle = !!changes; this.lastResult = { stable: !changes, oscillating: false, changes, evaluations: this.nodes.size }; return this.lastResult;
     }
     advanceFrame() {
@@ -275,7 +298,7 @@
     }
     toJSON() {
       return { format: 'logic-studio', version: 1, name: this.name, nextId: this.nextId,
-        nodes: [...this.nodes.values()].map(n => ({ ...n, x: String(n.x), y: String(n.y) })), wires: [...this.wires.values()].map(w => ({ ...w })),
+        nodes: [...this.nodes.values()].map(n=>{if(!n.storage)return {...n,x:String(n.x),y:String(n.y)};const data={};for(const k of Object.keys(n))if(k!=='memory'&&k!=='memoryVersion')data[k]=n[k];data.x=String(n.x);data.y=String(n.y);let packed='';const digits='0123456789ABCDEF';for(let a=0;a<65536;a+=4)packed+=digits[(n.storage[a]<<3)|(n.storage[a+1]<<2)|(n.storage[a+2]<<1)|n.storage[a+3]];data.memoryHex=packed;return data;}), wires: [...this.wires.values()].map(w => ({ ...w })),
         signals: [...this.values.entries()], groups: [...this.groups.values()].map(g => ({ ...g, nodeIds: this.groupNodes(g.id).map(n => n.id) })) };
     }
     static fromJSON(data) {
