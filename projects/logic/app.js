@@ -1,12 +1,12 @@
 /* Offline canvas editor. No network, dependencies, or build step. */
 (async () => {
   'use strict';
-  const { Circuit, inputCount, hasOutput, nodeSize, example } = Logic;
+  const { Circuit, inputCount, hasOutput, outputCount, inputWidth, outputWidth, nodeSize, example } = Logic;
   const $ = id => document.getElementById(id);
   const canvas = $('canvas'), ctx = canvas.getContext('2d');
   const CELL = 96;const wireRenderer=new LogicWires.Renderer();const portCache=new Map();
   const requestedExample = new URL(location.href).searchParams.get('example');
-  const initialExample = ['rgb-lights','rgb-counter','graphical-computer','computer-v2','computer16'].includes(requestedExample) ? requestedExample : null;
+  const initialExample = ['rgb-lights','rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io'].includes(requestedExample) ? requestedExample : null;
   const STORE = initialExample ? `logic-studio-example-${initialExample}-${initialExample==='computer16'?'v3':'v1'}` : 'logic-studio-v1';
   const COLORS = { bg: '#ffffff', grid: '#eeeeee', on: '#c5efad', off: '#777777', text: '#222222', muted: '#777777', line: '#777777', panel: '#f6f6f6' };
   let preferences = { theme: 'light', simSpeed: 50, simBatch: 1 };
@@ -23,6 +23,8 @@
   for (const type of ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN']) components.push({ type, name: type, category: type.startsWith('RGB')||type==='SCREEN' ? 'color' : 'io' });
   components.push({type:'SCREEN',screenPixels:1,name:'SCREEN PIXEL',category:'color'});
   for(const type of ['RAM','ROM'])components.push({type,addressBits:16,name:type+' (64K)',category:'io'});
+  for(const type of ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'])components.push({type,name:type,category:'io'});
+  let advancedUI;
   document.querySelector('.tiny-badge').textContent = components.length;
   const state = {
     circuit: example(initialExample === 'rgb-lights' ? 'rgb-lights' : 'adder'), layer: initialExample === 'rgb-lights' ? 1 : 0, camera: { x: 0n, y: 0n, ox: 0, oy: 0, scale: 1 },
@@ -44,7 +46,7 @@
     Object.assign(COLORS, { bg: dark ? '#111111' : '#ffffff', grid: dark ? '#252525' : '#eeeeee', text: dark ? '#eeeeee' : '#222222', muted: dark ? '#aaaaaa' : '#777777', off: dark ? '#aaaaaa' : '#777777', line: dark ? '#999999' : '#777777', panel: dark ? '#222222' : '#f6f6f6' });
     document.querySelector('meta[name="theme-color"]').content = COLORS.bg;
   }
-  const hasPulses = () => state.circuit.pulses.size > 0;
+  const hasPulses = () => state.circuit.hasPulses();
   function stopTicks() {
     clearTimeout(simulationTimer); cancelAnimationFrame(simulationFrame);
     simulationTimer = simulationFrame = null;
@@ -87,7 +89,7 @@
   }
   function toast(message) { $('toast').textContent = message; $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 3500); }
   function snapshot() {
-    return JSON.stringify({ ...state.circuit.toJSON(), editor: { layer: state.layer, camera: { ...state.camera, x: String(state.camera.x), y: String(state.camera.y) }, ghost: state.ghost, running: state.running, simSpeed: state.simSpeed, simBatch: state.simBatch,wireMode:state.wireMode } });
+    return JSON.stringify({ ...state.circuit.toJSON(), editor: { layer: state.layer, camera: { ...state.camera, x: String(state.camera.x), y: String(state.camera.y) }, ghost: state.ghost, running: state.running, simSpeed: state.simSpeed, simBatch: state.simBatch,wireMode:state.wireMode,chipEditParents:advancedUI?.context()||[] } });
   }
   function checkpoint() {
     state.history.push(snapshot());
@@ -107,6 +109,7 @@
       if (Number.isInteger(data.editor.simBatch) && data.editor.simBatch >= 1 && data.editor.simBatch <= 256) state.simBatch = data.editor.simBatch;
       else if (initialExample === 'graphical-computer' || data.name === 'Graphical 8-bit computer - RGB-8') state.simBatch = 64;
     }
+    advancedUI?.restoreContext(data.editor?.chipEditParents);
     state.lastSimulation = state.running ? c.settle() : { stable: true, oscillating: false };
     $('project-name').value = c.name; $('ghost').checked = state.ghost;
     updateUI(); renderLibrary(); render(); scheduleTick();
@@ -172,9 +175,10 @@
       else if (n.type === 'REGISTER') desc += `Q ${c.values.get(n.id) || 0} · stored bit\nD: top input · CLK: bottom input\nCaptures D on a rising CLK edge.`;
       else desc += `Signal ${c.values.get(n.id) || 0}${n.type === 'INPUT' ? ` · switch ${n.on ? 'on' : 'off'}` : ''}`;
       $('selected-description').textContent = desc; $('selected-description').style.whiteSpace = 'pre-line';
+      if(n.type==='CHIP')addAction('Edit chip contents',()=>advancedUI.edit(n));
       if (n.type === 'INPUT') addAction('Toggle', () => toggleInput(n));
       addAction('Properties', () => properties(n));
-      if (n.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN'].includes(n.type)) addAction('Settings', () => settings(n));
+      if (n.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(n.type)) addAction('Settings', () => settings(n));
       if (['TUNNEL','RGBTUNNEL'].includes(n.type)) addAction('Follow ↗', () => { setLayer(n.layer + n.direction); focusAt(n.x, n.y); });
     } else { $('selected-type').textContent = `${chosen.length} components`; $('selected-description').textContent = 'Drag to move together. Copy, paste, or delete the selection.'; }
     addAction('Delete', removeSelected);
@@ -182,7 +186,7 @@
     if (io.length) addAction('Group / title', () => groupDialog());
     $('io-selection-actions').hidden = !state.ioSelection || !!state.drag || !io.length;
     $('io-selection-summary').textContent = io.length ? `${io.length} ${io[0].type === 'INPUT' ? 'input' : 'output'}${io.length === 1 ? '' : 's'} selected` : '';
-    updateRelay();
+    updateRelay(); advancedUI?.process();
   }
   function addAction(label, onClick) { const b = document.createElement('button'); b.className = 'action'; b.textContent = label; b.onclick = onClick; $('selected-actions').append(b); }
   const normalizeBinary = text => text.replace(/[\s_]/g, '');
@@ -368,14 +372,14 @@
     state.camera.ox = centerX - state.width / 2 - cx * cellSize(); state.camera.oy = (state.height - availableH) / 2 + availableH / 2 - state.height / 2 - cy * cellSize(); render(); saveSoon();
   }
   function ports(n) {
-    const count = inputCount(n), key=n.type+':'+count;if(portCache.has(key))return portCache.get(key);const list = [];
+    const count = inputCount(n), outs=outputCount(n), key=n.type+':'+count+':'+outs;if(portCache.has(key))return portCache.get(key);const list = [];
     if (n.type === 'RGBTUNNEL') {
       for (let i = 0; i < 24; i++) {
         const side = Math.floor(i / 6), f = .18 + (i % 6) * .128;
         list.push({ x: side === 0 ? f : side === 1 ? .92 : side === 2 ? 1 - f : .08, y: side === 0 ? .08 : side === 1 ? f : side === 2 ? .92 : 1 - f, kind: 'in', index: i, side });
       }
     } else for (let i = 0; i < count; i++) list.push({ x: .08, y: .17 + .66 * ((i + .5) / count), kind: 'in', index: i, side: 3 });
-    if (hasOutput(n)) list.push({ x: .92, y: .5, kind: 'out', index: 0, side: 1 });
+    for(let i=0;i<outs;i++)list.push({x:.92,y:outs===1?.5:.17+.66*((i+.5)/outs),kind:'out',index:i,side:1});
     portCache.set(key,list);return list;
   }
   function nodePose(n, time = performance.now()) {
@@ -414,7 +418,7 @@
   }
   function wireGeometry(w) {
     const a = state.circuit.nodes.get(w.from), b = state.circuit.nodes.get(w.to);
-    const ap = ports(a).find(p => p.kind === 'out'), bp = ports(b).find(p => p.kind === 'in' && p.index === w.port);
+    const ap = ports(a).find(p => p.kind === 'out' && p.index === (w.fromPort||0)), bp = ports(b).find(p => p.kind === 'in' && p.index === w.port);
     return pathWire(portPoint(a, ap), portPoint(b, bp), 1, bp.side);
   }
   function drawCurve(g) { ctx.beginPath(); ctx.moveTo(g.a.x, g.a.y); ctx.bezierCurveTo(g.c.x, g.c.y, g.d.x, g.d.y, g.b.x, g.b.y); }
@@ -532,8 +536,11 @@
         const ink = value ? '#222222' : COLORS.text;
         ctx.fillStyle = ink; ctx.font = `${s * (small ? .095 : .13)}px Arial,sans-serif`;
         const symbol = Logic.GATES.includes(n.type) || ['PULSE', 'REGISTER'].includes(n.type);
-        ctx.fillText(n.type === 'RGBTUNNEL' ? 'RGB BUS' : n.type, p.x + s * .5, p.y + s * (symbol ? .165 : .38));
-        if (['INPUT', 'OUTPUT'].includes(n.type)) {
+        ctx.fillText(n.type === 'RGBTUNNEL' ? 'RGB BUS' : n.type, p.x + s * .5, p.y + s * (symbol || n.type==='CHIP' ? .165 : .38));
+        if (['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND','CHIP'].includes(n.type)) {
+          ctx.font=`${s*.12}px Consolas,monospace`;const text=n.type==='KEYBOARD'?(n.keyCode||'KeyW'):n.type==='COMMAND'?(n.command==='release_keyboard'?'RELEASE':'CAPTURE'):n.type==='CHIP'?(state.circuit.chips.get(n.chipId)?.name||'CHIP'):value.toString(16).toUpperCase().padStart((n.bits||8)/4,'0');ctx.fillText(text.slice(0,16),p.x+s*.5,p.y+s*(n.type==='CHIP'?.5:.61));
+          ctx.font=`${s*.08}px Arial`;ctx.fillText(n.type==='CHIP'?`${inputCount(n)} IN / ${outputCount(n)} OUT`:n.type==='KEYBOARD'?String(value):n.type==='COMMAND'?'ENABLE ↑':`${n.bits||8} BITS`,p.x+s*.5,p.y+s*(n.type==='CHIP'?.83:.79));
+        } else if (['INPUT', 'OUTPUT'].includes(n.type)) {
           ctx.font = `${s * .23}px Arial,sans-serif`; ctx.fillStyle = ink; ctx.fillText(String(value), p.x + s * .5, p.y + s * .65);
         } else if (['TUNNEL','RGBTUNNEL'].includes(n.type)) {
           ctx.fillStyle = ink; ctx.font = `${s * .24}px Arial,sans-serif`; ctx.fillText(n.direction === 1 ? '↑' : '↓', p.x + s * .5, p.y + s * .61);
@@ -557,10 +564,11 @@
       }
       if (n.label) { ctx.fillStyle = COLORS.muted; ctx.font = `${Math.min(12, s * .105)}px Arial,sans-serif`; ctx.fillText(n.label, p.x + s * .5, p.y - s * .065); }
     }
+    if(n.type==='CHIP'&&s>=70){const font=Math.min(12,s*.075,s*.5/Math.max(1,inputCount(n),outputCount(n)));if(font>=6){ctx.font=`${font}px Arial`;ctx.fillStyle=value?'#222222':COLORS.text;for(const kind of ['in','out'])for(const port of ports(n).filter(p=>p.kind===kind)){const pin=(kind==='in'?n.pinsIn:n.pinsOut)[port.index];ctx.textAlign=kind==='in'?'left':'right';ctx.fillText(pin.name,p.x+s*(kind==='in'?.15:.85),p.y+port.y*s,s*.28);}}}
     if (!ghost && s > 16 && !preview) for (const port of ports(n)) {
       const pp = { x: p.x + port.x * s, y: p.y + port.y * s };
-      const on = port.kind === 'out' ? value : state.circuit.bit(n.id, port.index);
-      const radius = Math.min(n.type === 'RGBTUNNEL' || inputCount(n) > 8 ? s * .021 : s * .045, 9);
+      const on = port.kind === 'out' ? state.circuit.signal(n.id,port.index) : state.circuit.word(n.id, port.index);
+      const radius = Math.min(n.type === 'RGBTUNNEL' || Math.max(inputCount(n),outputCount(n)) > 8 ? s * .021 : s * .045, 9);
       const hovered = state.hover?.node.id === n.id && state.hover?.port?.kind === port.kind && state.hover.port.index === port.index;
       ctx.beginPath(); ctx.arc(pp.x, pp.y, Math.max(1.5, radius + (hovered ? 2 : 0)), 0, Math.PI * 2);
       ctx.fillStyle = port.kind === 'out' ? COLORS.bg : on ? COLORS.on : COLORS.text; ctx.strokeStyle = on ? COLORS.on : COLORS.text; ctx.lineWidth = Math.min(2, Math.max(1, s * .015)); ctx.fill(); ctx.stroke();
@@ -593,6 +601,8 @@
     if (state.hover?.port && !state.drag && !state.wire && !state.placing) {
       const { node, port } = state.hover, p = portPoint(node, port);
       let text = port.kind === 'out' ? 'OUTPUT · drag to connect' : `INPUT ${port.index + 1} · ${c.bit(node.id, port.index)}`;
+      if(node.type==='CHIP'){const pin=(port.kind==='out'?node.pinsOut:node.pinsIn)[port.index];text=`${pin.name} · ${pin.width} bit${pin.width===1?'':'s'} · ${port.kind==='out'?c.signal(node.id,port.index):c.word(node.id,port.index)}`;}
+      if(['JOIN','SPLIT'].includes(node.type))text=`${port.kind==='out'&&node.type==='SPLIT'||port.kind==='in'&&node.type==='JOIN'?'BIT '+port.index:(node.bits||8)+'-BIT BUS'} · ${port.kind==='out'?c.signal(node.id,port.index):c.word(node.id,port.index)}`;
       if (node.type === 'REGISTER') text = port.kind === 'out' ? 'Q · stored bit · drag to connect' : `${port.index === 0 ? 'D · data' : 'CLK · rising edge'} · ${c.bit(node.id, port.index)}`;
       if (node.type === 'RGBTUNNEL') text = `${['R', 'G', 'B'][Math.floor(port.index / 8)]}${7 - port.index % 8} · BIT ${23 - port.index} · ${c.bit(node.id, port.index)}`;
       ctx.font = '10px Consolas,monospace'; const tw = ctx.measureText(text).width;
@@ -621,10 +631,12 @@
     if (h) {
       if (!state.selected.has(h.node.id)) { state.selected = new Set([h.node.id]); updateUI(); render(); }
       item('Copy', 'Ctrl+C', () => copy());item('Full copy', 'Ctrl+Shift+C', () => copy(true));
+      item('Create chip from selection…','',()=>advancedUI.create());
+      if(h.node.type==='CHIP')item('Edit chip contents…','',()=>advancedUI.edit(h.node));
       item('Properties…', '', () => properties(h.node));
       if (h.node.type === 'INPUT') item('Toggle input', 'Enter', () => toggleInput(h.node));
       if (['INPUT', 'OUTPUT'].includes(h.node.type)) item('Group / title…', 'G', () => groupDialog());
-      if (h.node.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN'].includes(h.node.type)) item('Settings…', '', () => settings(h.node));
+      if (h.node.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(h.node.type)) item('Settings…', '', () => settings(h.node));
       if (['TUNNEL','RGBTUNNEL'].includes(h.node.type)) item('Follow to adjacent layer', '↗', () => { setLayer(h.node.layer + h.node.direction); focusAt(h.node.x, h.node.y); });
       if (h.port?.kind === 'in') {
         const w = state.circuit.incoming.get(h.node.id)[h.port.index]; if (w) item('Disconnect input', '', () => edit(() => state.circuit.disconnect(w.id)));
@@ -638,6 +650,7 @@
   }
   let propertyNodeId = null;
   function properties(n) {
+    if(advancedUI.isAdvanced(n)){advancedUI.settings(n);return;}
     propertyNodeId = n.id;
     $('properties-title').textContent = `${n.type} properties`;
     $('property-label').value = n.label;
@@ -664,6 +677,7 @@
     if (success) { $('properties-dialog').close(); propertyNodeId = null; }
   };
   function settings(n, placing = false) {
+    if(advancedUI.settings(n,placing))return;
     pendingSettings = { node: n, placing }; $('settings-title').textContent = placing ? `Place ${n.type}` : `Edit ${n.type}`;
     const fields = $('settings-fields'); fields.replaceChildren();
     if(['RAM','ROM'].includes(n.type)){const bits=1<<(n.addressBits||8);$('settings-note').textContent=`${bits} × 1 memory plane. Address pins A0–A${(n.addressBits||8)-1}. Packed hex lists bits in address order, most significant bit first.`;const label=document.createElement('label');label.className='field';label.textContent='Packed memory hex';const input=document.createElement('textarea');input.id='setting-memory';input.rows=5;let hex='';for(let a=0;a<bits;a+=4){let v=0;for(let b=0;b<4;b++)v=(v<<1)|state.circuit.memoryBit(n,a+b);hex+=v.toString(16);}input.value=hex.toUpperCase();label.append(input);fields.append(label);
@@ -695,14 +709,14 @@
     const pos = screenToWorld(x, y), spec = state.placing;
     if (state.circuit.at(state.layer, pos.x, pos.y)) { toast('That grid square is occupied.'); return; }
     const node = { ...spec, x: pos.x, y: pos.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 };
-    if (spec.extendible || ['TUNNEL', 'RGBTUNNEL'].includes(spec.type)) settings(node, true);
+    if (spec.extendible || ['TUNNEL','RGBTUNNEL','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(spec.type)) settings(node, true);
     else edit(() => { const n = state.circuit.addNode(node); state.selected = new Set([n.id]); });
   }
   function finishWire(target) {
     if (!state.wire || !target?.port) return false;
     const start = state.wire;
     if (start.port.kind !== 'out' || target.port.kind !== 'in') return false;
-    edit(() => { if (start.detached) state.circuit.disconnect(start.detached); state.circuit.connect(start.node, target.node.id, target.port.index); }); state.wire = null; render(); return true;
+    edit(() => { state.circuit.connect(start.node, target.node.id, target.port.index, start.port.index); if (start.detached) state.circuit.disconnect(start.detached); }); state.wire = null; render(); return true;
   }
   const TOUCH_HOLD = 500, TOUCH_SLOP = 10, DOUBLE_TAP = 320;
   let touchGesture = null, lastTouchTap = null, touchHoldTimer = null, lastTouchAt = -Infinity;
@@ -748,7 +762,7 @@
         const old = state.circuit.incoming.get(h.node.id)[h.port.index];
         if (!old) { state.wire = null; state.drag = null; render(); return; }
         const source = state.circuit.nodes.get(old.from);
-        state.wire = { node: old.from, port: ports(source).find(p => p.kind === 'out'), detached: old.id, start: { x, y } };
+        state.wire = { node: old.from, port: ports(source).find(p => p.kind === 'out' && p.index === (old.fromPort||0)), detached: old.id, start: { x, y } };
       }
       state.drag = { kind: 'wire', moved: false }; render(); return;
     }
@@ -879,7 +893,7 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) clearTouchGesture(); });
   function copy(full = false) {
     const ids = new Set(state.selected); if (!ids.size) return;
-    state.clipboard = { nodes: [...ids].map(id => state.circuit.nodes.get(id)).filter(Boolean).map(n => ({ ...n })), signals: new Map([...ids].map(id => [id, state.circuit.values.get(id) || 0])), wires: [...state.circuit.wires.values()].filter(w => ids.has(w.from) && ids.has(w.to)).map(w => ({ ...w })), externalInputs: full ? [...state.circuit.wires.values()].filter(w => !ids.has(w.from) && ids.has(w.to)).map(w => ({...w})) : [], externalOutputs: full ? [...state.circuit.wires.values()].filter(w => ids.has(w.from) && !ids.has(w.to)).map(w => ({...w})) : [] };
+    state.clipboard = { chips:JSON.parse(JSON.stringify([...state.circuit.chips.values()])), nodes: [...ids].map(id => state.circuit.nodes.get(id)).filter(Boolean).map(n => ({ ...n, ...(n.type==='CHIP'?{chipState:state.circuit.children.get(n.id).toJSON()}: {}) })), signals: new Map([...ids].map(id => [id, state.circuit.values.get(id) || 0])), wires: [...state.circuit.wires.values()].filter(w => ids.has(w.from) && ids.has(w.to)).map(w => ({ ...w })), externalInputs: full ? [...state.circuit.wires.values()].filter(w => !ids.has(w.from) && ids.has(w.to)).map(w => ({...w})) : [], externalOutputs: full ? [...state.circuit.wires.values()].filter(w => ids.has(w.from) && !ids.has(w.to)).map(w => ({...w})) : [] };
     toast(`Copied ${ids.size} component${ids.size === 1 ? '' : 's'}`);
   }
   function paste() {
@@ -888,16 +902,17 @@
     let offset = 1n;
     while (clip.nodes.some(n => {const size=nodeSize(n);for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(c.at(state.layer,n.x+offset+BigInt(x),n.y+offset+BigInt(y)))return true;return false;})) offset++;
     try {
-      for (const n of clip.nodes) { const copy = c.addNode({ ...n, id: undefined, x: n.x + offset, y: n.y + offset, layer: state.layer, direction: state.layer === 255 ? -1 : state.layer === 0 ? 1 : n.direction }); c.values.set(copy.id, clip.signals.get(n.id) || 0); ids.set(n.id, copy.id); added.push(copy.id); }
-      for (const w of clip.wires) c.connect(ids.get(w.from), ids.get(w.to), w.port);
-      for(const w of clip.externalInputs||[]){const source=c.nodes.get(w.from),to=ids.get(w.to);if(source&&to&&source.layer===state.layer&&hasOutput(source))c.connect(w.from,to,w.port);}
+      const chipMap=new Map();for(const def of clip.chips||[]){const old=c.chips.get(def.id);if(!old)c.chips.set(def.id,def);else if(JSON.stringify(old)!==JSON.stringify(def)){const id=c.id('chip');c.chips.set(id,{...def,id});chipMap.set(def.id,id);}}
+      for (const n of clip.nodes) { const copy = c.addNode({ ...n, ...(n.type==='CHIP'?{chipId:chipMap.get(n.chipId)||n.chipId}: {}), id: undefined, x: n.x + offset, y: n.y + offset, layer: state.layer, direction: state.layer === 255 ? -1 : state.layer === 0 ? 1 : n.direction }); c.values.set(copy.id, clip.signals.get(n.id) || 0); ids.set(n.id, copy.id); added.push(copy.id); }
+      for (const w of clip.wires) c.connect(ids.get(w.from), ids.get(w.to), w.port, w.fromPort||0);
+      for(const w of clip.externalInputs||[]){const source=c.nodes.get(w.from),to=ids.get(w.to);if(source&&to&&source.layer===state.layer&&hasOutput(source))c.connect(w.from,to,w.port,w.fromPort||0);}
       const taken = new Set([...c.wires.values()].map(w => `${w.to}:${w.port}`));
       let restoredOutputs = false;
       for (const w of clip.externalOutputs || []) {
         const from = ids.get(w.from), target = c.nodes.get(w.to);
         const key = `${w.to}:${w.port}`;
         if (from && target?.layer === state.layer && Number.isInteger(w.port) && w.port >= 0 && w.port < inputCount(target) && !taken.has(key)) {
-          const id = c.id('w'); c.wires.set(id, { id, from, to: target.id, port: w.port }); taken.add(key); restoredOutputs = true;
+          const id = c.id('w'); c.wires.set(id, { id, from, to: target.id, port: w.port, ...(w.fromPort?{fromPort:w.fromPort}:{}) }); taken.add(key); restoredOutputs = true;
         }
       }
       if (restoredOutputs) c.rebuild();
@@ -941,10 +956,10 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   let memoryPage=0;
   function refreshMemory(){try{const c=state.circuit,values=LogicProgram.memory(c),bits=programBits(),hex=n=>n.toString(16).padStart(bits===16?4:2,'0').toUpperCase();memoryPage=Math.max(0,Math.min(values.length-256,memoryPage))&~255;let text='      '+Array.from({length:16},(_,i)=>hex(i)).join(' ')+'\n';for(let a=memoryPage;a<memoryPage+256;a+=16)text+=hex(a)+': '+values.slice(a,a+16).map(hex).join(' ')+'\n';$('memory-grid').value=text;$('memory-note').textContent=bits===16?'64K words / 128 KiB. Screen RAM is C000–FFFF (RGB565).':'256 bytes.';$('memory-error').textContent='';}catch(error){$('memory-grid').value='';$('memory-error').textContent=error.message;}}
   $('memory-open').onclick=()=>{setDrawer(false);refreshMemory();$('memory-dialog').showModal();};$('memory-go').onclick=()=>{const h=$('memory-page').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(h)){ $('memory-error').textContent='Use a hex page address.';return;}memoryPage=parseInt(h,16);refreshMemory();};$('memory-write').onclick=()=>{try{const a=$('memory-address').value.trim(),v=$('memory-value').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(a)||!/^[0-9a-f]{1,4}$/i.test(v))throw Error('Use hexadecimal addresses and values.');let ok=false;edit(()=>{LogicProgram.writeMemory(state.circuit,parseInt(a,16),parseInt(v,16));ok=true;});if(ok)refreshMemory();}catch(error){$('memory-error').textContent=error.message;}};
-  async function loadFileExample(name){const global={'rgb-counter':'LogicRGBCounter',computer16:'LogicComputer16','computer-v2':'LogicComputerV2','graphical-computer':'LogicGraphicalComputer'}[name];if(window[global])return window[global];return await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='examples/'+name+'.js';script.onload=()=>resolve(window[global]);script.onerror=()=>reject(Error('Example file is missing'));document.head.append(script);});}
+  async function loadFileExample(name){const global={'rgb-counter':'LogicRGBCounter',computer16:'LogicComputer16','computer16-keyboard':'LogicComputer16Keyboard','chips-io':'LogicChipsIO','computer-v2':'LogicComputerV2','graphical-computer':'LogicGraphicalComputer'}[name];if(window[global])return window[global];return await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='examples/'+name+'.js';script.onload=()=>resolve(window[global]);script.onerror=()=>reject(Error('Example file is missing'));document.head.append(script);});}
   function showCounter(){const n=[...state.circuit.nodes.values()].find(n=>n.type==='RGB');if(n){setLayer(n.layer);focusAt(n.x,n.y);}toast('RGB counter: open Control panel and press Run to start.');}
   function requestReplacement(which) {
-    const names = { 'rgb': 'RGB bus', 'rgb-lights': 'RGB lights', 'tunnel': 'layer tunnel', 'adder': 'half adder', 'rgb-counter':'RGB 24-bit counter', 'computer16':'programmable 16-bit computer (128×128 screen)', 'computer-v2':'RGB-8 v2 computer', 'graphical-computer':'original graphical computer' };
+    const names = { 'rgb': 'RGB bus', 'rgb-lights': 'RGB lights', 'tunnel': 'layer tunnel', 'adder': 'half adder', 'rgb-counter':'RGB 24-bit counter', 'computer16':'programmable 16-bit computer (128×128 screen)', 'computer16-keyboard':'keyboard-controlled 16-bit computer', 'chips-io':'chips, buses and keyboard commands', 'computer-v2':'RGB-8 v2 computer', 'graphical-computer':'original graphical computer' };
     pendingReplacement = which; $('confirm-title').textContent = which === 'blank' ? 'Start a blank circuit?' : `Open the ${names[which] || 'half adder'} example?`;
     $('confirm-replace').textContent = which === 'blank' ? 'Start new' : 'Open example';
     $('help-dialog').close(); $('confirm-dialog').showModal();
@@ -952,7 +967,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   $('confirm-dialog').addEventListener('close', async () => {
     if ($('confirm-dialog').returnValue === 'export') { exportFile(); $('confirm-dialog').showModal(); return; }
     if ($('confirm-dialog').returnValue !== 'replace') return;
-    let imported;try{if(['rgb-counter','computer-v2','computer16','graphical-computer'].includes(pendingReplacement))imported=await loadFileExample(pendingReplacement);}catch(error){toast(error.message);return;}checkpoint();if(imported){restore(JSON.stringify(imported));if(pendingReplacement==='rgb-counter')showCounter();changed(false);return;}state.circuit = pendingReplacement === 'blank' ? new Circuit() : example(pendingReplacement);
+    let imported;try{if(['rgb-counter','computer-v2','computer16','computer16-keyboard','chips-io','graphical-computer'].includes(pendingReplacement))imported=await loadFileExample(pendingReplacement);}catch(error){toast(error.message);return;}checkpoint();if(imported){restore(JSON.stringify(imported));if(pendingReplacement==='rgb-counter')showCounter();changed(false);return;}state.circuit = pendingReplacement === 'blank' ? new Circuit() : example(pendingReplacement);
     stopTicks(); state.simulationPending = false; state.simulationSeen.clear();
     state.layer = pendingReplacement === 'rgb-lights' ? 1 : 0; state.selected.clear(); state.wire = null; state.placing = null; state.running = true; state.ioSelection = false; state.relayDrafts.clear(); state.relayOrders.clear(); state.relayGroupId = ''; relayOrderKey = '';
     $('project-name').value = state.circuit.name; state.lastSimulation = state.circuit.settle(); fit(); changed(false); renderLibrary();
@@ -1002,6 +1017,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
     $('tool-drawer').style.removeProperty('transform'); $('drawer-handle').style.removeProperty('left');
   }
   function openTool(name, force) {
+    if(name==='chips'){setDrawer(false);advancedUI.open();return;}
     if (name === 'program') { setDrawer(false); openProgram(); return; }
     if (name === 'help') { setDrawer(false); $('help-dialog').showModal(); return; }
     if (name === 'settings') { setDrawer(false); $('sim-speed').value = state.simSpeed; $('sim-batch').value = state.simBatch; $('theme-select').value = state.theme; $('wire-mode').value=state.wireMode; $('preferences-dialog').showModal(); return; }
@@ -1038,12 +1054,13 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   $('drawer-handle').addEventListener('pointercancel', () => { const open = drawerDrag?.open || false; drawerDrag = null; document.body.classList.remove('drawer-dragging'); setDrawer(open); });
   $('drawer-handle').onclick = e => { if (e.detail === 0 && !suppressDrawerClick) setDrawer(!document.body.classList.contains('drawer-open')); suppressDrawerClick = false; };
   canvas.addEventListener('pointerdown', () => { if (document.body.classList.contains('drawer-open')) setDrawer(false); });
+  advancedUI=LogicAdvancedUI.install({state,$,edit,changed,toast,snapshot,restore,fit,render,updateUI,renderLibrary,requestSimulation,requestReplacement,checkpointBefore:before=>{state.history.push(before);state.future=[];}});
   applyTheme();
   let loaded = false;
   try { const saved = localStorage.getItem(STORE); if (saved) { restoring = true; restore(saved); loaded = true; } }
   catch { toast('The saved circuit could not be restored. Import an exported copy if needed.'); }
   finally { restoring = false; }
-  if (!loaded && ['rgb-counter','graphical-computer','computer-v2','computer16'].includes(initialExample)) {
+  if (!loaded && ['rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io'].includes(initialExample)) {
     try {
       // A local script works on file:// without a server or blocked JSON fetch.
       const data=await loadFileExample(initialExample);

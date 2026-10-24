@@ -1,0 +1,809 @@
+{
+  "format": "logic-studio",
+  "version": 1,
+  "name": "Chips, buses and keyboard commands",
+  "nextId": 52,
+  "chips": [
+    {
+      "id": "chip1",
+      "name": "Half adder",
+      "circuit": {
+        "format": "logic-studio",
+        "version": 1,
+        "name": "Half adder",
+        "nextId": 13,
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "INPUT",
+            "layer": 0,
+            "x": "-3",
+            "y": "-1",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": true,
+            "label": "A"
+          },
+          {
+            "id": "n2",
+            "type": "INPUT",
+            "layer": 0,
+            "x": "-3",
+            "y": "2",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": "B"
+          },
+          {
+            "id": "n3",
+            "type": "XOR",
+            "layer": 0,
+            "x": "0",
+            "y": "-1",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": ""
+          },
+          {
+            "id": "n4",
+            "type": "AND",
+            "layer": 0,
+            "x": "0",
+            "y": "2",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": ""
+          },
+          {
+            "id": "n5",
+            "type": "OUTPUT",
+            "layer": 0,
+            "x": "3",
+            "y": "-1",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": "SUM"
+          },
+          {
+            "id": "n6",
+            "type": "OUTPUT",
+            "layer": 0,
+            "x": "3",
+            "y": "2",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": "CARRY"
+          }
+        ],
+        "wires": [
+          {
+            "id": "w7",
+            "from": "n1",
+            "to": "n3",
+            "port": 0
+          },
+          {
+            "id": "w8",
+            "from": "n2",
+            "to": "n3",
+            "port": 1
+          },
+          {
+            "id": "w9",
+            "from": "n1",
+            "to": "n4",
+            "port": 0
+          },
+          {
+            "id": "w10",
+            "from": "n2",
+            "to": "n4",
+            "port": 1
+          },
+          {
+            "id": "w11",
+            "from": "n3",
+            "to": "n5",
+            "port": 0
+          },
+          {
+            "id": "w12",
+            "from": "n4",
+            "to": "n6",
+            "port": 0
+          }
+        ],
+        "signals": [
+          [
+            "n1",
+            1
+          ],
+          [
+            "n3",
+            1
+          ],
+          [
+            "n5",
+            1
+          ]
+        ],
+        "groups": []
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n2",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-6",
+      "y": "-4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": true,
+      "label": "A"
+    },
+    {
+      "id": "n3",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-6",
+      "y": "-2",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "B"
+    },
+    {
+      "id": "n4",
+      "type": "CHIP",
+      "layer": 0,
+      "x": "-3",
+      "y": "-3",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Reusable half adder",
+      "chipId": "chip1",
+      "chipState": {
+        "format": "logic-studio",
+        "version": 1,
+        "name": "Half adder",
+        "nextId": 13,
+        "nodes": [
+          {
+            "id": "n1",
+            "type": "INPUT",
+            "layer": 0,
+            "x": "-3",
+            "y": "-1",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": true,
+            "label": "A",
+            "driven": 1
+          },
+          {
+            "id": "n2",
+            "type": "INPUT",
+            "layer": 0,
+            "x": "-3",
+            "y": "2",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": "B",
+            "driven": 0
+          },
+          {
+            "id": "n3",
+            "type": "XOR",
+            "layer": 0,
+            "x": "0",
+            "y": "-1",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": ""
+          },
+          {
+            "id": "n4",
+            "type": "AND",
+            "layer": 0,
+            "x": "0",
+            "y": "2",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": ""
+          },
+          {
+            "id": "n5",
+            "type": "OUTPUT",
+            "layer": 0,
+            "x": "3",
+            "y": "-1",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": "SUM"
+          },
+          {
+            "id": "n6",
+            "type": "OUTPUT",
+            "layer": 0,
+            "x": "3",
+            "y": "2",
+            "inputs": 2,
+            "extendible": false,
+            "direction": 1,
+            "on": false,
+            "label": "CARRY"
+          }
+        ],
+        "wires": [
+          {
+            "id": "w7",
+            "from": "n1",
+            "to": "n3",
+            "port": 0
+          },
+          {
+            "id": "w8",
+            "from": "n2",
+            "to": "n3",
+            "port": 1
+          },
+          {
+            "id": "w9",
+            "from": "n1",
+            "to": "n4",
+            "port": 0
+          },
+          {
+            "id": "w10",
+            "from": "n2",
+            "to": "n4",
+            "port": 1
+          },
+          {
+            "id": "w11",
+            "from": "n3",
+            "to": "n5",
+            "port": 0
+          },
+          {
+            "id": "w12",
+            "from": "n4",
+            "to": "n6",
+            "port": 0
+          }
+        ],
+        "signals": [
+          [
+            "n1",
+            1
+          ],
+          [
+            "n3",
+            1
+          ],
+          [
+            "n5",
+            1
+          ]
+        ],
+        "groups": []
+      }
+    },
+    {
+      "id": "n5",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "0",
+      "y": "-4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "SUM"
+    },
+    {
+      "id": "n6",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "0",
+      "y": "-2",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "CARRY"
+    },
+    {
+      "id": "n11",
+      "type": "INPUT",
+      "layer": 0,
+      "x": "-6",
+      "y": "1",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Middle-click: capture keys"
+    },
+    {
+      "id": "n12",
+      "type": "COMMAND",
+      "layer": 0,
+      "x": "-3",
+      "y": "1",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Tab releases capture",
+      "command": "capture_keyboard",
+      "clock": 0
+    },
+    {
+      "id": "n14",
+      "type": "JOIN",
+      "layer": 0,
+      "x": "0",
+      "y": "4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Keyboard byte",
+      "bits": 8,
+      "busValue": 0
+    },
+    {
+      "id": "n15",
+      "type": "SPLIT",
+      "layer": 0,
+      "x": "3",
+      "y": "4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Bit 0 at the top",
+      "bits": 8,
+      "busValue": 0
+    },
+    {
+      "id": "n16",
+      "type": "KEYBOARD",
+      "layer": 0,
+      "x": "-6",
+      "y": "4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "KeyW",
+      "keyCode": "KeyW"
+    },
+    {
+      "id": "n18",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "6",
+      "y": "4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Bit 0"
+    },
+    {
+      "id": "n20",
+      "type": "KEYBOARD",
+      "layer": 0,
+      "x": "-6",
+      "y": "5",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "KeyA",
+      "keyCode": "KeyA"
+    },
+    {
+      "id": "n22",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "6",
+      "y": "5",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Bit 1"
+    },
+    {
+      "id": "n24",
+      "type": "KEYBOARD",
+      "layer": 0,
+      "x": "-6",
+      "y": "6",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "KeyS",
+      "keyCode": "KeyS"
+    },
+    {
+      "id": "n26",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "6",
+      "y": "6",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Bit 2"
+    },
+    {
+      "id": "n28",
+      "type": "KEYBOARD",
+      "layer": 0,
+      "x": "-6",
+      "y": "7",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "KeyD",
+      "keyCode": "KeyD"
+    },
+    {
+      "id": "n30",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "6",
+      "y": "7",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Bit 3"
+    },
+    {
+      "id": "n32",
+      "type": "KEYBOARD",
+      "layer": 0,
+      "x": "-6",
+      "y": "8",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "ArrowUp",
+      "keyCode": "ArrowUp"
+    },
+    {
+      "id": "n34",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "6",
+      "y": "8",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Bit 4"
+    },
+    {
+      "id": "n36",
+      "type": "KEYBOARD",
+      "layer": 0,
+      "x": "-6",
+      "y": "9",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "ArrowLeft",
+      "keyCode": "ArrowLeft"
+    },
+    {
+      "id": "n38",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "6",
+      "y": "9",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Bit 5"
+    },
+    {
+      "id": "n40",
+      "type": "KEYBOARD",
+      "layer": 0,
+      "x": "-6",
+      "y": "10",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "ArrowDown",
+      "keyCode": "ArrowDown"
+    },
+    {
+      "id": "n42",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "6",
+      "y": "10",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Bit 6"
+    },
+    {
+      "id": "n44",
+      "type": "KEYBOARD",
+      "layer": 0,
+      "x": "-6",
+      "y": "11",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "ArrowRight",
+      "keyCode": "ArrowRight"
+    },
+    {
+      "id": "n46",
+      "type": "OUTPUT",
+      "layer": 0,
+      "x": "6",
+      "y": "11",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Bit 7"
+    },
+    {
+      "id": "n49",
+      "type": "BUSINPUT",
+      "layer": 0,
+      "x": "3",
+      "y": "-4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "Edit hex in Properties",
+      "bits": 16,
+      "busValue": 42330
+    },
+    {
+      "id": "n50",
+      "type": "BUSOUTPUT",
+      "layer": 0,
+      "x": "6",
+      "y": "-4",
+      "inputs": 2,
+      "extendible": false,
+      "direction": 1,
+      "on": false,
+      "label": "16-bit word",
+      "bits": 16,
+      "busValue": 0
+    }
+  ],
+  "wires": [
+    {
+      "id": "w7",
+      "from": "n2",
+      "to": "n4",
+      "port": 0
+    },
+    {
+      "id": "w8",
+      "from": "n3",
+      "to": "n4",
+      "port": 1
+    },
+    {
+      "id": "w9",
+      "from": "n4",
+      "to": "n5",
+      "port": 0
+    },
+    {
+      "id": "w10",
+      "from": "n4",
+      "to": "n6",
+      "port": 0,
+      "fromPort": 1
+    },
+    {
+      "id": "w13",
+      "from": "n11",
+      "to": "n12",
+      "port": 0
+    },
+    {
+      "id": "w17",
+      "from": "n16",
+      "to": "n14",
+      "port": 0
+    },
+    {
+      "id": "w19",
+      "from": "n15",
+      "to": "n18",
+      "port": 0
+    },
+    {
+      "id": "w21",
+      "from": "n20",
+      "to": "n14",
+      "port": 1
+    },
+    {
+      "id": "w23",
+      "from": "n15",
+      "to": "n22",
+      "port": 0,
+      "fromPort": 1
+    },
+    {
+      "id": "w25",
+      "from": "n24",
+      "to": "n14",
+      "port": 2
+    },
+    {
+      "id": "w27",
+      "from": "n15",
+      "to": "n26",
+      "port": 0,
+      "fromPort": 2
+    },
+    {
+      "id": "w29",
+      "from": "n28",
+      "to": "n14",
+      "port": 3
+    },
+    {
+      "id": "w31",
+      "from": "n15",
+      "to": "n30",
+      "port": 0,
+      "fromPort": 3
+    },
+    {
+      "id": "w33",
+      "from": "n32",
+      "to": "n14",
+      "port": 4
+    },
+    {
+      "id": "w35",
+      "from": "n15",
+      "to": "n34",
+      "port": 0,
+      "fromPort": 4
+    },
+    {
+      "id": "w37",
+      "from": "n36",
+      "to": "n14",
+      "port": 5
+    },
+    {
+      "id": "w39",
+      "from": "n15",
+      "to": "n38",
+      "port": 0,
+      "fromPort": 5
+    },
+    {
+      "id": "w41",
+      "from": "n40",
+      "to": "n14",
+      "port": 6
+    },
+    {
+      "id": "w43",
+      "from": "n15",
+      "to": "n42",
+      "port": 0,
+      "fromPort": 6
+    },
+    {
+      "id": "w45",
+      "from": "n44",
+      "to": "n14",
+      "port": 7
+    },
+    {
+      "id": "w47",
+      "from": "n15",
+      "to": "n46",
+      "port": 0,
+      "fromPort": 7
+    },
+    {
+      "id": "w48",
+      "from": "n14",
+      "to": "n15",
+      "port": 0
+    },
+    {
+      "id": "w51",
+      "from": "n49",
+      "to": "n50",
+      "port": 0
+    }
+  ],
+  "signals": [
+    [
+      "n2",
+      1
+    ],
+    [
+      "n4",
+      1
+    ],
+    [
+      "n5",
+      1
+    ],
+    [
+      "n49",
+      42330
+    ],
+    [
+      "n50",
+      42330
+    ]
+  ],
+  "groups": [],
+  "editor": {
+    "layer": 0,
+    "running": true,
+    "simSpeed": 0,
+    "simBatch": 1,
+    "camera": {
+      "x": "0",
+      "y": "4",
+      "ox": 0,
+      "oy": 0,
+      "scale": 0.43
+    }
+  }
+}

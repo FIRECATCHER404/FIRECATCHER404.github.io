@@ -1,16 +1,20 @@
 /* Logic Studio: dependency-free circuit model. Works from file:// and in Node. */
 (function (root, factory) {
   const api = factory();
-  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (typeof module === 'object' && module.exports) { module.exports = api; require('./advanced.js'); }
   else root.Logic = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const MAX_LAYERS = 256;
   const GATES = ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR'];
-  const SPECIAL = ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN'];
+  const SPECIAL = ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN', 'BUSINPUT', 'BUSOUTPUT', 'JOIN', 'SPLIT', 'CHIP', 'KEYBOARD', 'COMMAND'];
   const key = (layer, x, y) => `${layer}:${x}:${y}`;
   const comparePosition = (a, b) => a.x < b.x ? -1 : a.x > b.x ? 1 : a.y < b.y ? -1 : a.y > b.y ? 1 : a.id.localeCompare(b.id);
   function inputCount(node) {
+    if (node.type === 'CHIP') return (node.pinsIn || []).length;
+    if (['BUSINPUT','KEYBOARD'].includes(node.type)) return 0;
+    if (node.type === 'JOIN') return node.bits || 8;
+    if (['BUSOUTPUT','SPLIT','COMMAND'].includes(node.type)) return 1;
     if (['INPUT', 'RGB', 'PULSE', 'SCREEN'].includes(node.type)) return 0;
     if (node.type === 'REGISTER') return 2;
     if (node.type === 'RAM') return (node.addressBits || 8) + 4 + (node.addressBits === 16 ? 1 : 0);
@@ -19,7 +23,10 @@
     if (['NOT', 'OUTPUT', 'TUNNEL'].includes(node.type)) return 1;
     return node.inputs;
   }
-  function hasOutput(node) { return !['OUTPUT', 'RGB', 'RGBTUNNEL', 'SCREEN'].includes(node.type); }
+  function hasOutput(node) { return !['OUTPUT', 'RGB', 'RGBTUNNEL', 'SCREEN', 'BUSOUTPUT'].includes(node.type); }
+  function outputCount(n) { return n.type === 'CHIP' ? (n.pinsOut || []).length : n.type === 'SPLIT' ? n.bits || 8 : +hasOutput(n); }
+  function inputWidth(n, p = 0) { return n.type === 'CHIP' ? n.pinsIn[p]?.width : ['SPLIT','BUSOUTPUT'].includes(n.type) ? n.bits || 8 : 1; }
+  function outputWidth(n, p = 0) { return n.type === 'CHIP' ? n.pinsOut[p]?.width : ['JOIN','BUSINPUT'].includes(n.type) ? n.bits || 8 : 1; }
   function nodeSize(node) { return node.type === 'SCREEN' && node.screenPixels !== 1 ? 8 : 1; }
   function gate(type, bits) {
     switch (type) {
@@ -64,14 +71,22 @@
     };
     if(n.type==='SCREEN'){n.screenPixels=data.screenPixels??128;n.screenBase=data.screenBase??49152;n.screenPrefix=data.screenPrefix??'DATA';if(![1,128].includes(n.screenPixels)||!Number.isInteger(n.screenBase)||n.screenBase<0||n.screenBase>65536-n.screenPixels*n.screenPixels||typeof n.screenPrefix!=='string'||!n.screenPrefix||n.screenPrefix.length>80)throw new Error('Invalid screen memory region.');}
     if(['RAM','ROM'].includes(n.type)&&addressBits===16){Object.defineProperty(n,'storage',{value:Uint8Array.from(memory,c=>+(c==='1')),writable:true});Object.defineProperty(n,'memory',{enumerable:true,get(){return Array.from(this.storage).join('');},set(value){this.storage=Uint8Array.from(value,c=>+(c==='1'));}});if(data.memoryHex!==undefined){if(typeof data.memoryHex!=='string'||!/^[0-9a-f]{16384}$/i.test(data.memoryHex))throw new Error('Invalid packed 64K memory plane.');for(let a=0;a<16384;a++){const v=parseInt(data.memoryHex[a],16);for(let b=0;b<4;b++)n.storage[a*4+b]=(v>>(3-b))&1;}}n.memoryVersion=0;}
+    if (['BUSINPUT','BUSOUTPUT','JOIN','SPLIT'].includes(n.type)) {
+      n.bits=data.bits??8;if(![8,16].includes(n.bits))throw Error('Buses use 8 or 16 bits.');
+      n.busValue=data.busValue??0;if(!Number.isInteger(n.busValue)||n.busValue<0||n.busValue>=2**n.bits)throw Error('Bus value is out of range.');
+    }
+    if(n.type==='KEYBOARD'){n.keyCode=data.keyCode??'KeyW';if(!/^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Enter|Escape|Backspace|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right))$/.test(n.keyCode))throw Error('Choose a supported keyboard key.');}
+    if(n.type==='COMMAND'){n.command=data.command??'capture_keyboard';n.clock=data.clock??0;if(!['capture_keyboard','release_keyboard'].includes(n.command)||![0,1].includes(n.clock))throw Error('Invalid command settings.');}
+    if(n.type==='CHIP'){n.chipId=String(data.chipId??'');if(data.chipState)n.chipState=data.chipState;}
     return n;
   }
   class Circuit {
     constructor() {
       this.nodes = new Map(); this.wires = new Map(); this.groups = new Map(); this.nextId = 1;
+      this.chips = new Map(); this.children = new Map(); this.keyDown = new Set(); this.keyboardCaptured = false; this.commands = [];
       this.values = new Map(); this.name = 'Untitled circuit'; this.rebuild();
     }
-    id(prefix) { let id; do { id = `${prefix}${this.nextId++}`; } while (this.nodes.has(id) || this.wires.has(id) || this.groups.has(id)); return id; }
+    id(prefix) { let id; do { id = `${prefix}${this.nextId++}`; } while (this.nodes.has(id) || this.wires.has(id) || this.groups.has(id) || this.chips.has(id)); return id; }
     selectIO(ids) {
       const nodes = [...new Set(ids)].map(id => this.nodes.get(id)).filter(Boolean);
       const inputs = nodes.filter(n => n.type === 'INPUT');
@@ -108,6 +123,7 @@
     }
     rebuild() {
       this.needsSettle = true;
+      this.prepareChips?.();
       this.largeMemory=[...this.nodes.values()].some(n=>n.addressBits===16);this.topologyVersion=(this.topologyVersion||0)+1;this.wireLayers=new Map();this.screens=new Set();this.positions = new Map(); this.layers = new Map(); this.incoming = new Map(); this.dependents = new Map();
       this.logicNodes=[];this.pulses = new Set(); this.registers = new Set(); this.memories = new Set();
       for (const n of this.nodes.values()) {
@@ -146,7 +162,7 @@
     }
     at(layer, x, y) { return this.positions.get(key(layer, x, y)); }
     addNode(data) {
-      const n = validateNode(data); n.id ||= this.id('n');
+      const n = validateNode(data); this.prepareChip?.(n); n.id ||= this.id('n');
       if (this.nodes.has(n.id) || this.wires.has(n.id) || this.groups.has(n.id)) throw new Error('Duplicate identifier.');
       if (this.at(n.layer, n.x, n.y)) throw new Error('That grid square already contains a node.');
       this.nodes.set(n.id, n);
@@ -155,11 +171,12 @@
     }
     updateNode(id, changes) {
       const old = this.nodes.get(id); if (!old) throw new Error('Node not found.');
-      const n = validateNode({ ...old, ...changes, id });
+      const n = validateNode({ ...old, ...changes, id }); this.prepareChip?.(n);
       if ((n.type !== old.type || n.layer !== old.layer) && [...this.groups.values()].some(g => g.nodeIds.includes(id))) throw new Error('Ungroup this node before changing its type or layer.');
       const occupied = this.at(n.layer, n.x, n.y);
       if (occupied && occupied.id !== id) throw new Error('That grid square already contains a node.');
       const removed = [...this.wires.values()].filter(w => w.to === id && w.port >= inputCount(n));
+      for(const w of this.wires.values()){if(removed.includes(w))continue;const a=w.from===id?n:this.nodes.get(w.from),b=w.to===id?n:this.nodes.get(w.to),fp=w.fromPort||0;if(fp>=outputCount(a)||outputWidth(a,fp)!==inputWidth(b,w.port))throw Error('Disconnect incompatible wires before changing bus width or pins.');}
       removed.forEach(w => this.wires.delete(w.id)); this.nodes.set(id, n);
       try { this.rebuild(); } catch (error) {
         this.nodes.set(id, old); removed.forEach(w => this.wires.set(w.id, w)); this.rebuild(); throw error;
@@ -186,19 +203,21 @@
       }
       this.rebuild();
     }
-    connect(from, to, port = 0) {
+    connect(from, to, port = 0, fromPort = 0) {
       const a = this.nodes.get(from), b = this.nodes.get(to);
       if (!a || !b || !hasOutput(a) || a.layer !== b.layer || !Number.isInteger(port) || port < 0 || port >= inputCount(b)) throw new Error('Connect an output to an input on the same layer.');
+      if(!Number.isInteger(fromPort)||fromPort<0||fromPort>=outputCount(a)||outputWidth(a,fromPort)!==inputWidth(b,port))throw Error('Pin widths must match. Use a bus joiner or splitter.');
       const old = this.incoming.get(to)[port]; if (old) this.wires.delete(old.id);
-      const wire = { id: this.id('w'), from, to, port };
+      const wire = { id: this.id('w'), from, to, port, ...(fromPort ? {fromPort} : {}) };
       this.wires.set(wire.id, wire); this.rebuild(); return wire;
     }
     disconnect(id) { this.wires.delete(id); this.rebuild(); }
     bit(id, port, values = this.values) {
-      const w = this.incoming.get(id)?.[port]; return w ? +!!values.get(w.from) : 0;
+      const w = this.incoming.get(id)?.[port]; return w ? +!!this.signal(w.from,w.fromPort||0,values) : 0;
     }
     evaluate(n, values = this.values) {
-      if(n.type==='SCREEN')return 0;if (n.type === 'INPUT') return +n.on;
+      if(n.type==='SCREEN')return 0;if (n.type === 'INPUT') return n.driven ?? +n.on;
+      if(['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','CHIP','KEYBOARD','COMMAND'].includes(n.type))return this.evaluateAdvanced(n,values);
       // Sequential outputs hold during combinational propagation. Only an
       // explicit frame flips pulses; registers are sampled in parallel below.
       if (n.type === 'PULSE' || n.type === 'REGISTER') return values.get(n.id) || 0;
@@ -237,7 +256,8 @@
     memoryBit(n,address){return n.storage?n.storage[address]:+(n.memory[address]==='1');}
     sampleMemory(n,values=this.values){const k=n.addressBits||8,clock=this.bit(n.id,k+2,values),rise=clock&&!n.clock;return {clock,address:this.memoryAddress(n,values),data:this.bit(n.id,k,values),clear:!!(rise&&this.bit(n.id,k+3,values)),write:!!(rise&&this.bit(n.id,k+1,values)),fill:!!(k===16&&rise&&this.bit(n.id,k+4,values))};}
     commitMemory(n,s){n.clock=s.clock;let changed=false;if(n.storage){if(s.clear){changed=n.storage.some(Boolean);if(changed)n.storage.fill(0);}else if(s.fill){for(let a=49152;a<65536;a++)if(n.storage[a]!==s.data){changed=true;break;}if(changed)n.storage.fill(s.data,49152);}else if(s.write&&n.storage[s.address]!==s.data){n.storage[s.address]=s.data;changed=true;}if(changed)n.memoryVersion++;}else{let m=n.memory;if(s.clear)m='0'.repeat(256);else if(s.write&&m[s.address]!==String(s.data))m=m.slice(0,s.address)+s.data+m.slice(s.address+1);changed=m!==n.memory;n.memory=m;}return changed;}
-    settle(seed) {
+    settle(seed, capture = true) {
+      this.childUnstable = false;
       const queue = seed ? [...seed] : [...this.logicNodes]; const queued = new Set(queue);
       const limit = Math.max(4096, this.nodes.size * 64); let head = 0, changes = 0;
       const enqueueDependents = id => {
@@ -246,12 +266,13 @@
       while (true) {
         while (head < queue.length && changes < limit) {
           const id = queue[head++]; queued.delete(id); const n = this.nodes.get(id); if (!n) continue;
-          const value = this.evaluate(n);
-          if (value !== (this.values.get(id) ?? 0)) {
+          this.portsChanged = false; const value = this.evaluate(n);
+          if (this.portsChanged || value !== (this.values.get(id) ?? 0)) {
             this.values.set(id, value); changes++; enqueueDependents(id);
           }
         }
         if (head < queue.length || changes >= limit) break;
+        if (!capture) break;
         // Settle D and CLK first, then capture all registers together. A chain
         // of registers sharing a clock therefore advances exactly one stage.
         const samples = [...this.registers].map(id => { const n = this.nodes.get(id); return [n, this.sampleRegister(n)]; });
@@ -266,14 +287,16 @@
         // Sample RAM with the same old address/data/clock as CPU registers.
         // Commit storage only after every sequential element has sampled.
         for (const [n,sample] of memorySamples)if(this.commitMemory(n,sample)){changes++;captured=true;if(!queued.has(n.id)){queued.add(n.id);queue.push(n.id);}}
+        for(const id of this.captureAdvanced?.()||[]){changes++;captured=true;if(!queued.has(id)){queued.add(id);queue.push(id);}}
         if (!captured) break;
       }
-      const stable = head === queue.length && changes < limit;
+      const stable = head === queue.length && changes < limit && !this.childUnstable;
       this.needsSettle = !stable;
       this.lastResult = { stable, oscillating: !stable, changes, evaluations: head };
       return this.lastResult;
     }
     step() {
+      this.flipChildren?.();
       const next = new Map(); let changes = 0;
       const clocks = [], memorySamples = [];
       for (const n of this.nodes.values()) {
@@ -285,6 +308,7 @@
       }
       for (const [n, clock] of clocks) n.clock = clock;
       for(const [n,sample]of memorySamples)if(this.commitMemory(n,sample))changes++;
+      for(const id of this.captureAdvanced?.()||[])changes++;
       this.values = next; this.needsSettle = !!changes; this.lastResult = { stable: !changes, oscillating: false, changes, evaluations: this.nodes.size }; return this.lastResult;
     }
     advanceFrame() {
@@ -296,18 +320,20 @@
         this.values.set(id, 1 - (this.values.get(id) || 0)); changedSources++;
         for (const to of this.dependents.get(id)) affected.add(to);
       }
+      for(const id of this.flipChildren?.()||[])affected.add(id);
       const result = this.settle(affected); result.changes += changedSources; return result;
     }
     toJSON() {
       return { format: 'logic-studio', version: 1, name: this.name, nextId: this.nextId,
-        nodes: [...this.nodes.values()].map(n=>{if(!n.storage)return {...n,x:String(n.x),y:String(n.y)};const data={};for(const k of Object.keys(n))if(k!=='memory'&&k!=='memoryVersion')data[k]=n[k];data.x=String(n.x);data.y=String(n.y);let packed='';const digits='0123456789ABCDEF';for(let a=0;a<65536;a+=4)packed+=digits[(n.storage[a]<<3)|(n.storage[a+1]<<2)|(n.storage[a+2]<<1)|n.storage[a+3]];data.memoryHex=packed;return data;}), wires: [...this.wires.values()].map(w => ({ ...w })),
+        ...(this.chips.size?{chips:[...this.chips.values()]}:{}),
+        nodes: [...this.nodes.values()].map(n=>{if(n.type==='CHIP'){const child=this.children.get(n.id);return {...n,x:String(n.x),y:String(n.y),pinsIn:undefined,pinsOut:undefined,...(child?{chipState:child.toJSON()}: {})};}if(!n.storage)return {...n,x:String(n.x),y:String(n.y)};const data={};for(const k of Object.keys(n))if(k!=='memory'&&k!=='memoryVersion')data[k]=n[k];data.x=String(n.x);data.y=String(n.y);let packed='';const digits='0123456789ABCDEF';for(let a=0;a<65536;a+=4)packed+=digits[(n.storage[a]<<3)|(n.storage[a+1]<<2)|(n.storage[a+2]<<1)|n.storage[a+3]];data.memoryHex=packed;return data;}), wires: [...this.wires.values()].map(w => ({ ...w })),
         signals: [...this.values.entries()], groups: [...this.groups.values()].map(g => ({ ...g, nodeIds: this.groupNodes(g.id).map(n => n.id) })) };
     }
     static fromJSON(data) {
       if (!data || data.format !== 'logic-studio' || data.version !== 1 || !Array.isArray(data.nodes) || !Array.isArray(data.wires)) throw new Error('This is not a supported Logic Studio circuit.');
-      const c = new Circuit(); c.name = typeof data.name === 'string' ? data.name.slice(0, 100) : 'Imported circuit';
+      const c = new Circuit(); if(data.chips!==undefined){if(!Array.isArray(data.chips))throw Error('Invalid chip library.');for(const def of data.chips){if(!def.id||c.chips.has(def.id))throw Error('Invalid or duplicate chip definition.');c.chips.set(def.id,def);}} c.name = typeof data.name === 'string' ? data.name.slice(0, 100) : 'Imported circuit';
       for (const raw of data.nodes) {
-        const n = validateNode(raw);
+        const n = validateNode(raw); c.prepareChip?.(n);
         if (!n.id || n.id.length > 100 || c.nodes.has(n.id)) throw new Error('Invalid or duplicate node identifier.');
         if (c.positions.has(key(n.layer, n.x, n.y))) throw new Error('Two nodes occupy the same grid square.');
         c.nodes.set(n.id, n); c.positions.set(key(n.layer, n.x, n.y), n);
@@ -316,8 +342,9 @@
       for (const raw of data.wires) {
         const a = c.nodes.get(raw.from), b = c.nodes.get(raw.to);
         if (typeof raw.id !== 'string' || !raw.id || raw.id.length > 100 || c.wires.has(raw.id) || c.nodes.has(raw.id) || !a || !b || a.layer !== b.layer || !hasOutput(a) || !Number.isInteger(raw.port) || raw.port < 0 || raw.port >= inputCount(b)) throw new Error('Invalid wire in circuit file.');
+        const fp=raw.fromPort??0;if(!Number.isInteger(fp)||fp<0||fp>=outputCount(a)||outputWidth(a,fp)!==inputWidth(b,raw.port))throw Error('Invalid output pin or bus width.');
         const k = `${raw.to}:${raw.port}`; if (occupied.has(k)) throw new Error('An input has multiple wires.'); occupied.add(k);
-        c.wires.set(raw.id, { id: raw.id, from: raw.from, to: raw.to, port: raw.port });
+        c.wires.set(raw.id, { id: raw.id, from: raw.from, to: raw.to, port: raw.port, ...(fp?{fromPort:fp}:{}) });
       }
       c.nextId = Number.isSafeInteger(data.nextId) && data.nextId > 0 ? data.nextId : c.nodes.size + c.wires.size + 1;
       c.rebuild();
@@ -333,7 +360,7 @@
       if (Array.isArray(data.signals)) for (const entry of data.signals) {
         if (!Array.isArray(entry) || entry.length !== 2) throw new Error('Invalid signal state.');
         const [id, v] = entry; const n = c.nodes.get(id);
-        if (!n || !Number.isInteger(v) || v < 0 || v > (['RGB', 'RGBTUNNEL'].includes(n.type) ? 0xffffff : 1)) throw new Error('Invalid signal state.');
+        if (!n || !Number.isInteger(v) || v < 0 || v > (['RGB', 'RGBTUNNEL'].includes(n.type) ? 0xffffff : ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','CHIP'].includes(n.type) ? 65535 : 1)) throw new Error('Invalid signal state.');
         c.values.set(id, v);
       }
       return c;
@@ -383,5 +410,5 @@
     }
     c.settle(); return c;
   }
-  return { Circuit, MAX_LAYERS, GATES, inputCount, hasOutput, nodeSize, gate, example, key, comparePosition };
+  return { Circuit, MAX_LAYERS, GATES, inputCount, hasOutput, outputCount, inputWidth, outputWidth, nodeSize, gate, example, key, comparePosition };
 });

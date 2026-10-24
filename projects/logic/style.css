@@ -11,4 +11,11 @@ textarea{font:15px/1.8 Consolas,monospace;letter-spacing:1px;resize:vertical;bac
 
 #program-dialog{width:min(720px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto}.program-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0}.program-row .field{flex:1;min-width:95px;margin:0}.program-row button{flex-shrink:0}.program-row input{font-family:Consolas,monospace}#program-status{white-space:pre-wrap;font:12px/1.8 Consolas,monospace;border:1px solid var(--line);padding:10px;margin:12px 0}#program-watch-value{font:16px Consolas,monospace;padding:5px}#program-dialog .dialog-actions{flex-wrap:wrap}#program-byte-help p{font-size:11px}#program-bytes{font-size:14px;line-height:1.5;letter-spacing:.5px;min-height:180px}
 
-.desktop-link{display:block;padding:14px 18px;color:inherit;font-size:13px;text-decoration:none}.desktop-link:hover{background:var(--hover,#eee)}
+/* Hidden unless explicitly editing a chip or capturing input. */
+#chip-edit-bar{position:fixed;top:8px;right:8px;z-index:50;padding:8px;display:flex;gap:8px;align-items:center;max-width:calc(100vw - 36px);flex-wrap:wrap}
+#chip-edit-bar[hidden],#keyboard-capture-indicator[hidden]{display:none}
+#keyboard-capture-indicator{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);padding:6px 12px;font:12px Arial;z-index:45;pointer-events:none;white-space:nowrap}
+.chip-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:10px 0;border-bottom:1px solid var(--line,#ddd)}
+.chip-row strong{flex:1}.chip-row small{width:100%}#advanced-error{color:#b54a4a}#chips-dialog{max-width:560px}#tool-drawer{overflow-y:auto}
+
+.desktop-link{display:block;margin:10px 18px;color:inherit;font-size:12px;text-decoration:none}
