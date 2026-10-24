@@ -20,6 +20,7 @@
     return node.inputs;
   }
   function hasOutput(node) { return !['OUTPUT', 'RGB', 'RGBTUNNEL', 'SCREEN'].includes(node.type); }
+  function nodeSize(node) { return node.type === 'SCREEN' && node.screenPixels !== 1 ? 8 : 1; }
   function gate(type, bits) {
     switch (type) {
       case 'AND': return +bits.every(Boolean);
@@ -61,7 +62,7 @@
       ...(data.type === 'REGISTER' ? { clock: data.clock ?? 0 } : {}),
       ...(['RAM', 'ROM'].includes(data.type) ? { memory, ...(addressBits !== 8 ? { addressBits } : {}), ...(data.type === 'RAM' ? { clock: data.clock ?? 0 } : {}) } : {})
     };
-    if(n.type==='SCREEN'){n.screenBase=data.screenBase??49152;n.screenPrefix=data.screenPrefix??'DATA';if(!Number.isInteger(n.screenBase)||n.screenBase<0||n.screenBase>49152||typeof n.screenPrefix!=='string'||!n.screenPrefix||n.screenPrefix.length>80)throw new Error('Invalid screen memory region.');}
+    if(n.type==='SCREEN'){n.screenPixels=data.screenPixels??128;n.screenBase=data.screenBase??49152;n.screenPrefix=data.screenPrefix??'DATA';if(![1,128].includes(n.screenPixels)||!Number.isInteger(n.screenBase)||n.screenBase<0||n.screenBase>65536-n.screenPixels*n.screenPixels||typeof n.screenPrefix!=='string'||!n.screenPrefix||n.screenPrefix.length>80)throw new Error('Invalid screen memory region.');}
     if(['RAM','ROM'].includes(n.type)&&addressBits===16){Object.defineProperty(n,'storage',{value:Uint8Array.from(memory,c=>+(c==='1')),writable:true});Object.defineProperty(n,'memory',{enumerable:true,get(){return Array.from(this.storage).join('');},set(value){this.storage=Uint8Array.from(value,c=>+(c==='1'));}});if(data.memoryHex!==undefined){if(typeof data.memoryHex!=='string'||!/^[0-9a-f]{16384}$/i.test(data.memoryHex))throw new Error('Invalid packed 64K memory plane.');for(let a=0;a<16384;a++){const v=parseInt(data.memoryHex[a],16);for(let b=0;b<4;b++)n.storage[a*4+b]=(v>>(3-b))&1;}}n.memoryVersion=0;}
     return n;
   }
@@ -108,12 +109,13 @@
     rebuild() {
       this.needsSettle = true;
       this.largeMemory=[...this.nodes.values()].some(n=>n.addressBits===16);this.topologyVersion=(this.topologyVersion||0)+1;this.wireLayers=new Map();this.screens=new Set();this.positions = new Map(); this.layers = new Map(); this.incoming = new Map(); this.dependents = new Map();
-      this.pulses = new Set(); this.registers = new Set(); this.memories = new Set();
+      this.logicNodes=[];this.pulses = new Set(); this.registers = new Set(); this.memories = new Set();
       for (const n of this.nodes.values()) {
+        if(n.type!=='SCREEN')this.logicNodes.push(n.id);
         if (n.type === 'PULSE') this.pulses.add(n.id);
         if (n.type === 'REGISTER') this.registers.add(n.id);
         if (n.type === 'RAM') this.memories.add(n.id);if(n.type==='SCREEN')this.screens.add(n.id);
-        if(n.type==='SCREEN')for(let y=0n;y<8n;y++)for(let x=0n;x<8n;x++){const k=key(n.layer,n.x+x,n.y+y);if(this.positions.has(k))throw new Error('Screen overlaps another component.');this.positions.set(k,n);}else{const k=key(n.layer,n.x,n.y);if(this.positions.has(k))throw new Error('That grid square is occupied.');this.positions.set(k,n);}
+        if(n.type==='SCREEN')for(let y=0n;y<BigInt(nodeSize(n));y++)for(let x=0n;x<BigInt(nodeSize(n));x++){const k=key(n.layer,n.x+x,n.y+y);if(this.positions.has(k))throw new Error('Screen overlaps another component.');this.positions.set(k,n);}else{const k=key(n.layer,n.x,n.y);if(this.positions.has(k))throw new Error('That grid square is occupied.');this.positions.set(k,n);}
         if (!this.layers.has(n.layer)) this.layers.set(n.layer, new Map());
         this.layers.get(n.layer).set(`${n.x}:${n.y}`, n);
         this.incoming.set(n.id, []); this.dependents.set(n.id, new Set());
@@ -236,7 +238,7 @@
     sampleMemory(n,values=this.values){const k=n.addressBits||8,clock=this.bit(n.id,k+2,values),rise=clock&&!n.clock;return {clock,address:this.memoryAddress(n,values),data:this.bit(n.id,k,values),clear:!!(rise&&this.bit(n.id,k+3,values)),write:!!(rise&&this.bit(n.id,k+1,values)),fill:!!(k===16&&rise&&this.bit(n.id,k+4,values))};}
     commitMemory(n,s){n.clock=s.clock;let changed=false;if(n.storage){if(s.clear){changed=n.storage.some(Boolean);if(changed)n.storage.fill(0);}else if(s.fill){for(let a=49152;a<65536;a++)if(n.storage[a]!==s.data){changed=true;break;}if(changed)n.storage.fill(s.data,49152);}else if(s.write&&n.storage[s.address]!==s.data){n.storage[s.address]=s.data;changed=true;}if(changed)n.memoryVersion++;}else{let m=n.memory;if(s.clear)m='0'.repeat(256);else if(s.write&&m[s.address]!==String(s.data))m=m.slice(0,s.address)+s.data+m.slice(s.address+1);changed=m!==n.memory;n.memory=m;}return changed;}
     settle(seed) {
-      const queue = seed ? [...seed] : [...this.nodes.keys()]; const queued = new Set(queue);
+      const queue = seed ? [...seed] : [...this.logicNodes]; const queued = new Set(queue);
       const limit = Math.max(4096, this.nodes.size * 64); let head = 0, changes = 0;
       const enqueueDependents = id => {
         for (const to of this.dependents.get(id)) if (!queued.has(to)) { queued.add(to); queue.push(to); }
@@ -381,5 +383,5 @@
     }
     c.settle(); return c;
   }
-  return { Circuit, MAX_LAYERS, GATES, inputCount, hasOutput, gate, example, key, comparePosition };
+  return { Circuit, MAX_LAYERS, GATES, inputCount, hasOutput, nodeSize, gate, example, key, comparePosition };
 });
