@@ -6,4 +6,7 @@
 .component-icon:is(.gates,.sequential){width:34px;height:26px}.component-icon:is(.gates,.sequential) svg{display:block;width:32px;height:24px}
 textarea{font:15px/1.8 Consolas,monospace;letter-spacing:1px;resize:vertical;background:var(--inset);color:var(--text);border:1px solid var(--line);padding:9px;width:100%}textarea:focus-visible{outline:1px solid var(--text);outline-offset:2px}#program-error{border-left:2px solid var(--muted);padding-left:8px;color:var(--text)}
 
+#canvas{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+@media (pointer:coarse){.context-menu{max-height:calc(100dvh - 24px);overflow-y:auto}.drawer-handle{width:44px;height:44px;font-size:27px;background:var(--bg)}.context-menu button{min-height:44px}.field input,.field select,.field textarea{font-size:16px}}
+
 .desktop-link{display:block;padding:14px 18px;color:inherit;font-size:13px;text-decoration:none}.desktop-link:hover{background:var(--hover,#eee)}

@@ -172,6 +172,7 @@
       else desc += `Signal ${c.values.get(n.id) || 0}${n.type === 'INPUT' ? ` · switch ${n.on ? 'on' : 'off'}` : ''}`;
       $('selected-description').textContent = desc; $('selected-description').style.whiteSpace = 'pre-line';
       if (n.type === 'INPUT') addAction('Toggle', () => toggleInput(n));
+      addAction('Properties', () => properties(n));
       if (n.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN'].includes(n.type)) addAction('Settings', () => settings(n));
       if (['TUNNEL','RGBTUNNEL'].includes(n.type)) addAction('Follow ↗', () => { setLayer(n.layer + n.direction); focusAt(n.x, n.y); });
     } else { $('selected-type').textContent = `${chosen.length} components`; $('selected-description').textContent = 'Drag to move together. Copy, paste, or delete the selection.'; }
@@ -524,7 +525,7 @@
           ctx.fillStyle = ink; ctx.font = `${s * .24}px Arial,sans-serif`; ctx.fillText(n.direction === 1 ? '↑' : '↓', p.x + s * .5, p.y + s * .61);
           ctx.font = `${s * .075}px Consolas,monospace`; ctx.fillText(`L${String(n.layer + n.direction + 1).padStart(3, '0')}`, p.x + s * .5, p.y + s * .8);
         } else if (n.type === 'RAM' || n.type === 'ROM') {
-          ctx.font=`${s*.1}px Arial,sans-serif`;ctx.fillText((n.addressBits===16?'64K':'256')+' × 1',p.x+s*.5,p.y+s*.59);ctx.font=`${s*.075}px Consolas,monospace`;ctx.fillText('A='+c.memoryAddress(n).toString(16).toUpperCase().padStart(n.addressBits===16?4:2,'0')+'  Q='+value,p.x+s*.5,p.y+s*.75);
+          ctx.font=`${s*.1}px Arial,sans-serif`;ctx.fillText((n.addressBits===16?'64K':'256')+' × 1',p.x+s*.5,p.y+s*.59);ctx.font=`${s*.075}px Consolas,monospace`;ctx.fillText('A='+state.circuit.memoryAddress(n).toString(16).toUpperCase().padStart(n.addressBits===16?4:2,'0')+'  Q='+value,p.x+s*.5,p.y+s*.75);
         } else if (n.type === 'PULSE' || n.type === 'REGISTER') {
           GateSymbols.draw(ctx, n.type, inputCount(n), p.x, p.y, s, ink);
           ctx.fillStyle = ink;
@@ -605,6 +606,7 @@
     if (h) {
       if (!state.selected.has(h.node.id)) { state.selected = new Set([h.node.id]); updateUI(); render(); }
       item('Copy', 'Ctrl+C', () => copy());item('Full copy', 'Ctrl+Shift+C', () => copy(true));
+      item('Properties…', '', () => properties(h.node));
       if (h.node.type === 'INPUT') item('Toggle input', 'Enter', () => toggleInput(h.node));
       if (['INPUT', 'OUTPUT'].includes(h.node.type)) item('Group / title…', 'G', () => groupDialog());
       if (h.node.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN'].includes(h.node.type)) item('Settings…', '', () => settings(h.node));
@@ -617,8 +619,35 @@
       const wire = hitWire(event.clientX, event.clientY); if (!wire) { hideContext(); return; }
       item('Delete wire', '×', () => edit(() => state.circuit.disconnect(wire.id)), true);
     }
-    menu.hidden = false; const bounds = menu.getBoundingClientRect(); menu.style.left = `${Math.min(event.clientX, innerWidth - bounds.width - 10)}px`; menu.style.top = `${Math.min(event.clientY, innerHeight - bounds.height - 40)}px`;
+    menu.hidden = false; const bounds = menu.getBoundingClientRect(); menu.style.left = `${Math.max(10, Math.min(event.clientX, innerWidth - bounds.width - 10))}px`; menu.style.top = `${Math.max(10, Math.min(event.clientY, innerHeight - bounds.height - 40))}px`;
   }
+  let propertyNodeId = null;
+  function properties(n) {
+    propertyNodeId = n.id;
+    $('properties-title').textContent = `${n.type} properties`;
+    $('property-label').value = n.label;
+    const editable = ['INPUT', 'REGISTER'].includes(n.type);
+    $('property-state-field').hidden = !editable;
+    $('property-state-label').textContent = n.type === 'REGISTER' ? 'Stored bit (Q)' : 'Switch state';
+    $('property-state').value = String(n.type === 'INPUT' ? +n.on : state.circuit.values.get(n.id) || 0);
+    $('property-note').textContent = n.type === 'REGISTER' ? 'Sets the stored bit now. The next rising clock edge can capture new data.' : 'Labels appear above the node.';
+    $('properties-dialog').showModal();
+    $('property-label').focus();
+  }
+  $('properties-form').onsubmit = e => {
+    e.preventDefault();
+    const c = state.circuit, n = c.nodes.get(propertyNodeId); if (!n) return;
+    const value = Number($('property-state').value), changes = { label: $('property-label').value };
+    if (n.type === 'INPUT') changes.on = !!value;
+    if (n.type === 'REGISTER') changes.clock = c.bit(n.id, 1);
+    let success = false;
+    edit(() => {
+      c.updateNode(n.id, changes);
+      if (['INPUT', 'REGISTER'].includes(n.type)) c.values.set(n.id, value);
+      success = true;
+    });
+    if (success) { $('properties-dialog').close(); propertyNodeId = null; }
+  };
   function settings(n, placing = false) {
     pendingSettings = { node: n, placing }; $('settings-title').textContent = placing ? `Place ${n.type}` : `Edit ${n.type}`;
     const fields = $('settings-fields'); fields.replaceChildren();
@@ -660,11 +689,32 @@
     if (start.port.kind !== 'out' || target.port.kind !== 'in') return false;
     edit(() => { if (start.detached) state.circuit.disconnect(start.detached); state.circuit.connect(start.node, target.node.id, target.port.index); }); state.wire = null; render(); return true;
   }
+  const TOUCH_HOLD = 500, TOUCH_SLOP = 10, DOUBLE_TAP = 320;
+  let touchGesture = null, lastTouchTap = null, touchHoldTimer = null, lastTouchAt = -Infinity;
+  function clearTouchGesture(clearTap = true) {
+    clearTimeout(touchHoldTimer); touchHoldTimer = null; touchGesture = null;
+    if (clearTap) lastTouchTap = null;
+  }
+  function beginTouch(event) {
+    clearTouchGesture(false); lastTouchAt = performance.now();
+    if (pointers.size !== 1 || state.placing) { lastTouchTap = null; return; }
+    const g = touchGesture = { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now(), node: hit(event.clientX, event.clientY)?.node.id, moved: false, fired: false };
+    touchHoldTimer = setTimeout(() => {
+      if (touchGesture !== g || g.moved || pointers.size !== 1 || document.querySelector('dialog[open]')) return;
+      g.fired = true; lastTouchTap = null; state.drag = null; state.wire = null; dropMotion = null;
+      const n = state.circuit.nodes.get(g.node);
+      if (n?.type === 'INPUT') toggleInput(n);
+      else { g.pan = true; state.drag = { kind: 'pan', last: { x: g.x, y: g.y } }; }
+      document.body.classList.toggle('dragging', !!g.pan); render();
+    }, TOUCH_HOLD);
+  }
   canvas.addEventListener('pointerdown', event => {
     if (event.button === 2) return;
     hideContext(); canvas.focus(); const { clientX: x, clientY: y } = event; state.pointer = { x, y };
     pointers.set(event.pointerId, { x, y }); canvas.setPointerCapture(event.pointerId);
+    if (event.pointerType === 'touch') { event.preventDefault(); beginTouch(event); }
     if (event.pointerType === 'touch' && pointers.size === 2) {
+      clearTouchGesture(); state.wire = null;
       const ps = [...pointers.values()]; state.drag = { kind: 'pinch', distance: Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y), midpoint: { x: (ps[0].x + ps[1].x) / 2, y: (ps[0].y + ps[1].y) / 2 } }; return;
     }
     const h = hit(x, y);
@@ -701,6 +751,14 @@
   canvas.addEventListener('pointermove', event => {
     const { clientX: x, clientY: y } = event; state.pointer = { x, y };
     if (pointers.has(event.pointerId)) pointers.set(event.pointerId, { x, y });
+    if (touchGesture?.id === event.pointerId) {
+      const g = touchGesture;
+      if (g.fired && !g.pan) return;
+      if (!g.fired) {
+      if (!g.moved && Math.hypot(x - g.x, y - g.y) <= TOUCH_SLOP) return;
+      g.moved = true; clearTimeout(touchHoldTimer); lastTouchTap = null;
+      }
+    }
     const drag = state.drag;
     if (drag?.kind === 'pinch' && pointers.size === 2) {
       const ps = [...pointers.values()], d = Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y), midpoint = { x: (ps[0].x + ps[1].x) / 2, y: (ps[0].y + ps[1].y) / 2 };
@@ -729,6 +787,16 @@
     canvas.style.cursor = state.placing ? 'crosshair' : state.tool === 'pan' || state.space ? 'grab' : hover?.port || state.wire ? 'crosshair' : hover?.node ? 'move' : 'default'; render();
   });
   function endPointer(event, canceled = false) {
+    let showTouchMenu = false;
+    if (touchGesture?.id === event.pointerId) {
+      const g = touchGesture, now = performance.now();
+      lastTouchAt = now; clearTimeout(touchHoldTimer);
+      const tap = !canceled && !g.fired && !g.moved && now - g.at < DOUBLE_TAP && Math.hypot(event.clientX - g.x, event.clientY - g.y) <= TOUCH_SLOP;
+      showTouchMenu = tap && lastTouchTap && now - lastTouchTap.at <= DOUBLE_TAP && lastTouchTap.node === g.node && Math.hypot(g.x - lastTouchTap.x, g.y - lastTouchTap.y) <= 24;
+      lastTouchTap = tap && !showTouchMenu ? { ...g, at: now } : null;
+      if (g.fired && !g.pan || showTouchMenu) { state.drag = null; state.wire = null; dropMotion = null; }
+      touchGesture = null;
+    } else if (canceled || event.pointerType === 'touch') clearTouchGesture();
     pointers.delete(event.pointerId); const drag = state.drag;
     if (drag?.kind === 'select' && drag.io) {
       if (canceled) { state.selected = drag.before; state.ioSelection = false; }
@@ -753,11 +821,15 @@
     if (canceled) state.wire = null;
     if (drag?.kind === 'pan' || drag?.kind === 'pinch') saveSoon();
     state.drag = null; document.body.classList.remove('dragging'); if (drag?.kind === 'select' && drag.io) updateUI(); render();
+    if (showTouchMenu) { event.preventDefault(); contextMenu(event); }
   }
   canvas.addEventListener('pointerup', e => endPointer(e)); canvas.addEventListener('pointercancel', e => endPointer(e, true));
-  canvas.addEventListener('contextmenu', contextMenu); canvas.addEventListener('auxclick', e => e.preventDefault());
+  canvas.addEventListener('contextmenu', e => {
+    if (e.pointerType === 'touch' || e.sourceCapabilities?.firesTouchEvents || !e.pointerType && performance.now() - lastTouchAt < 1000) e.preventDefault();
+    else contextMenu(e);
+  }); canvas.addEventListener('auxclick', e => e.preventDefault());
   canvas.addEventListener('wheel', e => { e.preventDefault(); const unit = e.deltaMode === 1 ? 18 : e.deltaMode === 2 ? state.height : 1; zoomAt(Math.exp(-Math.max(-500, Math.min(500, e.deltaY * unit)) * (e.ctrlKey ? .009 : .0018)), e.clientX, e.clientY); }, { passive: false });
-  canvas.addEventListener('dblclick', event => { const h = hit(event.clientX, event.clientY); if (h?.node.type === 'INPUT') toggleInput(h.node); });
+  canvas.addEventListener('dblclick', event => { if (performance.now() - lastTouchAt < 800) return; const h = hit(event.clientX, event.clientY); if (h?.node.type === 'INPUT') toggleInput(h.node); });
   document.addEventListener('pointerdown', e => { if (!$('context-menu').contains(e.target)) hideContext(); });
   document.addEventListener('keydown', e => {
     if (document.querySelector('dialog[open]')) return;
@@ -788,7 +860,8 @@
     else if (key === '-') zoomAt(.8);
   });
   document.addEventListener('keyup', e => { if (e.code === 'Space') { state.space = false; document.body.classList.remove('space-held'); canvas.style.cursor = ''; } });
-  window.addEventListener('blur', () => { state.space = false; state.drag = null; pointers.clear(); document.body.classList.remove('space-held', 'dragging'); render(); });
+  window.addEventListener('blur', () => { clearTouchGesture(); state.space = false; state.drag = null; state.wire = null; pointers.clear(); document.body.classList.remove('space-held', 'dragging'); render(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) clearTouchGesture(); });
   function copy(full = false) {
     const ids = new Set(state.selected); if (!ids.size) return;
     state.clipboard = { nodes: [...ids].map(id => state.circuit.nodes.get(id)).filter(Boolean).map(n => ({ ...n })), signals: new Map([...ids].map(id => [id, state.circuit.values.get(id) || 0])), wires: [...state.circuit.wires.values()].filter(w => ids.has(w.from) && ids.has(w.to)).map(w => ({ ...w })), externalInputs: full ? [...state.circuit.wires.values()].filter(w => !ids.has(w.from) && ids.has(w.to)).map(w => ({...w})) : [] };

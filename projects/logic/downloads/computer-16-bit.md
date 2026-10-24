@@ -1,6 +1,6 @@
-# Logic Studio 2.2 / RGB-16
+# Logic Studio 2.2.1 / RGB-16
 
-Run **Open 16-bit Computer.cmd**, import `computer-16-bit.logic.json`, or choose **Controls & examples → RGB-16**. The Windows ZIP includes the same file. The browser example is available through the sidebar help tool.
+Run **Open 16-bit Computer.cmd** locally or **Open RGB-16.cmd** from the portable ZIP, import `computer-16-bit.logic.json`, or choose **Controls & examples → RGB-16**. The Windows ZIP includes the same file. The browser example is available through the sidebar help tool.
 
 The computer uses 2,214 inspectable nodes and 4,815 wires. Its CPU is built from gates and 82 one-bit registers. RAM and ROM are memory components connected to that circuit; there is no separate CPU interpreter.
 
@@ -69,3 +69,5 @@ The library provides RAM/ROM 256×1 and RAM/ROM 64K×1. Address pins are A0 upwa
 **Settings → Wires** offers Automatic, All, Selected connections only, and Hidden. Automatic suppresses distant/dense wire drawing. These options affect drawing only; every circuit connection still simulates. Both renderers cache wire paths and skip offscreen wires. The native engine and save worker run separately from drawing.
 
 The 16-bit computer uses a different program format from older examples. Open the corresponding computer before loading its program. The Windows application is the main development version; the browser retains scheduling and storage limits imposed by its browser.
+
+On touch screens, hold still for 0.5 seconds to middle-click an INPUT; hold elsewhere and drag to pan. Two quick taps open the context menu. The sidebar caret has a 44x44 touch target. Right-click (or double-tap) any node and choose Properties to edit its label; INPUT switch state and REGISTER stored Q can also be set to on/off. Registers capture again on the next rising clock edge. These edits support undo and saving.
