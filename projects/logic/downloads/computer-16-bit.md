@@ -1,4 +1,4 @@
-# Logic Studio 2.2.1 / RGB-16
+# Logic Studio 2.2.2 / RGB-16
 
 Run **Open 16-bit Computer.cmd** locally or **Open RGB-16.cmd** from the portable ZIP, import `computer-16-bit.logic.json`, or choose **Controls & examples → RGB-16**. The Windows ZIP includes the same file. The browser example is available through the sidebar help tool.
 
@@ -64,7 +64,7 @@ Pixel index is `X & 3FFF`, with `x = index & 127`, `y = index >> 7`. Its RAM wor
 
 The library provides RAM/ROM 256×1 and RAM/ROM 64K×1. Address pins are A0 upward (least significant first). RAM adds D, WE, CLK, RESET, and on 64K variants FILL. A rising CLK writes D if WE is high. RESET clears the plane. FILL on a rising clock fills the C000–FFFF video region with D; lower RAM remains unchanged. Registers and RAM sample the same edge. Sixteen planes form one 16-bit memory. Right-click Settings edits a plane's packed bits; ordinary programs use the Program bytes tool instead.
 
-**Copy / Ctrl+C** clones selected nodes and their internal wires. **Full copy / Ctrl+Shift+C** also creates new input wires from existing external sources into the clones. It does not clone those sources or move their original wires. External destination wires stay attached to their original nodes. Paste uses Ctrl+V. Copy stays usable within the Windows app if the system clipboard is unavailable.
+**Copy / Ctrl+C** clones selected nodes and their internal wires. **Full copy / Ctrl+Shift+C** also creates new input wires from existing external sources into the clones. It does not clone those sources or move their original wires. Full copy also remembers outgoing wires. Paste restores them to existing destination input ports that are still free; occupied ports keep their current wires. This supports copying a pulse, deleting it, running to clear disconnected logic, and pasting it back with its connections restored. Missing destinations, removed input ports, and destinations on other layers are skipped. Paste uses Ctrl+V. Copy stays usable within the Windows app if the system clipboard is unavailable.
 
 **Settings → Wires** offers Automatic, All, Selected connections only, and Hidden. Automatic suppresses distant/dense wire drawing. These options affect drawing only; every circuit connection still simulates. Both renderers cache wire paths and skip offscreen wires. The native engine and save worker run separately from drawing.
 

@@ -864,7 +864,7 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) clearTouchGesture(); });
   function copy(full = false) {
     const ids = new Set(state.selected); if (!ids.size) return;
-    state.clipboard = { nodes: [...ids].map(id => state.circuit.nodes.get(id)).filter(Boolean).map(n => ({ ...n })), signals: new Map([...ids].map(id => [id, state.circuit.values.get(id) || 0])), wires: [...state.circuit.wires.values()].filter(w => ids.has(w.from) && ids.has(w.to)).map(w => ({ ...w })), externalInputs: full ? [...state.circuit.wires.values()].filter(w => !ids.has(w.from) && ids.has(w.to)).map(w => ({...w})) : [] };
+    state.clipboard = { nodes: [...ids].map(id => state.circuit.nodes.get(id)).filter(Boolean).map(n => ({ ...n })), signals: new Map([...ids].map(id => [id, state.circuit.values.get(id) || 0])), wires: [...state.circuit.wires.values()].filter(w => ids.has(w.from) && ids.has(w.to)).map(w => ({ ...w })), externalInputs: full ? [...state.circuit.wires.values()].filter(w => !ids.has(w.from) && ids.has(w.to)).map(w => ({...w})) : [], externalOutputs: full ? [...state.circuit.wires.values()].filter(w => ids.has(w.from) && !ids.has(w.to)).map(w => ({...w})) : [] };
     toast(`Copied ${ids.size} component${ids.size === 1 ? '' : 's'}`);
   }
   function paste() {
@@ -876,6 +876,16 @@
       for (const n of clip.nodes) { const copy = c.addNode({ ...n, id: undefined, x: n.x + offset, y: n.y + offset, layer: state.layer, direction: state.layer === 255 ? -1 : state.layer === 0 ? 1 : n.direction }); c.values.set(copy.id, clip.signals.get(n.id) || 0); ids.set(n.id, copy.id); added.push(copy.id); }
       for (const w of clip.wires) c.connect(ids.get(w.from), ids.get(w.to), w.port);
       for(const w of clip.externalInputs||[]){const source=c.nodes.get(w.from),to=ids.get(w.to);if(source&&to&&source.layer===state.layer&&hasOutput(source))c.connect(w.from,to,w.port);}
+      const taken = new Set([...c.wires.values()].map(w => `${w.to}:${w.port}`));
+      let restoredOutputs = false;
+      for (const w of clip.externalOutputs || []) {
+        const from = ids.get(w.from), target = c.nodes.get(w.to);
+        const key = `${w.to}:${w.port}`;
+        if (from && target?.layer === state.layer && Number.isInteger(w.port) && w.port >= 0 && w.port < inputCount(target) && !taken.has(key)) {
+          const id = c.id('w'); c.wires.set(id, { id, from, to: target.id, port: w.port }); taken.add(key); restoredOutputs = true;
+        }
+      }
+      if (restoredOutputs) c.rebuild();
       state.selected = new Set(added); state.history.push(before); state.future = []; changed();
     } catch (error) { restore(before); toast(error.message); }
   }
