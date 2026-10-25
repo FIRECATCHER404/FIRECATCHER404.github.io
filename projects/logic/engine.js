@@ -5,6 +5,7 @@
   else root.Logic = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
+  const migrateTunnels = typeof module === 'object' && module.exports ? require('./tunnel-migration.js').migrate : globalThis.LogicTunnelMigration.migrate;
   const MAX_LAYERS = 256;
   const GATES = ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR'];
   const SPECIAL = ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN', 'BUSINPUT', 'BUSOUTPUT', 'JOIN', 'SPLIT', 'CHIP', 'KEYBOARD', 'COMMAND', 'COMMENT', 'MULTITUNNEL', 'SENDTUNNEL', 'RECEIVETUNNEL'];
@@ -26,8 +27,8 @@
   }
   function hasOutput(node) { return !['SENDTUNNEL','COMMENT', 'OUTPUT', 'RGB', 'RGBTUNNEL', 'SCREEN', 'BUSOUTPUT'].includes(node.type); }
   function outputCount(n) { return ['MULTITUNNEL','RECEIVETUNNEL'].includes(n.type)?n.inputs:n.type === 'CHIP' ? (n.pinsOut || []).length : n.type === 'SPLIT' ? n.bits || 8 : +hasOutput(n); }
-  function inputWidth(n, p = 0) { return ['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)?n.channelBits:n.type === 'CHIP' ? n.pinsIn[p]?.width : ['SPLIT','BUSOUTPUT'].includes(n.type) ? n.bits || 8 : 1; }
-  function outputWidth(n, p = 0) { return ['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)?n.channelBits:n.type === 'CHIP' ? n.pinsOut[p]?.width : ['JOIN','BUSINPUT'].includes(n.type) ? n.bits || 8 : 1; }
+  function inputWidth(n, p = 0) { return n.type==='MULTITUNNEL'?n.channelBits:n.type === 'CHIP' ? n.pinsIn[p]?.width : ['SPLIT','BUSOUTPUT'].includes(n.type) ? n.bits || 8 : 1; }
+  function outputWidth(n, p = 0) { return n.type==='MULTITUNNEL'?n.channelBits:n.type === 'CHIP' ? n.pinsOut[p]?.width : ['JOIN','BUSINPUT'].includes(n.type) ? n.bits || 8 : 1; }
   function nodeSize(node) { return node.type === 'SCREEN' && node.screenPixels !== 1 ? 8 : 1; }
   function gate(type, bits) {
     switch (type) {
@@ -71,7 +72,7 @@
       ...(['RAM', 'ROM'].includes(data.type) ? { memory, ...(addressBits !== 8 ? { addressBits } : {}), ...(data.type === 'RAM' ? { clock: data.clock ?? 0 } : {}) } : {})
     };
     if(n.type==='COMMENT'){for(const [key,value]of Object.entries({commentOX:0,commentOY:0,commentWidth:3,commentHeight:1.5})){n[key]=data[key]??value;if(typeof n[key]!=='number'||!Number.isFinite(n[key]))throw Error('Invalid comment geometry.');}if(n.commentOX<0||n.commentOX>=1||n.commentOY<0||n.commentOY>=1||n.commentWidth<.5||n.commentWidth>10000||n.commentHeight<.4||n.commentHeight>10000)throw Error('Invalid comment bounds.');}
-    if(['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)){n.sourceId=data.sourceId??'';if(typeof n.sourceId!=='string'||n.sourceId.length>100)throw Error('Invalid tunnel source.');n.channelBits=data.channelBits??1;if(!Number.isInteger(n.inputs)||n.inputs<(n.type==='MULTITUNNEL'?2:1)||n.inputs>16||![1,8,16].includes(n.channelBits))throw Error('Use 2-16 channels of 1, 8 or 16 bits.');n.portValues=data.portValues??Array(n.inputs).fill(0);if(!Array.isArray(n.portValues)||n.portValues.length!==n.inputs||n.portValues.some(v=>!Number.isInteger(v)||v<0||v>=2**n.channelBits))throw Error('Invalid tunnel channel state.');n.portValues=[...n.portValues];}
+    if(['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)){n.sourceId=data.sourceId??'';if(typeof n.sourceId!=='string'||n.sourceId.length>100)throw Error('Invalid tunnel source.');n.channelBits=data.channelBits??1;if(n.type!=='MULTITUNNEL'&&n.channelBits!==1)throw Error('Send and receive tunnels use one bit per input. Use SPLIT for a bus.');if(!Number.isInteger(n.inputs)||n.inputs<(n.type==='MULTITUNNEL'?2:1)||n.inputs>16||![1,8,16].includes(n.channelBits))throw Error(n.type==='MULTITUNNEL'?'Use 2-16 channels of 1, 8 or 16 bits.':'Use 1-16 one-bit tunnel pins.');n.portValues=data.portValues??Array(n.inputs).fill(0);if(!Array.isArray(n.portValues)||n.portValues.length!==n.inputs||n.portValues.some(v=>!Number.isInteger(v)||v<0||v>=2**n.channelBits))throw Error('Invalid tunnel channel state.');n.portValues=[...n.portValues];}
     if(n.type==='SCREEN'){n.screenPixels=data.screenPixels??128;n.screenBase=data.screenBase??49152;n.screenPrefix=data.screenPrefix??'DATA';if(![1,128].includes(n.screenPixels)||!Number.isInteger(n.screenBase)||n.screenBase<0||n.screenBase>65536-n.screenPixels*n.screenPixels||typeof n.screenPrefix!=='string'||!n.screenPrefix||n.screenPrefix.length>80)throw new Error('Invalid screen memory region.');}
     if(['RAM','ROM'].includes(n.type)&&addressBits===16){Object.defineProperty(n,'storage',{value:Uint8Array.from(memory,c=>+(c==='1')),writable:true});Object.defineProperty(n,'memory',{enumerable:true,get(){return Array.from(this.storage).join('');},set(value){this.storage=Uint8Array.from(value,c=>+(c==='1'));}});if(data.memoryHex!==undefined){if(typeof data.memoryHex!=='string'||!/^[0-9a-f]{16384}$/i.test(data.memoryHex))throw new Error('Invalid packed 64K memory plane.');for(let a=0;a<16384;a++){const v=parseInt(data.memoryHex[a],16);for(let b=0;b<4;b++)n.storage[a*4+b]=(v>>(3-b))&1;}}n.memoryVersion=0;}
     if (['BUSINPUT','BUSOUTPUT','JOIN','SPLIT'].includes(n.type)) {
@@ -337,6 +338,7 @@
     }
     static fromJSON(data) {
       if (!data || data.format !== 'logic-studio' || data.version !== 1 || !Array.isArray(data.nodes) || !Array.isArray(data.wires)) throw new Error('This is not a supported Logic Studio circuit.');
+      data = migrateTunnels(data);
       const c = new Circuit(); if(data.chips!==undefined){if(!Array.isArray(data.chips))throw Error('Invalid chip library.');for(const def of data.chips){if(!def.id||c.chips.has(def.id))throw Error('Invalid or duplicate chip definition.');c.chips.set(def.id,def);}} c.name = typeof data.name === 'string' ? data.name.slice(0, 100) : 'Imported circuit';
       for (const raw of data.nodes) {
         const n = validateNode(raw); c.prepareChip?.(n);
@@ -366,7 +368,7 @@
       if (Array.isArray(data.signals)) for (const entry of data.signals) {
         if (!Array.isArray(entry) || entry.length !== 2) throw new Error('Invalid signal state.');
         const [id, v] = entry; const n = c.nodes.get(id);
-        if (!n || !Number.isInteger(v) || v < 0 || v > (['RGB', 'RGBTUNNEL'].includes(n.type) ? 0xffffff : ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','CHIP','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type) ? 65535 : 1)) throw new Error('Invalid signal state.');
+        if (!n || !Number.isInteger(v) || v < 0 || v > (['RGB', 'RGBTUNNEL'].includes(n.type) ? 0xffffff : ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','CHIP','MULTITUNNEL'].includes(n.type) ? 65535 : 1)) throw new Error('Invalid signal state.');
         c.values.set(id, v);
       }
       return c;

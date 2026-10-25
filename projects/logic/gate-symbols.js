@@ -8,6 +8,14 @@
   function shape(type, inputs) {
     const key = `${type}:${inputs}`;
     if (shapes.has(key)) return shapes.get(key);
+    const tunnels = {
+      SENDTUNNEL: 'M68 22V78M80 22V78M10 50H58M44 36L58 50L44 64',
+      RECEIVETUNNEL: 'M20 22V78M32 22V78M42 50H90M76 36L90 50L76 64',
+      RGBTUNNEL: 'M72 22V78M84 22V78M8 28H38L60 50M8 50H60M8 72H38L60 50M48 38L60 50L48 62',
+      TUNNEL: 'M38 22V78M62 22V78M8 38H90M78 26L90 38L78 50M90 64H8M20 52L8 64L20 76',
+      MULTITUNNEL: 'M68 22V78M80 22V78M8 28H58M8 50H58M8 72H58'
+    };
+    if (tunnels[type]) { const result={body:tunnels[type],extra:'',leads:'',bubble:''}; shapes.set(key,result); return result; }
     if (type === 'PULSE' || type === 'REGISTER') {
       const result = type === 'PULSE'
         ? { body: 'M22 28H78V72H22Z', extra: 'M30 59H39V41H50V59H61V41H70', leads: 'M78 50H92', bubble: '' }

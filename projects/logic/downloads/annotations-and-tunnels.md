@@ -1,4 +1,4 @@
-# Comments and multi-input tunnels / Logic Studio 2.6
+# Comments and multi-input tunnels / Logic Studio 2.7.4
 
 Open **Open Logic Studio.cmd** for the updated native app, or **Open Logic
 Web.cmd** for the updated local browser edition. Close an older native app
@@ -28,8 +28,8 @@ undo/redo, copying, saving, and export/import.
 
 Choose **SENDTUNNEL** in Components. Placement opens settings for:
 
-* **Channels:** 1-16 independent signals. Use 2-16 for multi-input tunneling.
-* **Bits per channel:** 1, 8, or 16. Connected wire widths must match.
+* **Inputs:** 1-16 independent one-bit signals. Each pin is on or off.
+* Use a **SPLIT** node to separate a bus into individual bit wires before sending it, and **JOIN** after receiving it to rebuild a bus.
 * **Destination:** up or down one layer, within the 256-layer limit.
 
 A sender has **only input pins**. Placing it automatically creates a
@@ -40,12 +40,11 @@ Input 1 appears at output 1, input 2 at output 2, and so on.
 The receiver links to the sender by ID. You can move either endpoint anywhere
 on its own layer without losing the connection. Changing the sender's channel
 count updates its receivers; discarded channel wires are removed. Disconnect
-incompatible wires before changing bit width. Disconnect receiver wires before
-changing its destination layer.
+receiver wires before changing its destination layer.
 
 Right-click > Settings configures the sender. Receiver settings let you select
-another sender targeting the receiver's layer; its channel count and width
-follow that sender. You can also place or copy additional RECEIVETUNNEL nodes
+another sender targeting the receiver's layer; its number of one-bit outputs
+follows that sender. You can also place or copy additional RECEIVETUNNEL nodes
 linked to the same sender. An unlinked receiver outputs zero.
 
 Copying/pasting a sender creates a receiver for the copy. Copying a receiver
@@ -53,9 +52,13 @@ keeps its source link when pasted on the source's destination layer. Old
 TUNNEL and MULTITUNNEL circuit files retain their original duplex behavior;
 new circuits use the directional components.
 
-Import **comments-multi-tunnels.logic.json** for a four-channel, 8-bit example.
-Layer 1 sends `05`, `2A`, `4F`, and `74`; Layer 2 displays the corresponding
-values. The example also includes a freely positioned comment.
+The Components menu has separate icons for send, receive, and RGB tunnels.
+Older directional bus-tunnel saves automatically convert to one-bit tunnels
+with SPLIT/JOIN adapters, preserving their bus connections and signals.
+
+Import **comments-multi-tunnels.logic.json** for a four-input, one-bit example.
+Layer 1 sends `0`, `1`, `0`, and `1`; Layer 2 shows the matching outputs.
+Middle-click an INPUT to toggle it. The example includes a free comment.
 
 These additions are included in the native release and local web edition.
 They are also available on the hosted website at

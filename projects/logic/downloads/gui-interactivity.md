@@ -1,4 +1,9 @@
-# Logic Studio 2.7.3
+# Logic Studio 2.7.4
+
+Components has distinct icons for send, receive, and RGB tunnels. Send tunnels
+have 1-16 inputs with exactly one bit per pin. Receiver outputs match them.
+Use SPLIT/JOIN for bus wiring; older wide directional tunnels convert on load
+without dropping their bus bits.
 
 Custom nodes display bare gate symbols joined by wires, without internal node
 tiles or input/output blocks. Nested chips expand into the same schematic,
