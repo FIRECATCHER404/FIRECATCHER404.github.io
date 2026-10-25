@@ -1,4 +1,12 @@
-# Logic Studio 2.7
+# Logic Studio 2.7.1
+
+Components now has a **Custom** tab for created/imported chips, listed by name.
+Choose one to place it on the canvas. Search includes custom names, and the
+list updates after creating/importing, reloading, editing, and undo/redo.
+**Manage custom nodes** opens the existing chip creation/import/edit tools.
+
+Comments have a separate **Notes** tab and no longer appear under I/O.
+Both built-in and custom nodes remain available under All.
 
 The website and local browser edition include free comments and directional
 send/receive tunnels. Open Controls & examples > Comments & send/receive tunnels

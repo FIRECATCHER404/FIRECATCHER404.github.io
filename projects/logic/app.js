@@ -23,7 +23,8 @@
   for (const type of ['INPUT', 'OUTPUT', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN']) components.push({ type, name: type, category: type.startsWith('RGB')||type==='SCREEN' ? 'color' : 'io' });
   components.push({type:'SCREEN',screenPixels:1,name:'SCREEN PIXEL',category:'color'});
   for(const type of ['RAM','ROM'])components.push({type,addressBits:16,name:type+' (64K)',category:'io'});
-  for(const type of ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND','COMMENT','SENDTUNNEL','RECEIVETUNNEL'])components.push({type,name:type,category:'io',...(['SENDTUNNEL','RECEIVETUNNEL'].includes(type)?{inputs:1}:{})});
+  for(const type of ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND','SENDTUNNEL','RECEIVETUNNEL'])components.push({type,name:type,category:'io',...(['SENDTUNNEL','RECEIVETUNNEL'].includes(type)?{inputs:1}:{})});
+  components.push({type:'COMMENT',name:'COMMENT',category:'notes'});
   let advancedUI;
   document.querySelector('.tiny-badge').textContent = components.length;
   const state = {
@@ -307,29 +308,38 @@
     state.layer = Math.max(0, Math.min(255, layer)); state.selected.clear(); state.wire = null; state.drag = null; state.ioSelection = false; hideContext(); changed(false);
   }
   function renderLibrary() {
+    document.querySelector('.tiny-badge').textContent=components.length+state.circuit.chips.size;
     const query = $('search').value.trim().toUpperCase(), list = $('component-list'); list.replaceChildren();
     const symbols = { COMMENT:'T',MULTITUNNEL:'?', INPUT: '01', OUTPUT: '◉', TUNNEL: '⇅', RGB: '◈', RGBTUNNEL: '▦', RAM: 'M', ROM: 'R', SCREEN: '▣' };
+    const custom = [...state.circuit.chips.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(d=>{
+      const pins=Logic.chipPins(d.circuit);
+      return {type:'CHIP',chipId:d.id,name:d.name,label:d.name,pinsIn:pins.inputs,pinsOut:pins.outputs,category:'custom'};
+    });
     let lastGroup, count = 0;
-    for (const spec of components) {
-      if ((state.activeFilter !== 'all' && spec.category !== state.activeFilter) || (query && !spec.name.includes(query))) continue;
+    for (const spec of [...components,...custom]) {
+      if ((state.activeFilter !== 'all' && spec.category !== state.activeFilter) || (query && !spec.name.toUpperCase().includes(query))) continue;
       if (spec.category !== lastGroup) {
-        const h = document.createElement('div'); h.className = 'component-group'; h.textContent = { gates: 'LOGIC GATES', io: 'INPUT / OUTPUT', color: '24-BIT COLOR' }[spec.category]; list.append(h); lastGroup = spec.category;
+        const h = document.createElement('div'); h.className = 'component-group'; h.textContent = { gates: 'LOGIC GATES', io: 'INPUT / OUTPUT', color: '24-BIT COLOR', custom:'CUSTOM NODES', notes:'COMMENTS' }[spec.category]; list.append(h); lastGroup = spec.category;
       }
-      const b = document.createElement('button'); b.className = `component${state.placing === spec ? ' active' : ''}`; b.dataset.component = spec.name;
+      const active=state.placing===spec||(spec.type==='CHIP'&&state.placing?.type==='CHIP'&&state.placing.chipId===spec.chipId);
+      const b = document.createElement('button'); b.className = `component${active ? ' active' : ''}`; b.dataset.component = spec.name;
+      if(spec.type==='CHIP')b.dataset.chipId=spec.chipId;
       b.title = `Place ${spec.name}`; b.setAttribute('aria-label', `Place ${spec.name}`);
       const icon = document.createElement('span'); icon.className = `component-icon ${spec.category}`;
       if (spec.category === 'gates' || ['PULSE', 'REGISTER'].includes(spec.type)) {
         if (spec.category !== 'gates') icon.classList.add('sequential');
         icon.append(GateSymbols.icon(spec.type, spec.inputs));
       }
-      else icon.textContent = symbols[spec.type];
-      const label = document.createElement('span'); label.className = 'component-name'; label.textContent = spec.screenPixels===1?'SCREEN PIXEL':spec.type;
+      else icon.textContent = spec.type==='CHIP'?'▣':symbols[spec.type];
+      const label = document.createElement('span'); label.className = 'component-name'; label.textContent = spec.type==='CHIP'?spec.name:spec.screenPixels===1?'SCREEN PIXEL':spec.type;
       const detail = document.createElement('span'); detail.className = 'component-detail'; detail.textContent = ['RAM','ROM'].includes(spec.type)?(spec.addressBits===16?'64K × 1':'256 × 1'):spec.type==='SCREEN'?(spec.screenPixels===1?'1 grid cell':'128×128'):spec.type === 'PULSE' ? 'generator' : spec.type === 'REGISTER' ? '1 bit' : spec.extendible ? '2–16 in' : spec.type === 'RGBTUNNEL' ? '24 in' : spec.inputs > 2 ? `${spec.inputs} in` : '';
       const plus = document.createElement('span'); plus.className = 'component-plus'; plus.textContent = '+';
-      b.append(icon, label, detail, plus); b.onclick = () => { state.placing = state.placing === spec ? null : spec; state.wire = null; state.drag = null; updateUI(); renderLibrary(); render(); canvas.focus(); };
+      if(spec.type==='CHIP'){detail.textContent=`${spec.pinsIn.length} in · ${spec.pinsOut.length} out`;b.title+=` (${detail.textContent})`;}
+      b.append(icon, label, detail, plus); b.onclick = () => { state.placing = active ? null : spec; state.wire = null; state.drag = null; updateUI(); renderLibrary(); render(); canvas.focus(); };
       list.append(b); count++;
     }
-    if (!count) { const p = document.createElement('p'); p.className = 'no-components'; p.textContent = 'No matching components'; list.append(p); }
+    if (!count) { const p = document.createElement('p'); p.className = 'no-components'; p.textContent = state.activeFilter==='custom'&&!query?'No custom nodes yet. Create or import a chip to add one here.':'No matching components'; list.append(p); }
+    if(state.activeFilter==='custom'){const b=document.createElement('button');b.className='secondary-button custom-manage';b.textContent='Manage custom nodes';b.onclick=()=>advancedUI.open();list.append(b);}
   }
   const cellSize = () => CELL * state.camera.scale;
   function screenToWorld(x, y) {
@@ -1048,7 +1058,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
     if (open && name === 'relay') openTool('control', false);
     if (open && name === 'control') openTool('relay', false);
     const button = document.querySelector(`[data-open-tool="${name}"]`); button.setAttribute('aria-pressed', String(open)); button.querySelector('.drawer-indicator').textContent = open ? '−' : '+';
-    if (name === 'components') { document.body.classList.remove('library-hidden'); if (!open) { state.placing = null; state.wire = null; updateUI(); renderLibrary(); } }
+    if (name === 'components') { document.body.classList.remove('library-hidden'); if (!open) { state.placing = null; state.wire = null; updateUI(); } renderLibrary(); }
     setDrawer(false); render();
   }
   document.querySelectorAll('[data-open-tool]').forEach(b => b.onclick = () => openTool(b.dataset.openTool));
