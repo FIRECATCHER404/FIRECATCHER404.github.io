@@ -17,11 +17,11 @@
   return {positions,widths,size:values.length?end+widths.get(values.at(-1)):0};
  }
  function layout(c){
-  const old=cache.get(c);if(old&&old.dependencies.every(([model,v])=>model.topologyVersion===v))return old;
+  const old=cache.get(c);if(old&&old.dependencies.every(([model,v,path])=>circuitAt(c,path)===model&&model.topologyVersion===v))return old;
   const graph=new Map(),sources=[],sinks=new Map(),dependencies=[],allNodes=new Map();
   const link=(a,b)=>{if(!graph.has(a))graph.set(a,[]);graph.get(a).push(b);};
   function visit(model,path,depth){
-   dependencies.push([model,model.topologyVersion]);const inputs=[...model.nodes.values()].filter(ioIn).sort(sortPins),outputs=[...model.nodes.values()].filter(ioOut).sort(sortPins),slots=[];
+   dependencies.push([model,model.topologyVersion,[...path]]);const inputs=[...model.nodes.values()].filter(ioIn).sort(sortPins),outputs=[...model.nodes.values()].filter(ioOut).sort(sortPins),slots=[];
    for(const w of model.wires.values())link(endpoint(path,w.from,'out',w.fromPort||0),endpoint(path,w.to,'in',w.port));
    for(const n of model.nodes.values()){
     if(ioIn(n)||ioOut(n)||n.type==='COMMENT')continue;
