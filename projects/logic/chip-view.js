@@ -1,60 +1,92 @@
-/* Compact, live schematics for custom nodes. Layouts survive signal changes. */
+/* Bare gate schematics. Interface nodes and nested chip boundaries are wires. */
 (function(root){
  'use strict';
- const cache=new WeakMap();
- function axis(values){
-  const sorted=[...new Set(values)].sort((a,b)=>a<b?-1:a>b?1:0),positions=new Map();let offset=0;
-  for(let i=0;i<sorted.length;i++){if(i)offset+=Math.min(4,Number(sorted[i]-sorted[i-1]));positions.set(sorted[i],offset);}
-  return {positions,size:Math.max(1,offset)};
+ const cache=new WeakMap(),ioIn=n=>['INPUT','BUSINPUT'].includes(n.type),ioOut=n=>['OUTPUT','BUSOUTPUT'].includes(n.type);
+ const tunnels=new Set(['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL']);
+ const sortPins=(a,b)=>a.x<b.x?-1:a.x>b.x?1:a.y<b.y?-1:a.y>b.y?1:a.id.localeCompare(b.id);
+ const endpoint=(path,id,side,index)=>JSON.stringify([...path,id,side,index]);
+ function port(n,out,index){
+  const count=out?root.Logic.outputCount(n):root.Logic.inputCount(n);
+  if(!out&&n.type==='RGBTUNNEL'){const side=Math.floor(index/6),f=.18+(index%6)*.128;return {x:side===0?f:side===1?.92:side===2?1-f:.08,y:side===0?.08:side===1?f:side===2?.92:1-f};}
+  return {x:out?.92:.08,y:out&&count===1?.5:.17+.66*((index+.5)/Math.max(1,count))};
  }
- function extent(n){return n.type==='COMMENT'?{w:Math.ceil((n.commentWidth||3)+(n.commentOX||0)),h:Math.ceil((n.commentHeight||1.5)+(n.commentOY||0))}:{w:root.Logic.nodeSize(n),h:root.Logic.nodeSize(n)};}
- function port(n,output,index){
-  const count=output?root.Logic.outputCount(n):root.Logic.inputCount(n);
-  if(!output&&n.type==='RGBTUNNEL'){const side=Math.floor(index/6),f=.18+(index%6)*.128;return {x:side===0?f:side===1?.92:side===2?1-f:.08,y:side===0?.08:side===1?f:side===2?.92:1-f};}
-  return {x:output?.92:.08,y:output&&count===1?.5:.17+.66*((index+.5)/Math.max(1,count))};
+ function axis(slots,coordinate,size){
+  const widths=new Map();for(const s of slots)widths.set(s.n[coordinate],Math.max(widths.get(s.n[coordinate])||0,s.body[size]));
+  const values=[...widths.keys()].sort((a,b)=>a<b?-1:a>b?1:0),positions=new Map();let end=0;
+  values.forEach((v,i)=>{if(i)end+=Math.max(Math.min(4,Number(v-values[i-1])),widths.get(values[i-1]));positions.set(v,end);});
+  return {positions,widths,size:values.length?end+widths.get(values.at(-1)):0};
  }
  function layout(c){
-  const old=cache.get(c);if(old&&old.version===c.topologyVersion)return old;
-  const groups=new Map();for(const n of c.nodes.values()){if(!groups.has(n.layer))groups.set(n.layer,[]);groups.get(n.layer).push(n);}
-  const panels=[...groups].sort((a,b)=>a[0]-b[0]).map(([layer,nodes])=>{
-   const xs=[],ys=[];for(const n of nodes){const e=extent(n);xs.push(n.x,n.x+BigInt(e.w));ys.push(n.y,n.y+BigInt(e.h));}
-   return {layer,nodes,ax:axis(xs),ay:axis(ys)};
-  });
-  const columns=Math.max(1,Math.ceil(Math.sqrt(panels.length))),rows=Math.ceil(panels.length/columns),cw=Array(columns).fill(0),rh=Array(rows).fill(0),head=panels.length>1?.6:0;
-  panels.forEach((p,i)=>{cw[i%columns]=Math.max(cw[i%columns],p.ax.size+1);rh[Math.floor(i/columns)]=Math.max(rh[Math.floor(i/columns)],p.ay.size+1+head);});
-  const sum=(a,end)=>a.slice(0,end).reduce((s,n)=>s+n,0),nodes=new Map();
-  panels.forEach((p,i)=>{p.x=sum(cw,i%columns);p.y=sum(rh,Math.floor(i/columns));p.w=cw[i%columns];p.h=rh[Math.floor(i/columns)];
-   for(const n of p.nodes){const e=extent(n),ox=n.type==='COMMENT'?(n.commentOX||0):0,oy=n.type==='COMMENT'?(n.commentOY||0):0,x=p.ax.positions.get(n.x),y=p.ay.positions.get(n.y);
-    nodes.set(n.id,{id:n.id,x:p.x+.5+x+ox,y:p.y+.5+head+y+oy,w:Math.max(.1,p.ax.positions.get(n.x+BigInt(e.w))-x-ox),h:Math.max(.1,p.ay.positions.get(n.y+BigInt(e.h))-y-oy)});
+  const old=cache.get(c);if(old&&old.dependencies.every(([model,v])=>model.topologyVersion===v))return old;
+  const graph=new Map(),sources=[],sinks=new Map(),dependencies=[],allNodes=new Map();
+  const link=(a,b)=>{if(!graph.has(a))graph.set(a,[]);graph.get(a).push(b);};
+  function visit(model,path,depth){
+   dependencies.push([model,model.topologyVersion]);const inputs=[...model.nodes.values()].filter(ioIn).sort(sortPins),outputs=[...model.nodes.values()].filter(ioOut).sort(sortPins),slots=[];
+   for(const w of model.wires.values())link(endpoint(path,w.from,'out',w.fromPort||0),endpoint(path,w.to,'in',w.port));
+   for(const n of model.nodes.values()){
+    if(ioIn(n)||ioOut(n)||n.type==='COMMENT')continue;
+    if(n.type==='CHIP'&&depth<16){const child=model.children.get(n.id);if(!child)continue;const body=visit(child,[...path,n.id],depth+1);
+     n.pinsIn.forEach((pin,i)=>link(endpoint(path,n.id,'in',i),endpoint([...path,n.id],pin.nodeId,'out',0)));
+     n.pinsOut.forEach((pin,i)=>link(endpoint([...path,n.id],pin.nodeId,'in',0),endpoint(path,n.id,'out',i)));
+     if(body.nodes.length)slots.push({n,body});continue;
+    }
+    if(tunnels.has(n.type)){
+     const peer=model.peers.get(n.id);
+     if(n.type==='RECEIVETUNNEL'){if(peer)for(let i=0;i<n.inputs;i++)link(endpoint(path,peer,'in',i),endpoint(path,n.id,'out',i));}
+     else if(n.type!=='SENDTUNNEL')for(let i=0;i<root.Logic.inputCount(n);i++){const from=model.incoming.get(n.id)?.[i]?n.id:peer;if(from)link(endpoint(path,from,'in',i),endpoint(path,n.id,'out',i));}
+     continue;
+    }
+    const key=JSON.stringify([...path,n.id]),visual={key,id:n.id,path:[...path],type:n.type,x:0,y:0,w:1,h:1};allNodes.set(key,visual);
+    for(let i=0;i<root.Logic.outputCount(n);i++)sources.push({vertex:endpoint(path,n.id,'out',i),kind:'node',node:key,port:i,path:[...path],id:n.id});
+    for(let i=0;i<root.Logic.inputCount(n);i++)sinks.set(endpoint(path,n.id,'in',i),{kind:'node',node:key,port:i});
+    slots.push({n,body:{nodes:[visual],w:1,h:1}});
    }
-  });
-  const wires=[];for(const w of c.wires.values()){const a=nodes.get(w.from),b=nodes.get(w.to);if(!a||!b)continue;const p=port(c.nodes.get(w.from),true,w.fromPort||0),q=port(c.nodes.get(w.to),false,w.port);wires.push({id:w.id,from:w.from,fromPort:w.fromPort||0,x1:a.x+p.x*a.w,y1:a.y+p.y*a.h,x2:b.x+q.x*b.w,y2:b.y+q.y*b.h});}
-  const ordered=[...nodes.values()].sort((a,b)=>(c.nodes.get(a.id).type!=='COMMENT')-(c.nodes.get(b.id).type!=='COMMENT'));
-  const result={version:c.topologyVersion,nodes,ordered,wires,panels,w:Math.max(1,sum(cw,cw.length)),h:Math.max(1,sum(rh,rh.length))};cache.set(c,result);return result;
+   const groups=new Map();for(const s of slots){if(!groups.has(s.n.layer))groups.set(s.n.layer,[]);groups.get(s.n.layer).push(s);}
+   const panels=[...groups].sort((a,b)=>a[0]-b[0]).map(([layer,items])=>({layer,items,ax:axis(items,'x','w'),ay:axis(items,'y','h')}));
+   const cols=Math.max(1,Math.ceil(Math.sqrt(panels.length))),rows=Math.ceil(panels.length/cols),cw=Array(cols).fill(0),rh=Array(rows).fill(0),gap=panels.length>1?1:0,header=panels.length>1?.5:0;
+   panels.forEach((p,i)=>{cw[i%cols]=Math.max(cw[i%cols],p.ax.size+gap);rh[Math.floor(i/cols)]=Math.max(rh[Math.floor(i/cols)],p.ay.size+gap+header);});
+   const sum=(a,end)=>a.slice(0,end).reduce((v,n)=>v+n,0),nodes=[];
+   panels.forEach((p,i)=>{p.x=sum(cw,i%cols);p.y=sum(rh,Math.floor(i/cols));p.w=p.ax.size;p.h=p.ay.size+header;
+    for(const s of p.items){const dx=p.x+p.ax.positions.get(s.n.x)+(p.ax.widths.get(s.n.x)-s.body.w)/2,dy=p.y+header+p.ay.positions.get(s.n.y)+(p.ay.widths.get(s.n.y)-s.body.h)/2;for(const node of s.body.nodes){node.x+=dx;node.y+=dy;nodes.push(node);}}
+   });
+   return {nodes,inputs,outputs,panels,w:Math.max(1,sum(cw,cw.length)-gap),h:Math.max(1,sum(rh,rh.length)-gap)};
+  }
+  const body=visit(c,[],0);
+  body.inputs.forEach((n,i)=>sources.push({vertex:endpoint([],n.id,'out',0),kind:'input',port:i,path:[],id:n.id}));
+  body.outputs.forEach((n,i)=>sinks.set(endpoint([],n.id,'in',0),{kind:'output',port:i}));
+  const wires=[];
+  for(const source of sources){const queue=[source.vertex],seen=new Set(queue);for(let head=0;head<queue.length;head++){
+   const at=queue[head],sink=sinks.get(at);if(sink){wires.push({from:source,to:sink});continue;}
+   for(const next of graph.get(at)||[])if(!seen.has(next)){seen.add(next);queue.push(next);}
+  }}
+  const result={...body,nodes:allNodes,wires,dependencies,version:c.topologyVersion};cache.set(c,result);return result;
  }
- function render(ctx,c,x,y,w,h,colors,depth=0){
-  if(!c||depth>16||w<2||h<2)return;const d=layout(c),scale=Math.min(w/d.w,h/d.h),left=x+(w-d.w*scale)/2,top=y+(h-d.h*scale)/2;
-  ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
-  if(d.panels.length>1)for(const p of d.panels){ctx.strokeStyle=colors.line;ctx.lineWidth=.6;ctx.strokeRect(left+(p.x+.15)*scale,top+(p.y+.15)*scale,(p.w-.3)*scale,(p.h-.3)*scale);if(scale>=9){ctx.fillStyle=colors.muted;ctx.font=`${Math.min(12,scale*.36)}px Arial`;ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('L'+(p.layer+1),left+(p.x+.3)*scale,top+(p.y+.2)*scale);}}
-  if(scale>=1.5)for(const wire of d.wires){ctx.strokeStyle=c.signal(wire.from,wire.fromPort)?colors.on:colors.off;ctx.lineWidth=Math.max(.5,Math.min(1.5,scale*.045));const a={x:left+wire.x1*scale,y:top+wire.y1*scale},b={x:left+wire.x2*scale,y:top+wire.y2*scale},bend=Math.max(scale*.25,Math.abs(b.x-a.x)*.45);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.bezierCurveTo(a.x+bend,a.y,b.x-bend,b.y,b.x,b.y);ctx.stroke();}
-  // Comments are behind the circuit, just as on the full canvas.
-  for(const r of d.ordered){const n=c.nodes.get(r.id),v=c.values.get(n.id)||0,nx=left+r.x*scale,ny=top+r.y*scale,nw=r.w*scale,nh=r.h*scale,size=Math.min(nw,nh),ink=v?'#222222':colors.text;
-   ctx.lineWidth=Math.max(.5,Math.min(1,scale*.025));ctx.fillStyle=n.type==='RGB'?'#'+v.toString(16).padStart(6,'0'):n.type==='COMMENT'?colors.bg:v?colors.on:colors.bg;ctx.strokeStyle=colors.line;
-   ctx.beginPath();if(n.type==='RGB'||n.type==='SCREEN')ctx.rect(nx,ny,nw,nh);else ctx.roundRect(nx+nw*.08,ny+nh*.08,nw*.84,nh*.84,size*.055);ctx.fill();if(size>=2&&n.type!=='RGB')ctx.stroke();
-   if(n.type==='CHIP'){render(ctx,c.children.get(n.id),nx+nw*.15,ny+nh*.15,nw*.7,nh*.7,colors,depth+1);continue;}
-   if(size<5)continue;
-   if(root.Logic.GATES.includes(n.type)||n.type==='PULSE'||n.type==='REGISTER')root.GateSymbols.draw(ctx,n.type,root.Logic.inputCount(n),nx,ny,size,ink);
-   else if(size>=12){ctx.fillStyle=ink;ctx.font=`${size*(n.type==='INPUT'||n.type==='OUTPUT'?.22:.13)}px Arial`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(n.type==='COMMENT'?n.label:n.type==='INPUT'||n.type==='OUTPUT'?String(v):n.type,nx+nw/2,ny+nh/2,nw*.8);}
-   if(size>=24&&n.type!=='COMMENT'&&n.label){ctx.fillStyle=colors.muted;ctx.font=`${Math.min(10,size*.1)}px Arial`;ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(n.label,nx+nw/2,ny+nh*.04,nw*1.5);}
-   if(size>=12)for(const output of [false,true]){const count=output?root.Logic.outputCount(n):root.Logic.inputCount(n);for(let i=0;i<count;i++){const p=port(n,output,i),on=output?c.signal(n.id,i):c.word(n.id,i);ctx.beginPath();ctx.arc(nx+p.x*nw,ny+p.y*nh,Math.max(.7,Math.min(2,size*.03)),0,Math.PI*2);ctx.fillStyle=output?colors.bg:on?colors.on:colors.off;ctx.strokeStyle=on?colors.on:colors.off;ctx.fill();ctx.stroke();}}
+ function circuitAt(c,path){for(const id of path){c=c?.children.get(id);if(!c)return null;}return c;}
+ function inputLeads(ctx,model,n,x,y,size,colors){
+  const count=root.Logic.inputCount(n);ctx.lineWidth=Math.max(.85,size*.017);ctx.lineCap='round';ctx.lineJoin='round';
+  for(let i=0;i<count;i++){
+   const yy=17+66*((i+.5)/count),entry=count>4?26+48*((i+.5)/count):yy,t=(entry-25)/50,isAnd=n.type==='AND'||n.type==='NAND',xx=n.type==='NOT'?32:n.type==='REGISTER'||isAnd?28:(n.type==='XOR'?18:25)+40*t*(1-t);
+   ctx.strokeStyle=model.word(n.id,i)?colors.on:colors.off;ctx.beginPath();ctx.moveTo(x+size*.08,y+size*yy/100);
+   if(count>4){ctx.lineTo(x+size*.12,y+size*yy/100);ctx.lineTo(x+size*.17,y+size*entry/100);}ctx.lineTo(x+size*xx/100,y+size*entry/100);ctx.stroke();
+  }
+ }
+ function draw(ctx,c,owner,x,y,size,colors){
+  if(!c||size<3)return;const d=layout(c),scale=Math.min(size*.68/d.w,size*.68/d.h),left=x+(size-d.w*scale)/2,top=y+(size-d.h*scale)/2;
+  const point=(end,out)=>{if(end.kind==='input'||end.kind==='output'){const p=port(owner,end.kind==='output',end.port);return{x:x+p.x*size,y:y+p.y*size};}const r=d.nodes.get(end.node),n=circuitAt(c,r.path)?.nodes.get(r.id),p=port(n,out,end.port);return {x:left+(r.x+p.x)*scale,y:top+(r.y+p.y)*scale};};
+  ctx.save();ctx.beginPath();ctx.rect(x+size*.08,y+size*.08,size*.84,size*.84);ctx.clip();
+  for(const wire of d.wires){const a=point(wire.from,true),b=point(wire.to,false),model=circuitAt(c,wire.from.path),on=model?.signal(wire.from.id,wire.from.port)||0;ctx.strokeStyle=on?colors.on:colors.off;ctx.lineWidth=Math.max(.6,Math.min(1.6,scale*.035));ctx.beginPath();ctx.moveTo(a.x,a.y);
+   if(Math.abs(a.y-b.y)<.5)ctx.lineTo(b.x,b.y);else{const bend=a.x<=b.x?(a.x+b.x)/2:a.x+scale*.3;ctx.lineTo(bend,a.y);ctx.lineTo(bend,b.y);ctx.lineTo(b.x,b.y);}ctx.stroke();
+  }
+  if(d.panels.length>1&&scale>=12){ctx.fillStyle=colors.muted;ctx.font=`${Math.min(11,scale*.22)}px Arial`;ctx.textAlign='left';ctx.textBaseline='top';for(const p of d.panels)ctx.fillText('L'+(p.layer+1),left+p.x*scale,top+p.y*scale);}
+  for(const r of d.nodes.values()){
+   const model=circuitAt(c,r.path),n=model?.nodes.get(r.id);if(!n)continue;const value=model.values.get(n.id)||0,nx=left+r.x*scale,ny=top+r.y*scale,ink=value?colors.on:colors.text;
+   if(root.Logic.GATES.includes(n.type)||n.type==='PULSE'||n.type==='REGISTER'){root.GateSymbols.draw(ctx,n.type,root.Logic.inputCount(n),nx,ny,scale,ink);inputLeads(ctx,model,n,nx,ny,scale,colors);continue;}
+   if(n.type==='RGB'){ctx.beginPath();ctx.arc(nx+scale*.5,ny+scale*.5,scale*.22,0,Math.PI*2);ctx.fillStyle='#'+value.toString(16).padStart(6,'0');ctx.fill();ctx.strokeStyle=colors.line;ctx.stroke();continue;}
+   ctx.strokeStyle=ink;ctx.lineWidth=Math.max(.6,scale*.015);ctx.beginPath();for(const output of [false,true]){const count=output?root.Logic.outputCount(n):root.Logic.inputCount(n);for(let i=0;i<count;i++){const p=port(n,output,i);ctx.moveTo(nx+p.x*scale,ny+p.y*scale);ctx.lineTo(nx+scale*(output?.72:.28),ny+p.y*scale);}}ctx.stroke();
+   if(scale>=7){ctx.fillStyle=ink;ctx.font=`${scale*.13}px Arial`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(n.type,nx+scale*.5,ny+scale*.5,scale*.5);}
   }
   ctx.restore();
  }
- function draw(ctx,c,owner,x,y,size,colors){
-  if(!c)return;const d=layout(c),box={x:x+size*.145,y:y+size*.145,w:size*.71,h:size*.71},scale=Math.min(box.w/d.w,box.h/d.h),left=box.x+(box.w-d.w*scale)/2,top=box.y+(box.h-d.h*scale)/2;
-  ctx.save();ctx.beginPath();ctx.rect(x+size*.085,y+size*.085,size*.83,size*.83);ctx.clip();
-  for(const output of [false,true]){const pins=output?owner.pinsOut:owner.pinsIn;for(let i=0;i<(pins?.length||0);i++){const n=d.nodes.get(pins[i].nodeId);if(!n)continue;const p=port(owner,output,i);ctx.lineWidth=Math.max(.5,Math.min(1.2,size*.008));ctx.strokeStyle=c.values.get(pins[i].nodeId)?colors.on:colors.off;ctx.beginPath();ctx.moveTo(x+p.x*size,y+p.y*size);ctx.lineTo(left+(n.x+(output?.92:.08)*n.w)*scale,top+(n.y+n.h*.5)*scale);ctx.stroke();}}
-  render(ctx,c,box.x,box.y,box.w,box.h,colors);ctx.restore();
- }
+ function render(ctx,c,x,y,w,h,colors){const d=layout(c);draw(ctx,c,{pinsIn:d.inputs,pinsOut:d.outputs},x,y,Math.min(w,h),colors);}
  root.LogicChipView={layout,render,draw};if(typeof module!=='undefined')module.exports=root.LogicChipView;
 })(globalThis);
