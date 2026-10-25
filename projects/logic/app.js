@@ -534,7 +534,7 @@
       const right = pose?.lift ? end.x : Math.round(end.x * ratio) / ratio, bottom = pose?.lift ? end.y : Math.round(end.y * ratio) / ratio;
       ctx.fillStyle = color; ctx.fillRect(left, top, right - left, bottom - top);
     } else {
-      ctx.fillStyle = s < 9 ? color : value ? COLORS.on : COLORS.bg;
+      ctx.fillStyle = n.type==='CHIP'?COLORS.bg:s < 9 ? color : value ? COLORS.on : COLORS.bg;
       ctx.strokeStyle = COLORS.line; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.roundRect(p.x + inset, p.y + inset, size, size, .055 * s); ctx.fill();
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = ctx.shadowOffsetY = 0;
@@ -544,12 +544,13 @@
     if (s < 9) { ctx.restore(); return; }
     if(selected&&rgb)displaySelection(n,p,s);
     if (selected&&!rgb) { ctx.strokeStyle = COLORS.text; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.strokeRect(p.x + .035 * s, p.y + .035 * s, .93 * s, .93 * s); ctx.setLineDash([]); }
+    if(n.type==='CHIP')LogicChipView.draw(ctx,state.circuit.children.get(n.id),n,p.x,p.y,s,COLORS);
     if (s >= 27) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       if (n.type === 'RGB') {
         ctx.fillStyle = luminance > 145 ? '#13200e' : '#f0faeb'; ctx.font = `600 ${s * .115}px Consolas,monospace`; ctx.fillText(hex(value), p.x + s / 2, p.y + s * .5);
         ctx.font = `${s * .08}px Consolas,monospace`; ctx.fillText('RGB', p.x + s / 2, p.y + s * .75);
-      } else {
+      } else if(n.type!=='CHIP') {
         const small = n.type.length > 6;
         const ink = value ? '#222222' : COLORS.text;
         ctx.fillStyle = ink; ctx.font = `${s * (small ? .095 : .13)}px Arial,sans-serif`;
@@ -580,9 +581,8 @@
           ctx.font = `${s * .075}px Arial,sans-serif`; ctx.fillStyle = ink; ctx.fillText(n.type === 'NOT' ? '' : `${n.inputs} INPUTS${n.extendible ? ' +' : ''}`, p.x + s / 2, p.y + s * .83);
         }
       }
-      if (n.label) { ctx.fillStyle = COLORS.muted; ctx.font = `${Math.min(12, s * .105)}px Arial,sans-serif`; ctx.fillText(n.label, p.x + s * .5, p.y - s * .065); }
+      if (n.label||n.type==='CHIP') { ctx.fillStyle = COLORS.muted; ctx.font = `${Math.min(12, s * .105)}px Arial,sans-serif`; ctx.fillText(n.label||(state.circuit.chips.get(n.chipId)?.name||'CHIP'), p.x + s * .5, p.y - s * .065); }
     }
-    if(n.type==='CHIP'&&s>=70){const font=Math.min(12,s*.075,s*.5/Math.max(1,inputCount(n),outputCount(n)));if(font>=6){ctx.font=`${font}px Arial`;ctx.fillStyle=value?'#222222':COLORS.text;for(const kind of ['in','out'])for(const port of ports(n).filter(p=>p.kind===kind)){const pin=(kind==='in'?n.pinsIn:n.pinsOut)[port.index];ctx.textAlign=kind==='in'?'left':'right';ctx.fillText(pin.name,p.x+s*(kind==='in'?.15:.85),p.y+port.y*s,s*.28);}}}
     if (!ghost && s > 16 && !preview) for (const port of ports(n)) {
       const pp = { x: p.x + port.x * s, y: p.y + port.y * s };
       const on = port.kind === 'out' ? state.circuit.signal(n.id,port.index) : state.circuit.word(n.id, port.index);

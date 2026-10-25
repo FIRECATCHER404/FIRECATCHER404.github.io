@@ -1,4 +1,14 @@
-# Logic Studio 2.7.1
+# Logic Studio 2.7.2
+
+Custom nodes display their internal circuits: every node, connecting wires,
+gate symbols and live signal colors. Nested chips draw their contents too.
+Multiple layers get separate labelled sections. Large empty coordinate gaps
+are compressed in the preview, and geometry is cached between signal changes.
+
+Zoom in to inspect the miniature. External pins remain ordinary wire targets;
+hover for names, widths and values. Right-click > Edit chip contents opens
+the full circuit for editing. Import `custom-node-diagram.logic.json` for
+a six-gate example.
 
 Components now has a **Custom** tab for created/imported chips, listed by name.
 Choose one to place it on the canvas. Search includes custom names, and the
