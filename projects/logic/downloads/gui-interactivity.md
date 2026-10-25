@@ -17,7 +17,9 @@ rate, including faster Ctrl+wheel zoom.
 Native hit testing queries occupied grid cells rather than scanning every
 screen pixel. Rendering submits without waiting for presentation, and UI
 animation polling uses an 8 ms timer; the Windows compositor presents frames.
-Tool labels refresh only when needed. Simulation speed remains independent.
+Tool labels refresh only when needed. CPU status and the byte RAM viewer now
+refresh independently, so opening both cannot leave either view stale.
+Simulation speed remains independent.
 
 On this machine, the same six-second native panning test, with the platformer,
 16,384 individual pixels, four panels and autosave active, measured:
