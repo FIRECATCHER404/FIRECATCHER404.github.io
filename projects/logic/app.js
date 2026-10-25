@@ -534,7 +534,7 @@
       const right = pose?.lift ? end.x : Math.round(end.x * ratio) / ratio, bottom = pose?.lift ? end.y : Math.round(end.y * ratio) / ratio;
       ctx.fillStyle = color; ctx.fillRect(left, top, right - left, bottom - top);
     } else {
-      ctx.fillStyle = n.type==='CHIP'?COLORS.bg:s < 9 ? color : value ? COLORS.on : COLORS.bg;
+      ctx.fillStyle = s < 9 ? color : n.type==='CHIP'?COLORS.bg:value?COLORS.on:COLORS.bg;
       ctx.strokeStyle = COLORS.line; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.roundRect(p.x + inset, p.y + inset, size, size, .055 * s); ctx.fill();
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = ctx.shadowOffsetY = 0;
