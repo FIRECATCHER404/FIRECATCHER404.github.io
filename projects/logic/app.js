@@ -6,7 +6,7 @@
   const canvas = $('canvas'), ctx = canvas.getContext('2d');
   const CELL = 96;const wireRenderer=new LogicWires.Renderer();const portCache=new Map();
   const requestedExample = new URL(location.href).searchParams.get('example');
-  const initialExample = ['rgb-lights','rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io'].includes(requestedExample) ? requestedExample : null;
+  const initialExample = ['rgb-lights','rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io','comments-tunnels'].includes(requestedExample) ? requestedExample : null;
   const STORE = initialExample ? `logic-studio-example-${initialExample}-${initialExample==='computer16'?'v3':'v1'}` : 'logic-studio-v1';
   const COLORS = { bg: '#ffffff', grid: '#eeeeee', on: '#c5efad', off: '#777777', text: '#222222', muted: '#777777', line: '#777777', panel: '#f6f6f6' };
   let preferences = { theme: 'light', simSpeed: 50, simBatch: 1 };
@@ -20,10 +20,10 @@
       components.push({ type, inputs: 2, extendible: true, name: `${type} (EXTENDIBLE INPUT)`, category: 'gates' });
     }
   }
-  for (const type of ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN']) components.push({ type, name: type, category: type.startsWith('RGB')||type==='SCREEN' ? 'color' : 'io' });
+  for (const type of ['INPUT', 'OUTPUT', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN']) components.push({ type, name: type, category: type.startsWith('RGB')||type==='SCREEN' ? 'color' : 'io' });
   components.push({type:'SCREEN',screenPixels:1,name:'SCREEN PIXEL',category:'color'});
   for(const type of ['RAM','ROM'])components.push({type,addressBits:16,name:type+' (64K)',category:'io'});
-  for(const type of ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'])components.push({type,name:type,category:'io'});
+  for(const type of ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND','COMMENT','SENDTUNNEL','RECEIVETUNNEL'])components.push({type,name:type,category:'io',...(['SENDTUNNEL','RECEIVETUNNEL'].includes(type)?{inputs:1}:{})});
   let advancedUI;
   document.querySelector('.tiny-badge').textContent = components.length;
   const state = {
@@ -170,6 +170,7 @@
       let desc = `X ${n.x} · Y ${n.y}\n`;
       if (n.type === 'RGB') desc += `${hex(c.values.get(n.id))} · ${c.peers.has(n.id) ? 'bus connected' : 'no adjacent bus'}`;
       else if (n.type === 'RGBTUNNEL') desc += `24 bits → layer ${n.layer + n.direction + 1}\n${hex(c.values.get(n.id))} · ${c.peers.has(n.id) ? 'RGB linked' : 'place RGB at target'}`;
+      else if(['SENDTUNNEL','RECEIVETUNNEL'].includes(n.type))desc+=`${n.inputs} channels / ${n.channelBits} bit\n${n.type==='SENDTUNNEL'?'Send to layer '+(n.layer+n.direction+1):n.sourceId?'Receive from '+n.sourceId:'Unlinked receiver'} ? ${c.peers.has(n.id)?'Linked':'Unlinked'}`;
       else if (n.type === 'TUNNEL') desc += `${n.direction === 1 ? 'Up' : 'Down'} → layer ${n.layer + n.direction + 1}\n${c.peers.has(n.id) ? 'Tunnel linked' : 'Place facing tunnel at target'}`;
       else if (n.type === 'PULSE') desc += `Signal ${c.values.get(n.id) || 0} · flips every simulation frame\nPause freezes it; Step flips once.`;
       else if (n.type === 'REGISTER') desc += `Q ${c.values.get(n.id) || 0} · stored bit\nD: top input · CLK: bottom input\nCaptures D on a rising CLK edge.`;
@@ -178,8 +179,8 @@
       if(n.type==='CHIP')addAction('Edit chip contents',()=>advancedUI.edit(n));
       if (n.type === 'INPUT') addAction('Toggle', () => toggleInput(n));
       addAction('Properties', () => properties(n));
-      if (n.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(n.type)) addAction('Settings', () => settings(n));
-      if (['TUNNEL','RGBTUNNEL'].includes(n.type)) addAction('Follow ↗', () => { setLayer(n.layer + n.direction); focusAt(n.x, n.y); });
+      if (n.extendible || ['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL','RGBTUNNEL','RAM','ROM','SCREEN','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(n.type)) addAction('Settings', () => settings(n));
+      if (['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL','RGBTUNNEL'].includes(n.type)) addAction('Follow ↗', () => { const peer=state.circuit.nodes.get(state.circuit.peers.get(n.id));setLayer(peer?.layer??n.layer+n.direction);focusAt(peer?.x??n.x,peer?.y??n.y); });
     } else { $('selected-type').textContent = `${chosen.length} components`; $('selected-description').textContent = 'Drag to move together. Copy, paste, or delete the selection.'; }
     addAction('Delete', removeSelected);
     const io = c.selectIO(state.selected);
@@ -307,7 +308,7 @@
   }
   function renderLibrary() {
     const query = $('search').value.trim().toUpperCase(), list = $('component-list'); list.replaceChildren();
-    const symbols = { INPUT: '01', OUTPUT: '◉', TUNNEL: '⇅', RGB: '◈', RGBTUNNEL: '▦', RAM: 'M', ROM: 'R', SCREEN: '▣' };
+    const symbols = { COMMENT:'T',MULTITUNNEL:'?', INPUT: '01', OUTPUT: '◉', TUNNEL: '⇅', RGB: '◈', RGBTUNNEL: '▦', RAM: 'M', ROM: 'R', SCREEN: '▣' };
     let lastGroup, count = 0;
     for (const spec of components) {
       if ((state.activeFilter !== 'all' && spec.category !== state.activeFilter) || (query && !spec.name.includes(query))) continue;
@@ -357,7 +358,7 @@
     const nodes = [...(state.circuit.layers.get(state.layer)?.values() || [])];
     if (!nodes.length) { state.camera = { x: 0n, y: 0n, ox: 0, oy: 0, scale: 1 }; render(); return; }
     let minX = nodes[0].x, maxX = minX, minY = nodes[0].y, maxY = minY;
-    nodes.forEach(n => { if (n.x < minX) minX = n.x; if(n.x+(BigInt(nodeSize(n)-1))>maxX)maxX=n.x+(BigInt(nodeSize(n)-1)); if (n.y < minY) minY = n.y; if(n.y+(BigInt(nodeSize(n)-1))>maxY)maxY=n.y+(BigInt(nodeSize(n)-1)); });
+    nodes.forEach(n=>{const dx=BigInt(n.type==='COMMENT'?Math.ceil(n.commentWidth+n.commentOX)-1:nodeSize(n)-1),dy=BigInt(n.type==='COMMENT'?Math.ceil(n.commentHeight+n.commentOY)-1:nodeSize(n)-1);if(n.x<minX)minX=n.x;if(n.x+dx>maxX)maxX=n.x+dx;if(n.y<minY)minY=n.y;if(n.y+dy>maxY)maxY=n.y+dy;});
     const libraryVisible = $('library').classList.contains('tool-open') && !document.body.classList.contains('library-hidden');
     const left = libraryVisible ? $('library').getBoundingClientRect().right + 35 : 40;
     const control = $('relay-panel').classList.contains('tool-open') ? $('relay-panel') : document.querySelector('.right-panels');
@@ -396,9 +397,15 @@
     return { x: base.x + dx + (normalSize - size) / 2, y: base.y + dy + (normalSize - size) / 2 - 3 * lift, size, lift };
   }
   function portPoint(n, port) { const p = nodePose(n); return { x: p.x + port.x * p.size, y: p.y + port.y * p.size }; }
+  function commentRect(n){const p=worldToScreen(n.x,n.y,n.commentOX||0,n.commentOY||0),d=state.drag,s=cellSize();let w=(n.commentWidth||3)*s,h=(n.commentHeight||1.5)*s;if(d?.id===n.id){if(d.kind==='comment-move'){p.x+=d.dx;p.y+=d.dy;}if(d.kind==='comment-resize'){w=Math.max(.5,Math.min(10000,(n.commentWidth||3)+d.dx/s))*s;h=Math.max(.4,Math.min(10000,(n.commentHeight||1.5)+d.dy/s))*s;}}else if(d?.kind==='move'&&state.selected.has(n.id)){p.x+=d.freeX;p.y+=d.freeY;}return {...p,w,h};}
+  function commentHit(x,y){for(const id of [...(state.circuit.comments||[])].reverse()){const n=state.circuit.nodes.get(id);if(n.layer!==state.layer)continue;const p=commentRect(n);if(x>=p.x&&y>=p.y&&x<=p.x+p.w&&y<=p.y+p.h)return {node:n};}return null;}
+  function drawComment(n){const p=commentRect(n);if(![p.x,p.y,p.w,p.h].every(Number.isFinite)||p.x+p.w<0||p.y+p.h<0||p.x>state.width||p.y>state.height)return;ctx.save();ctx.fillStyle=COLORS.bg;ctx.strokeStyle=state.selected.has(n.id)?'#75ac62':state.theme==='dark'?'#555555':'#cccccc';ctx.lineWidth=state.selected.has(n.id)?1.5:.8;ctx.beginPath();ctx.roundRect(p.x,p.y,p.w,p.h,Math.min(3,p.w/2,p.h/2));ctx.fill();ctx.stroke();if(p.w>10&&p.h>10){const size=Math.max(6,Math.min(24,cellSize()*.15)),pad=Math.min(10,p.w*.05,p.h*.15);ctx.beginPath();ctx.rect(p.x+pad,p.y+pad,p.w-pad*2,p.h-pad*2);ctx.clip();ctx.font=`${size}px Arial,sans-serif`;ctx.textAlign='left';ctx.textBaseline='top';ctx.fillStyle=COLORS.text;let y=p.y+pad;for(const paragraph of n.label.split('\n')){let line='';for(const word of paragraph.split(/\s+/)){const next=line?line+' '+word:word;if(line&&ctx.measureText(next).width>p.w-2*pad){ctx.fillText(line,p.x+pad,y);y+=size*1.35;line=word;}else line=next;}ctx.fillText(line,p.x+pad,y);y+=size*1.35;if(y>p.y+p.h)break;}}ctx.restore();if(state.selected.has(n.id)||state.hover?.node.id===n.id){ctx.save();ctx.strokeStyle=COLORS.muted;ctx.beginPath();ctx.moveTo(p.x+p.w-11,p.y+p.h-3);ctx.lineTo(p.x+p.w-3,p.y+p.h-11);ctx.moveTo(p.x+p.w-7,p.y+p.h-3);ctx.lineTo(p.x+p.w-3,p.y+p.h-7);ctx.stroke();ctx.restore();}}
+  let commentEditId=null;
+  function editComment(n){state.drag=null;state.wire=null;commentEditId=n.id;$('comment-text').value=n.label;$('comment-dialog').showModal();$('comment-text').focus();}
+  $('comment-form').onsubmit=e=>{e.preventDefault();const id=commentEditId;if(!state.circuit.nodes.has(id))return;edit(()=>state.circuit.updateNode(id,{label:$('comment-text').value}));$('comment-dialog').close();};
   function hit(x, y) {
     const w = screenToWorld(x, y), c = state.circuit, s = cellSize();
-    if (s < 8) { const n = c.at(state.layer, w.x, w.y); return n ? { node: n } : null; }
+    if (s < 8) { const n = c.at(state.layer, w.x, w.y); return n ? { node: n } : commentHit(x,y); }
     const radius = Math.max(4, Math.min(10, s * .06));
     const cells = [w, { x: w.x - 1n, y: w.y }, { x: w.x + 1n, y: w.y }, { x: w.x, y: w.y - 1n }, { x: w.x, y: w.y + 1n }];
     let nearest = null, nearestDistance = radius;
@@ -409,7 +416,7 @@
     if (nearest) return nearest;
     const n = c.at(state.layer, w.x, w.y);
     if (n && w.fx > .05 && w.fx < .95 && w.fy > .05 && w.fy < .95) return { node: n };
-    return null;
+    return commentHit(x,y);
   }
   function pathWire(a, b, sourceSide = 1, targetSide = 3) {
     const len = Math.max(28, Math.min(180, Math.hypot(b.x - a.x, b.y - a.y) * .45));
@@ -496,6 +503,7 @@
     }ctx.stroke();
   }
   function drawNode(n, ghost = false, preview = false, dx = 0n, dy = 0n) {
+    if(n.type==='COMMENT')return;
     const pose = !ghost && !preview ? nodePose(n) : null;
     const s = pose?.size || cellSize()*(nodeSize(n)), p = pose ? { x: pose.x, y: pose.y } : worldToScreen(n.x + dx, n.y + dy);
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x + s < 0 || p.y + s < 0 || p.x > state.width || p.y > state.height) return;
@@ -542,9 +550,9 @@
           ctx.font=`${s*.08}px Arial`;ctx.fillText(n.type==='CHIP'?`${inputCount(n)} IN / ${outputCount(n)} OUT`:n.type==='KEYBOARD'?String(value):n.type==='COMMAND'?'ENABLE ↑':`${n.bits||8} BITS`,p.x+s*.5,p.y+s*(n.type==='CHIP'?.83:.79));
         } else if (['INPUT', 'OUTPUT'].includes(n.type)) {
           ctx.font = `${s * .23}px Arial,sans-serif`; ctx.fillStyle = ink; ctx.fillText(String(value), p.x + s * .5, p.y + s * .65);
-        } else if (['TUNNEL','RGBTUNNEL'].includes(n.type)) {
+        } else if (['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL','RGBTUNNEL'].includes(n.type)) {
           ctx.fillStyle = ink; ctx.font = `${s * .24}px Arial,sans-serif`; ctx.fillText(n.direction === 1 ? '↑' : '↓', p.x + s * .5, p.y + s * .61);
-          ctx.font = `${s * .075}px Consolas,monospace`; ctx.fillText(`L${String(n.layer + n.direction + 1).padStart(3, '0')}`, p.x + s * .5, p.y + s * .8);
+          ctx.font = `${s * .075}px Consolas,monospace`; ctx.fillText(n.type==='MULTITUNNEL'?`${n.inputs} x ${n.channelBits} bit`:`L${String(n.layer + n.direction + 1).padStart(3, '0')}`, p.x + s * .5, p.y + s * .8);
         } else if (n.type === 'RAM' || n.type === 'ROM') {
           ctx.font=`${s*.1}px Arial,sans-serif`;ctx.fillText((n.addressBits===16?'64K':'256')+' × 1',p.x+s*.5,p.y+s*.59);ctx.font=`${s*.075}px Consolas,monospace`;ctx.fillText('A='+state.circuit.memoryAddress(n).toString(16).toUpperCase().padStart(n.addressBits===16?4:2,'0')+'  Q='+value,p.x+s*.5,p.y+s*.75);
         } else if (n.type === 'PULSE' || n.type === 'REGISTER') {
@@ -579,6 +587,7 @@
     animation = null; const { width, height } = state;
     const ratio = Math.min(devicePixelRatio || 1, 2); if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) { canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio); }
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.clearRect(0, 0, width, height); ctx.fillStyle = COLORS.bg; ctx.fillRect(0, 0, width, height); grid();
+    for(const id of state.circuit.comments||[]){const n=state.circuit.nodes.get(id);if(n.layer===state.layer)drawComment(n);}
     if (state.ghost) for (const layer of [state.layer - 1, state.layer + 1]) visibleNodes(layer).forEach(n => drawNode(n, true));
     drawGroups();
     const c = state.circuit;
@@ -587,7 +596,8 @@
     const floating = state.drag?.kind === 'move' && state.drag.moved ? state.selected : dropMotion?.ids;
     visibleNodes(state.layer).forEach(n => { if (!floating?.has(n.id)) drawNode(n); });
     for (const id of floating || []) { const n = c.nodes.get(id); if (n?.layer === state.layer) drawNode(n); }
-    if (state.placing && state.pointer.y > 72) { const w = screenToWorld(state.pointer.x, state.pointer.y); drawNode({ ...state.placing, id: 'preview', x: w.x, y: w.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 }, false, true); }
+    if (state.placing?.type==='COMMENT'&&state.pointer.y>20){const w=screenToWorld(state.pointer.x,state.pointer.y);drawComment({id:'preview',type:'COMMENT',x:w.x,y:w.y,commentOX:w.fx,commentOY:w.fy,label:'Comment'});}
+    else if (state.placing && state.pointer.y > 72) { const w = screenToWorld(state.pointer.x, state.pointer.y); drawNode({ ...state.placing, id: 'preview', x: w.x, y: w.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 }, false, true); }
     if (state.wire) {
       const n = c.nodes.get(state.wire.node), port = state.wire.port;
       if (n) { const p = portPoint(n, port), end = state.pointer;
@@ -603,6 +613,7 @@
       let text = port.kind === 'out' ? 'OUTPUT · drag to connect' : `INPUT ${port.index + 1} · ${c.bit(node.id, port.index)}`;
       if(node.type==='CHIP'){const pin=(port.kind==='out'?node.pinsOut:node.pinsIn)[port.index];text=`${pin.name} · ${pin.width} bit${pin.width===1?'':'s'} · ${port.kind==='out'?c.signal(node.id,port.index):c.word(node.id,port.index)}`;}
       if(['JOIN','SPLIT'].includes(node.type))text=`${port.kind==='out'&&node.type==='SPLIT'||port.kind==='in'&&node.type==='JOIN'?'BIT '+port.index:(node.bits||8)+'-BIT BUS'} · ${port.kind==='out'?c.signal(node.id,port.index):c.word(node.id,port.index)}`;
+      if(['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(node.type))text=`CHANNEL ${port.index+1} ? ${node.channelBits} bit ? ${port.kind==='out'?c.signal(node.id,port.index):c.word(node.id,port.index)}`;
       if (node.type === 'REGISTER') text = port.kind === 'out' ? 'Q · stored bit · drag to connect' : `${port.index === 0 ? 'D · data' : 'CLK · rising edge'} · ${c.bit(node.id, port.index)}`;
       if (node.type === 'RGBTUNNEL') text = `${['R', 'G', 'B'][Math.floor(port.index / 8)]}${7 - port.index % 8} · BIT ${23 - port.index} · ${c.bit(node.id, port.index)}`;
       ctx.font = '10px Consolas,monospace'; const tw = ctx.measureText(text).width;
@@ -636,8 +647,8 @@
       item('Properties…', '', () => properties(h.node));
       if (h.node.type === 'INPUT') item('Toggle input', 'Enter', () => toggleInput(h.node));
       if (['INPUT', 'OUTPUT'].includes(h.node.type)) item('Group / title…', 'G', () => groupDialog());
-      if (h.node.extendible || ['TUNNEL','RGBTUNNEL','RAM','ROM','SCREEN','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(h.node.type)) item('Settings…', '', () => settings(h.node));
-      if (['TUNNEL','RGBTUNNEL'].includes(h.node.type)) item('Follow to adjacent layer', '↗', () => { setLayer(h.node.layer + h.node.direction); focusAt(h.node.x, h.node.y); });
+      if (h.node.extendible || ['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL','RGBTUNNEL','RAM','ROM','SCREEN','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(h.node.type)) item('Settings…', '', () => settings(h.node));
+      if (['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL','RGBTUNNEL'].includes(h.node.type)) item('Follow to adjacent layer', '↗', () => { const peer=state.circuit.nodes.get(state.circuit.peers.get(h.node.id));setLayer(peer?.layer??h.node.layer+h.node.direction);focusAt(peer?.x??h.node.x,peer?.y??h.node.y); });
       if (h.port?.kind === 'in') {
         const w = state.circuit.incoming.get(h.node.id)[h.port.index]; if (w) item('Disconnect input', '', () => edit(() => state.circuit.disconnect(w.id)));
       }
@@ -650,6 +661,7 @@
   }
   let propertyNodeId = null;
   function properties(n) {
+    if(n.type==='COMMENT'){editComment(n);return;}if(['SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)){settings(n);return;}
     if(advancedUI.isAdvanced(n)){advancedUI.settings(n);return;}
     propertyNodeId = n.id;
     $('properties-title').textContent = `${n.type} properties`;
@@ -677,10 +689,12 @@
     if (success) { $('properties-dialog').close(); propertyNodeId = null; }
   };
   function settings(n, placing = false) {
+    if(n.type==='COMMENT'){editComment(n);return;}
     if(advancedUI.settings(n,placing))return;
     pendingSettings = { node: n, placing }; $('settings-title').textContent = placing ? `Place ${n.type}` : `Edit ${n.type}`;
     const fields = $('settings-fields'); fields.replaceChildren();
-    if(['RAM','ROM'].includes(n.type)){const bits=1<<(n.addressBits||8);$('settings-note').textContent=`${bits} × 1 memory plane. Address pins A0–A${(n.addressBits||8)-1}. Packed hex lists bits in address order, most significant bit first.`;const label=document.createElement('label');label.className='field';label.textContent='Packed memory hex';const input=document.createElement('textarea');input.id='setting-memory';input.rows=5;let hex='';for(let a=0;a<bits;a+=4){let v=0;for(let b=0;b<4;b++)v=(v<<1)|state.circuit.memoryBit(n,a+b);hex+=v.toString(16);}input.value=hex.toUpperCase();label.append(input);fields.append(label);
+    if(n.type==='RECEIVETUNNEL'){$('settings-note').textContent='Only output pins. Choose a sender whose destination is this layer. Channel count and width follow the sender; moving either endpoint keeps the connection.';const label=document.createElement('label');label.className='field';label.textContent='Sender';const sel=document.createElement('select');sel.id='setting-source';sel.add(new Option('Unlinked',''));for(const source of state.circuit.nodes.values())if(source.type==='SENDTUNNEL'&&source.layer+source.direction===n.layer)sel.add(new Option(`${source.label||source.id} ? ${source.inputs} channels ? ${source.channelBits} bit`,source.id));sel.value=n.sourceId||'';label.append(sel);fields.append(label);
+    }else if(['RAM','ROM'].includes(n.type)){const bits=1<<(n.addressBits||8);$('settings-note').textContent=`${bits} × 1 memory plane. Address pins A0–A${(n.addressBits||8)-1}. Packed hex lists bits in address order, most significant bit first.`;const label=document.createElement('label');label.className='field';label.textContent='Packed memory hex';const input=document.createElement('textarea');input.id='setting-memory';input.rows=5;let hex='';for(let a=0;a<bits;a+=4){let v=0;for(let b=0;b<4;b++)v=(v<<1)|state.circuit.memoryBit(n,a+b);hex+=v.toString(16);}input.value=hex.toUpperCase();label.append(input);fields.append(label);
     }else if(n.type==='SCREEN'){$('settings-note').textContent=n.screenPixels===1?'One grid-sized pixel reading one RGB565 word. Address range: 0000–FFFF.':'Displays 16384 RGB565 words from sixteen 64K RAM planes. Address range: 0000–C000.';for(const [id,title,value]of [['setting-prefix','RAM plane prefix',n.screenPrefix||'DATA'],['setting-base','Base address (hex)',(n.screenBase??49152).toString(16).toUpperCase()]]){const l=document.createElement('label');l.className='field';l.textContent=title;const input=document.createElement('input');input.id=id;input.value=value;l.append(input);fields.append(l);}
     }else if (n.extendible) {
       $('settings-note').textContent = 'Choose how many inputs this gate should have. Unconnected inputs are off.';
@@ -694,6 +708,7 @@
         const option = document.createElement('option'); option.value = direction; option.textContent = `${direction === 1 ? '↑ Up' : '↓ Down'} one layer${n.layer + direction >= 0 && n.layer + direction < 256 ? ` → Layer ${n.layer + direction + 1}` : ' (unavailable)'}`; option.disabled = n.layer + direction < 0 || n.layer + direction > 255; select.append(option);
       }
       select.value = n.direction || (n.layer === 255 ? -1 : 1); label.append(select); fields.append(label);
+      if(n.type==='MULTITUNNEL'||n.type==='SENDTUNNEL'){$('settings-note').textContent=n.type==='SENDTUNNEL'?'Only input pins. Placement automatically creates a linked receiver on the selected adjacent layer. Its outputs match these channels.':'Independent legacy channels between facing tunnels.';const l=document.createElement('label');l.className='field';l.textContent=n.type==='SENDTUNNEL'?'Channels (1-16)':'Channels (2-16)';const input=document.createElement('input');Object.assign(input,{id:'setting-channels',type:'number',min:n.type==='SENDTUNNEL'?1:2,max:16,step:1,value:n.inputs||2,required:true});l.append(input);fields.append(l);const b=document.createElement('label');b.className='field';b.textContent='Bits per channel';const sel=document.createElement('select');sel.id='setting-channel-bits';for(const width of [1,8,16]){const o=document.createElement('option');o.value=width;o.textContent=width+' bit'+(width>1?'s':'');sel.append(o);}sel.value=n.channelBits||1;b.append(sel);fields.append(b);}
     }
     $('settings-dialog').showModal(); fields.querySelector('input,select')?.focus();
   }
@@ -701,15 +716,18 @@
     e.preventDefault(); if (!pendingSettings) return;
     const { node, placing } = pendingSettings;
     let changes = node.extendible ? { inputs: Number($('setting-inputs').value) } : { direction: Number($('setting-direction')?.value||1) };if(['RAM','ROM'].includes(node.type)){const h=$('setting-memory').value.replace(/\s/g,'');if(!/^[0-9a-f]+$/i.test(h)||h.length!==(1<<(node.addressBits||8))/4){toast('Use exactly '+((1<<(node.addressBits||8))/4)+' packed hex digits.');return;}changes={memory:[...h].map(c=>parseInt(c,16).toString(2).padStart(4,'0')).join('')};}if(node.type==='SCREEN'){const h=$('setting-base').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(h)){toast('Use a four-digit hex memory address.');return;}changes={screenPrefix:$('setting-prefix').value.trim(),screenBase:parseInt(h,16)};}
+    if(node.type==='RECEIVETUNNEL'){changes={sourceId:$('setting-source').value};const source=state.circuit.nodes.get(changes.sourceId);if(source)Object.assign(changes,{inputs:source.inputs,channelBits:source.channelBits,direction:source.layer-node.layer});}
+    if(node.type==='MULTITUNNEL'||node.type==='SENDTUNNEL')Object.assign(changes,{inputs:Number($('setting-channels').value),channelBits:Number($('setting-channel-bits').value)});
     let success = false;
     edit(() => { if (placing) { const n = state.circuit.addNode({ ...node, ...changes }); state.selected = new Set([n.id]); } else state.circuit.updateNode(node.id, changes); success = true; });
     if (success) { $('settings-dialog').close(); pendingSettings = null; }
   };
   function place(x, y) {
     const pos = screenToWorld(x, y), spec = state.placing;
-    if (state.circuit.at(state.layer, pos.x, pos.y)) { toast('That grid square is occupied.'); return; }
+    if (spec.type!=='COMMENT'&&state.circuit.at(state.layer, pos.x, pos.y)) { toast('That grid square is occupied.'); return; }
     const node = { ...spec, x: pos.x, y: pos.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 };
-    if (spec.extendible || ['TUNNEL','RGBTUNNEL','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(spec.type)) settings(node, true);
+    if(spec.type==='COMMENT'){let n;edit(()=>{n=state.circuit.addNode({...node,label:'Comment',commentOX:pos.fx,commentOY:pos.fy});state.selected=new Set([n.id]);});if(n)editComment(n);return;}
+    if (spec.extendible || ['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL','RGBTUNNEL','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(spec.type)) settings(node, true);
     else edit(() => { const n = state.circuit.addNode(node); state.selected = new Set([n.id]); });
   }
   function finishWire(target) {
@@ -732,7 +750,7 @@
       if (touchGesture !== g || g.moved || pointers.size !== 1 || document.querySelector('dialog[open]')) return;
       g.fired = true; lastTouchTap = null; state.drag = null; state.wire = null; dropMotion = null;
       const n = state.circuit.nodes.get(g.node);
-      if (n?.type === 'INPUT') toggleInput(n);
+      if(n?.type==='COMMENT')editComment(n);else if (n?.type === 'INPUT') toggleInput(n);
       else { g.pan = true; state.drag = { kind: 'pan', last: { x: g.x, y: g.y } }; }
       document.body.classList.toggle('dragging', !!g.pan); render();
     }, TOUCH_HOLD);
@@ -753,9 +771,10 @@
       updateUI(); renderLibrary(); render(); return;
     }
     state.ioSelection = false;
-    if (event.button === 1) { event.preventDefault(); if (h?.node.type === 'INPUT') { toggleInput(h.node); state.drag = null; return; } }
+    if (event.button === 1) { event.preventDefault(); if(h?.node.type==='COMMENT'){editComment(h.node);state.drag=null;return;}if (h?.node.type === 'INPUT') { toggleInput(h.node); state.drag = null; return; } }
     if (event.button === 1 || state.space || state.tool === 'pan') { state.drag = { kind: 'pan', last: { x, y } }; document.body.classList.add('dragging'); return; }
     if (state.placing) { place(x, y); return; }
+    if(h?.node.type==='COMMENT'){state.selected=new Set([h.node.id]);const p=commentRect(h.node);state.drag={kind:x>=p.x+p.w-14&&y>=p.y+p.h-14?'comment-resize':'comment-move',id:h.node.id,start:{x,y},dx:0,dy:0};updateUI();render();return;}
     if (h?.port) {
       if (h.port.kind === 'out') state.wire = { node: h.node.id, port: h.port, start: { x, y } };
       else {
@@ -795,6 +814,7 @@
     }
     const w = screenToWorld(x, y); $('cursor-position').textContent = `X ${shorten(w.x)} · Y ${shorten(w.y)}`;
     if (drag?.kind === 'pan') { pan(x - drag.last.x, y - drag.last.y); drag.last = { x, y }; return; }
+    if(drag?.kind==='comment-move'||drag?.kind==='comment-resize'){drag.dx=x-drag.start.x;drag.dy=y-drag.start.y;render();return;}
     if (drag?.kind === 'move') {
       if (!drag.moved && Math.hypot(x - drag.start.x, y - drag.start.y) > 3) { drag.moved = true; drag.liftStart = performance.now(); }
       drag.freeX = x - drag.start.x; drag.freeY = y - drag.start.y;
@@ -813,7 +833,7 @@
       updateUI(); render();
     } else if (drag?.kind === 'wire') { drag.moved ||= Math.hypot(x - state.wire.start.x, y - state.wire.start.y) > 5; }
     const hover = hit(x, y); state.hover = hover;
-    canvas.style.cursor = state.placing ? 'crosshair' : state.tool === 'pan' || state.space ? 'grab' : hover?.port || state.wire ? 'crosshair' : hover?.node ? 'move' : 'default'; render();
+    canvas.style.cursor = state.placing ? 'crosshair' : state.tool === 'pan' || state.space ? 'grab' : hover?.port || state.wire ? 'crosshair' : hover?.node.type==='COMMENT'&&x>=commentRect(hover.node).x+commentRect(hover.node).w-14&&y>=commentRect(hover.node).y+commentRect(hover.node).h-14?'nwse-resize':hover?.node ? 'move' : 'default'; render();
   });
   function endPointer(event, canceled = false) {
     let showTouchMenu = false;
@@ -835,6 +855,7 @@
         if (drag.hit?.node) { const id = drag.hit.node.id; if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id); }
       }
     }
+    if(!canceled&&(drag?.kind==='comment-move'||drag?.kind==='comment-resize')&&(drag.dx||drag.dy)){const n=state.circuit.nodes.get(drag.id),s=cellSize();if(drag.kind==='comment-resize')edit(()=>state.circuit.updateNode(n.id,{commentWidth:Math.max(.5,Math.min(10000,n.commentWidth+drag.dx/s)),commentHeight:Math.max(.4,Math.min(10000,n.commentHeight+drag.dy/s))}));else{const dx=n.commentOX+drag.dx/s,dy=n.commentOY+drag.dy/s,ix=Math.floor(dx),iy=Math.floor(dy);edit(()=>state.circuit.updateNode(n.id,{x:n.x+BigInt(ix),y:n.y+BigInt(iy),commentOX:dx-ix,commentOY:dy-iy}));}}
     if (!canceled && drag?.kind === 'move' && drag.moved) {
       let committed = !drag.dx && !drag.dy;
       if (drag.dx || drag.dy) edit(() => { state.circuit.moveNodes(state.selected, drag.dx, drag.dy); committed = true; });
@@ -874,7 +895,7 @@
     else if (e.code === 'Space') { e.preventDefault(); state.space = true; document.body.classList.add('space-held'); canvas.style.cursor = 'grab'; }
     else if (key === 'delete' || key === 'backspace') { e.preventDefault(); removeSelected(); }
     else if (key === 'escape') cancel();
-    else if (key === 'enter') { const n = state.circuit.nodes.get([...state.selected][0]); if (n?.type === 'INPUT') toggleInput(n); }
+    else if (key === 'enter') { const n = state.circuit.nodes.get([...state.selected][0]); if(n?.type==='COMMENT')editComment(n);else if (n?.type === 'INPUT') toggleInput(n); }
     else if (key === 'f') fit();
     else if (key === '0') { state.camera = { x: 0n, y: 0n, ox: 0, oy: 0, scale: 1 }; render(); saveSoon(); }
     else if (key === 'v') chooseTool('select');
@@ -900,10 +921,11 @@
     if (!state.clipboard) return;
     const c = state.circuit, clip = state.clipboard, before = snapshot(), ids = new Map(), added = [];
     let offset = 1n;
-    while (clip.nodes.some(n => {const size=nodeSize(n);for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(c.at(state.layer,n.x+offset+BigInt(x),n.y+offset+BigInt(y)))return true;return false;})) offset++;
+    while (clip.nodes.some(n => {if(n.type==='COMMENT')return false;const size=nodeSize(n);for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(c.at(state.layer,n.x+offset+BigInt(x),n.y+offset+BigInt(y)))return true;return false;})) offset++;
     try {
       const chipMap=new Map();for(const def of clip.chips||[]){const old=c.chips.get(def.id);if(!old)c.chips.set(def.id,def);else if(JSON.stringify(old)!==JSON.stringify(def)){const id=c.id('chip');c.chips.set(id,{...def,id});chipMap.set(def.id,id);}}
-      for (const n of clip.nodes) { const copy = c.addNode({ ...n, ...(n.type==='CHIP'?{chipId:chipMap.get(n.chipId)||n.chipId}: {}), id: undefined, x: n.x + offset, y: n.y + offset, layer: state.layer, direction: state.layer === 255 ? -1 : state.layer === 0 ? 1 : n.direction }); c.values.set(copy.id, clip.signals.get(n.id) || 0); ids.set(n.id, copy.id); added.push(copy.id); }
+      for (const n of clip.nodes) { const copy = c.addNode({ ...n, ...(n.type==='CHIP'?{chipId:chipMap.get(n.chipId)||n.chipId}: {}), id: undefined, x: n.x + offset, y: n.y + offset, layer: state.layer, direction: state.layer === 255 ? -1 : state.layer === 0 ? 1 : n.direction },{autoReceiver:false}); c.values.set(copy.id, clip.signals.get(n.id) || 0); ids.set(n.id, copy.id); added.push(copy.id); }
+      for(const old of clip.nodes){const n=c.nodes.get(ids.get(old.id));if(n.type==='RECEIVETUNNEL'&&ids.has(n.sourceId))n.sourceId=ids.get(n.sourceId);}c.rebuild();c.ensureSendReceivers(added);
       for (const w of clip.wires) c.connect(ids.get(w.from), ids.get(w.to), w.port, w.fromPort||0);
       for(const w of clip.externalInputs||[]){const source=c.nodes.get(w.from),to=ids.get(w.to);if(source&&to&&source.layer===state.layer&&hasOutput(source))c.connect(w.from,to,w.port,w.fromPort||0);}
       const taken = new Set([...c.wires.values()].map(w => `${w.to}:${w.port}`));
@@ -956,10 +978,10 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   let memoryPage=0;
   function refreshMemory(){try{const c=state.circuit,values=LogicProgram.memory(c),bits=programBits(),hex=n=>n.toString(16).padStart(bits===16?4:2,'0').toUpperCase();memoryPage=Math.max(0,Math.min(values.length-256,memoryPage))&~255;let text='      '+Array.from({length:16},(_,i)=>hex(i)).join(' ')+'\n';for(let a=memoryPage;a<memoryPage+256;a+=16)text+=hex(a)+': '+values.slice(a,a+16).map(hex).join(' ')+'\n';$('memory-grid').value=text;$('memory-note').textContent=bits===16?'64K words / 128 KiB. Screen RAM is C000–FFFF (RGB565).':'256 bytes.';$('memory-error').textContent='';}catch(error){$('memory-grid').value='';$('memory-error').textContent=error.message;}}
   $('memory-open').onclick=()=>{setDrawer(false);refreshMemory();$('memory-dialog').showModal();};$('memory-go').onclick=()=>{const h=$('memory-page').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(h)){ $('memory-error').textContent='Use a hex page address.';return;}memoryPage=parseInt(h,16);refreshMemory();};$('memory-write').onclick=()=>{try{const a=$('memory-address').value.trim(),v=$('memory-value').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(a)||!/^[0-9a-f]{1,4}$/i.test(v))throw Error('Use hexadecimal addresses and values.');let ok=false;edit(()=>{LogicProgram.writeMemory(state.circuit,parseInt(a,16),parseInt(v,16));ok=true;});if(ok)refreshMemory();}catch(error){$('memory-error').textContent=error.message;}};
-  async function loadFileExample(name){const global={'rgb-counter':'LogicRGBCounter',computer16:'LogicComputer16','computer16-keyboard':'LogicComputer16Keyboard','chips-io':'LogicChipsIO','computer-v2':'LogicComputerV2','graphical-computer':'LogicGraphicalComputer'}[name];if(window[global])return window[global];return await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='examples/'+name+'.js';script.onload=()=>resolve(window[global]);script.onerror=()=>reject(Error('Example file is missing'));document.head.append(script);});}
+  async function loadFileExample(name){const global={'comments-tunnels':'LogicCommentsTunnels','rgb-counter':'LogicRGBCounter',computer16:'LogicComputer16','computer16-keyboard':'LogicComputer16Keyboard','chips-io':'LogicChipsIO','computer-v2':'LogicComputerV2','graphical-computer':'LogicGraphicalComputer'}[name];if(window[global])return window[global];return await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='examples/'+name+'.js';script.onload=()=>resolve(window[global]);script.onerror=()=>reject(Error('Example file is missing'));document.head.append(script);});}
   function showCounter(){const n=[...state.circuit.nodes.values()].find(n=>n.type==='RGB');if(n){setLayer(n.layer);focusAt(n.x,n.y);}toast('RGB counter: open Control panel and press Run to start.');}
   function requestReplacement(which) {
-    const names = { 'rgb': 'RGB bus', 'rgb-lights': 'RGB lights', 'tunnel': 'layer tunnel', 'adder': 'half adder', 'rgb-counter':'RGB 24-bit counter', 'computer16':'programmable 16-bit computer (128×128 screen)', 'computer16-keyboard':'keyboard-controlled 16-bit computer', 'chips-io':'chips, buses and keyboard commands', 'computer-v2':'RGB-8 v2 computer', 'graphical-computer':'original graphical computer' };
+    const names = { 'comments-tunnels':'comments and directional tunnels', 'rgb': 'RGB bus', 'rgb-lights': 'RGB lights', 'tunnel': 'layer tunnel', 'adder': 'half adder', 'rgb-counter':'RGB 24-bit counter', 'computer16':'programmable 16-bit computer (128×128 screen)', 'computer16-keyboard':'keyboard-controlled 16-bit computer', 'chips-io':'chips, buses and keyboard commands', 'computer-v2':'RGB-8 v2 computer', 'graphical-computer':'original graphical computer' };
     pendingReplacement = which; $('confirm-title').textContent = which === 'blank' ? 'Start a blank circuit?' : `Open the ${names[which] || 'half adder'} example?`;
     $('confirm-replace').textContent = which === 'blank' ? 'Start new' : 'Open example';
     $('help-dialog').close(); $('confirm-dialog').showModal();
@@ -967,7 +989,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   $('confirm-dialog').addEventListener('close', async () => {
     if ($('confirm-dialog').returnValue === 'export') { exportFile(); $('confirm-dialog').showModal(); return; }
     if ($('confirm-dialog').returnValue !== 'replace') return;
-    let imported;try{if(['rgb-counter','computer-v2','computer16','computer16-keyboard','chips-io','graphical-computer'].includes(pendingReplacement))imported=await loadFileExample(pendingReplacement);}catch(error){toast(error.message);return;}checkpoint();if(imported){restore(JSON.stringify(imported));if(pendingReplacement==='rgb-counter')showCounter();changed(false);return;}state.circuit = pendingReplacement === 'blank' ? new Circuit() : example(pendingReplacement);
+    let imported;try{if(['rgb-counter','computer-v2','computer16','computer16-keyboard','chips-io','graphical-computer','comments-tunnels'].includes(pendingReplacement))imported=await loadFileExample(pendingReplacement);}catch(error){toast(error.message);return;}checkpoint();if(imported){restore(JSON.stringify(imported));if(pendingReplacement==='rgb-counter')showCounter();changed(false);return;}state.circuit = pendingReplacement === 'blank' ? new Circuit() : example(pendingReplacement);
     stopTicks(); state.simulationPending = false; state.simulationSeen.clear();
     state.layer = pendingReplacement === 'rgb-lights' ? 1 : 0; state.selected.clear(); state.wire = null; state.placing = null; state.running = true; state.ioSelection = false; state.relayDrafts.clear(); state.relayOrders.clear(); state.relayGroupId = ''; relayOrderKey = '';
     $('project-name').value = state.circuit.name; state.lastSimulation = state.circuit.settle(); fit(); changed(false); renderLibrary();
@@ -1060,7 +1082,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   try { const saved = localStorage.getItem(STORE); if (saved) { restoring = true; restore(saved); loaded = true; } }
   catch { toast('The saved circuit could not be restored. Import an exported copy if needed.'); }
   finally { restoring = false; }
-  if (!loaded && ['rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io'].includes(initialExample)) {
+  if (!loaded && ['rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io','comments-tunnels'].includes(initialExample)) {
     try {
       // A local script works on file:// without a server or blocked JSON fetch.
       const data=await loadFileExample(initialExample);

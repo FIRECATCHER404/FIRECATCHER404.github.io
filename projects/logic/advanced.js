@@ -16,7 +16,7 @@ Circuit.prototype.prepareChips=function(){
  for(const n of this.nodes.values())if(n.type==='CHIP'){this.prepareChip(n);if(!this.children.has(n.id)){const d=this.chips.get(n.chipId),child=Circuit.fromJSON(n.chipState||d.circuit);for(const p of [...n.pinsIn,...n.pinsOut]){const q=child.nodes.get(p.nodeId);if(!q||q.type!==d.circuit.nodes.find(q=>q.id===p.nodeId)?.type||(q.bits||1)!==p.width)throw Error('Chip state has an incompatible interface.');}this.children.set(n.id,child);delete n.chipState;}}
 };
 let depth=0;const load=Circuit.fromJSON;Circuit.fromJSON=function(data){if(++depth>16){depth--;throw Error('Chip nesting exceeds 16 levels.');}try{return load.call(this,data);}finally{depth--;}};
-Circuit.prototype.signal=function(id,p=0,values=this.values){const n=this.nodes.get(id);if(!n)return 0;if(n.type==='SPLIT')return ((values.get(id)||0)>>p)&1;if(n.type==='CHIP')return this.children.get(id)?.values.get(n.pinsOut[p]?.nodeId)||0;return values.get(id)||0;};
+Circuit.prototype.signal=function(id,p=0,values=this.values){const n=this.nodes.get(id);if(!n)return 0;if(n.type==='MULTITUNNEL'||n.type==='RECEIVETUNNEL')return n.portValues?.[p]||0;if(n.type==='SPLIT')return ((values.get(id)||0)>>p)&1;if(n.type==='CHIP')return this.children.get(id)?.values.get(n.pinsOut[p]?.nodeId)||0;return values.get(id)||0;};
 Circuit.prototype.word=function(id,p=0,values=this.values){const w=this.incoming.get(id)?.[p];return w?this.signal(w.from,w.fromPort||0,values):0;};
 Circuit.prototype.evaluateAdvanced=function(n,values){switch(n.type){
  case 'BUSINPUT':return n.driven??n.busValue;

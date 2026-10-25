@@ -7,10 +7,11 @@
   'use strict';
   const MAX_LAYERS = 256;
   const GATES = ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR'];
-  const SPECIAL = ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN', 'BUSINPUT', 'BUSOUTPUT', 'JOIN', 'SPLIT', 'CHIP', 'KEYBOARD', 'COMMAND'];
+  const SPECIAL = ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN', 'BUSINPUT', 'BUSOUTPUT', 'JOIN', 'SPLIT', 'CHIP', 'KEYBOARD', 'COMMAND', 'COMMENT', 'MULTITUNNEL', 'SENDTUNNEL', 'RECEIVETUNNEL'];
   const key = (layer, x, y) => `${layer}:${x}:${y}`;
   const comparePosition = (a, b) => a.x < b.x ? -1 : a.x > b.x ? 1 : a.y < b.y ? -1 : a.y > b.y ? 1 : a.id.localeCompare(b.id);
   function inputCount(node) {
+    if(node.type==='COMMENT'||node.type==='RECEIVETUNNEL')return 0;if(node.type==='MULTITUNNEL'||node.type==='SENDTUNNEL')return node.inputs;
     if (node.type === 'CHIP') return (node.pinsIn || []).length;
     if (['BUSINPUT','KEYBOARD'].includes(node.type)) return 0;
     if (node.type === 'JOIN') return node.bits || 8;
@@ -23,10 +24,10 @@
     if (['NOT', 'OUTPUT', 'TUNNEL'].includes(node.type)) return 1;
     return node.inputs;
   }
-  function hasOutput(node) { return !['OUTPUT', 'RGB', 'RGBTUNNEL', 'SCREEN', 'BUSOUTPUT'].includes(node.type); }
-  function outputCount(n) { return n.type === 'CHIP' ? (n.pinsOut || []).length : n.type === 'SPLIT' ? n.bits || 8 : +hasOutput(n); }
-  function inputWidth(n, p = 0) { return n.type === 'CHIP' ? n.pinsIn[p]?.width : ['SPLIT','BUSOUTPUT'].includes(n.type) ? n.bits || 8 : 1; }
-  function outputWidth(n, p = 0) { return n.type === 'CHIP' ? n.pinsOut[p]?.width : ['JOIN','BUSINPUT'].includes(n.type) ? n.bits || 8 : 1; }
+  function hasOutput(node) { return !['SENDTUNNEL','COMMENT', 'OUTPUT', 'RGB', 'RGBTUNNEL', 'SCREEN', 'BUSOUTPUT'].includes(node.type); }
+  function outputCount(n) { return ['MULTITUNNEL','RECEIVETUNNEL'].includes(n.type)?n.inputs:n.type === 'CHIP' ? (n.pinsOut || []).length : n.type === 'SPLIT' ? n.bits || 8 : +hasOutput(n); }
+  function inputWidth(n, p = 0) { return ['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)?n.channelBits:n.type === 'CHIP' ? n.pinsIn[p]?.width : ['SPLIT','BUSOUTPUT'].includes(n.type) ? n.bits || 8 : 1; }
+  function outputWidth(n, p = 0) { return ['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)?n.channelBits:n.type === 'CHIP' ? n.pinsOut[p]?.width : ['JOIN','BUSINPUT'].includes(n.type) ? n.bits || 8 : 1; }
   function nodeSize(node) { return node.type === 'SCREEN' && node.screenPixels !== 1 ? 8 : 1; }
   function gate(type, bits) {
     switch (type) {
@@ -55,7 +56,7 @@
       if (!Number.isInteger(inputs) || inputs < 2 || inputs > 16 || (!data.extendible && !allowed.includes(inputs))) throw new Error('Invalid input count (2–16 for extendible gates).');
     }
     let direction = data.direction ?? (layer === 255 ? -1 : 1);
-    if (['TUNNEL', 'RGBTUNNEL'].includes(data.type) &&
+    if (['TUNNEL', 'MULTITUNNEL','SENDTUNNEL', 'RGBTUNNEL'].includes(data.type) &&
         (![1, -1].includes(direction) || layer + direction < 0 || layer + direction >= MAX_LAYERS)) throw new Error('The tunnel must target an adjacent layer between 1 and 256.');
     if (data.type === 'REGISTER' && data.clock !== undefined && ![0, 1].includes(data.clock)) throw new Error('Invalid register clock state.');
     const addressBits = data.addressBits ?? 8;if (![8,16].includes(addressBits)) throw new Error('Memory uses 8 or 16 address bits.');const memory = data.memory ?? '0'.repeat(1 << addressBits);
@@ -65,10 +66,12 @@
       id: String(data.id ?? ''), type: data.type, layer,
       x: integerCoordinate(data.x ?? 0), y: integerCoordinate(data.y ?? 0),
       inputs, extendible: !!data.extendible, direction,
-      on: !!data.on, label: typeof data.label === 'string' ? data.label.slice(0, 80) : '',
+      on: !!data.on, label: typeof data.label === 'string' ? data.label.slice(0, data.type==='COMMENT'?8192:80) : '',
       ...(data.type === 'REGISTER' ? { clock: data.clock ?? 0 } : {}),
       ...(['RAM', 'ROM'].includes(data.type) ? { memory, ...(addressBits !== 8 ? { addressBits } : {}), ...(data.type === 'RAM' ? { clock: data.clock ?? 0 } : {}) } : {})
     };
+    if(n.type==='COMMENT'){for(const [key,value]of Object.entries({commentOX:0,commentOY:0,commentWidth:3,commentHeight:1.5})){n[key]=data[key]??value;if(typeof n[key]!=='number'||!Number.isFinite(n[key]))throw Error('Invalid comment geometry.');}if(n.commentOX<0||n.commentOX>=1||n.commentOY<0||n.commentOY>=1||n.commentWidth<.5||n.commentWidth>10000||n.commentHeight<.4||n.commentHeight>10000)throw Error('Invalid comment bounds.');}
+    if(['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)){n.sourceId=data.sourceId??'';if(typeof n.sourceId!=='string'||n.sourceId.length>100)throw Error('Invalid tunnel source.');n.channelBits=data.channelBits??1;if(!Number.isInteger(n.inputs)||n.inputs<(n.type==='MULTITUNNEL'?2:1)||n.inputs>16||![1,8,16].includes(n.channelBits))throw Error('Use 2-16 channels of 1, 8 or 16 bits.');n.portValues=data.portValues??Array(n.inputs).fill(0);if(!Array.isArray(n.portValues)||n.portValues.length!==n.inputs||n.portValues.some(v=>!Number.isInteger(v)||v<0||v>=2**n.channelBits))throw Error('Invalid tunnel channel state.');n.portValues=[...n.portValues];}
     if(n.type==='SCREEN'){n.screenPixels=data.screenPixels??128;n.screenBase=data.screenBase??49152;n.screenPrefix=data.screenPrefix??'DATA';if(![1,128].includes(n.screenPixels)||!Number.isInteger(n.screenBase)||n.screenBase<0||n.screenBase>65536-n.screenPixels*n.screenPixels||typeof n.screenPrefix!=='string'||!n.screenPrefix||n.screenPrefix.length>80)throw new Error('Invalid screen memory region.');}
     if(['RAM','ROM'].includes(n.type)&&addressBits===16){Object.defineProperty(n,'storage',{value:Uint8Array.from(memory,c=>+(c==='1')),writable:true});Object.defineProperty(n,'memory',{enumerable:true,get(){return Array.from(this.storage).join('');},set(value){this.storage=Uint8Array.from(value,c=>+(c==='1'));}});if(data.memoryHex!==undefined){if(typeof data.memoryHex!=='string'||!/^[0-9a-f]{16384}$/i.test(data.memoryHex))throw new Error('Invalid packed 64K memory plane.');for(let a=0;a<16384;a++){const v=parseInt(data.memoryHex[a],16);for(let b=0;b<4;b++)n.storage[a*4+b]=(v>>(3-b))&1;}}n.memoryVersion=0;}
     if (['BUSINPUT','BUSOUTPUT','JOIN','SPLIT'].includes(n.type)) {
@@ -125,15 +128,15 @@
       this.needsSettle = true;
       this.prepareChips?.();
       this.largeMemory=[...this.nodes.values()].some(n=>n.addressBits===16);this.topologyVersion=(this.topologyVersion||0)+1;this.wireLayers=new Map();this.screens=new Set();this.positions = new Map(); this.layers = new Map(); this.incoming = new Map(); this.dependents = new Map();
-      this.logicNodes=[];this.pulses = new Set(); this.registers = new Set(); this.memories = new Set();
+      this.comments=new Set([...this.nodes.values()].filter(n=>n.type==='COMMENT').map(n=>n.id));this.logicNodes=[];this.pulses = new Set(); this.registers = new Set(); this.memories = new Set();
       for (const n of this.nodes.values()) {
-        if(n.type!=='SCREEN')this.logicNodes.push(n.id);
+        if(!['SCREEN','COMMENT'].includes(n.type))this.logicNodes.push(n.id);
         if (n.type === 'PULSE') this.pulses.add(n.id);
         if (n.type === 'REGISTER') this.registers.add(n.id);
         if (n.type === 'RAM') this.memories.add(n.id);if(n.type==='SCREEN')this.screens.add(n.id);
-        if(n.type==='SCREEN')for(let y=0n;y<BigInt(nodeSize(n));y++)for(let x=0n;x<BigInt(nodeSize(n));x++){const k=key(n.layer,n.x+x,n.y+y);if(this.positions.has(k))throw new Error('Screen overlaps another component.');this.positions.set(k,n);}else{const k=key(n.layer,n.x,n.y);if(this.positions.has(k))throw new Error('That grid square is occupied.');this.positions.set(k,n);}
+        if(n.type==='COMMENT'){}else if(n.type==='SCREEN')for(let y=0n;y<BigInt(nodeSize(n));y++)for(let x=0n;x<BigInt(nodeSize(n));x++){const k=key(n.layer,n.x+x,n.y+y);if(this.positions.has(k))throw new Error('Screen overlaps another component.');this.positions.set(k,n);}else{const k=key(n.layer,n.x,n.y);if(this.positions.has(k))throw new Error('That grid square is occupied.');this.positions.set(k,n);}
         if (!this.layers.has(n.layer)) this.layers.set(n.layer, new Map());
-        this.layers.get(n.layer).set(`${n.x}:${n.y}`, n);
+        this.layers.get(n.layer).set(n.type==='COMMENT'?'comment:'+n.id:`${n.x}:${n.y}`, n);
         this.incoming.set(n.id, []); this.dependents.set(n.id, new Set());
       }
       for (const w of this.wires.values()) {
@@ -143,12 +146,11 @@
       }
       this.peers = new Map();
       for (const n of this.nodes.values()) {
-        if (n.type === 'TUNNEL') {
+        if (n.type === 'TUNNEL'||n.type==='MULTITUNNEL') {
           const peer = this.at(n.layer + n.direction, n.x, n.y);
-          if (peer?.type === 'TUNNEL' && peer.layer + peer.direction === n.layer) {
+          if (peer?.type===n.type&&peer.layer+peer.direction===n.layer&&(n.type!=='MULTITUNNEL'||peer.inputs===n.inputs&&peer.channelBits===n.channelBits)) {
             this.peers.set(n.id, peer.id);
-            const incoming = this.incoming.get(peer.id)[0];
-            if (incoming) this.dependents.get(incoming.from).add(n.id);
+            for(const incoming of this.incoming.get(peer.id))if(incoming)this.dependents.get(incoming.from).add(n.id);
           }
         } else if (n.type === 'RGBTUNNEL') {
           const peer = this.at(n.layer + n.direction, n.x, n.y);
@@ -159,23 +161,24 @@
           }
         }
       }
+      for(const n of this.nodes.values())if(n.type==='RECEIVETUNNEL'){const source=this.nodes.get(n.sourceId);if(source?.type==='SENDTUNNEL'&&source.layer+source.direction===n.layer&&source.inputs===n.inputs&&source.channelBits===n.channelBits){this.peers.set(n.id,source.id);if(!this.peers.has(source.id))this.peers.set(source.id,n.id);for(const w of this.incoming.get(source.id))if(w)this.dependents.get(w.from).add(n.id);}}
     }
     at(layer, x, y) { return this.positions.get(key(layer, x, y)); }
-    addNode(data) {
+    addNode(data,{autoReceiver=true}={}) {
       const n = validateNode(data); this.prepareChip?.(n); n.id ||= this.id('n');
       if (this.nodes.has(n.id) || this.wires.has(n.id) || this.groups.has(n.id)) throw new Error('Duplicate identifier.');
-      if (this.at(n.layer, n.x, n.y)) throw new Error('That grid square already contains a node.');
+      if (n.type!=='COMMENT'&&this.at(n.layer, n.x, n.y)) throw new Error('That grid square already contains a node.');
       this.nodes.set(n.id, n);
       try { this.rebuild(); } catch (error) { this.nodes.delete(n.id); this.rebuild(); throw error; }
-      return n;
+      if(n.type==='SENDTUNNEL'&&autoReceiver){try{this.ensureSendReceivers([n.id]);}catch(e){this.nodes.delete(n.id);this.rebuild();throw e;}}return n;
     }
     updateNode(id, changes) {
       const old = this.nodes.get(id); if (!old) throw new Error('Node not found.');
-      const n = validateNode({ ...old, ...changes, id }); this.prepareChip?.(n);
+      const n = validateNode({ ...old, ...changes, ...(['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(old.type)&&(changes.inputs!==undefined||changes.channelBits!==undefined)?{portValues:undefined}:{}), id }); this.prepareChip?.(n);
       if ((n.type !== old.type || n.layer !== old.layer) && [...this.groups.values()].some(g => g.nodeIds.includes(id))) throw new Error('Ungroup this node before changing its type or layer.');
       const occupied = this.at(n.layer, n.x, n.y);
-      if (occupied && occupied.id !== id) throw new Error('That grid square already contains a node.');
-      const removed = [...this.wires.values()].filter(w => w.to === id && w.port >= inputCount(n));
+      if (n.type!=='COMMENT'&&occupied && occupied.id !== id) throw new Error('That grid square already contains a node.');
+      const removed = [...this.wires.values()].filter(w => w.to === id && w.port >= inputCount(n)||w.from===id&&(w.fromPort||0)>=outputCount(n));
       for(const w of this.wires.values()){if(removed.includes(w))continue;const a=w.from===id?n:this.nodes.get(w.from),b=w.to===id?n:this.nodes.get(w.to),fp=w.fromPort||0;if(fp>=outputCount(a)||outputWidth(a,fp)!==inputWidth(b,w.port))throw Error('Disconnect incompatible wires before changing bus width or pins.');}
       removed.forEach(w => this.wires.delete(w.id)); this.nodes.set(id, n);
       try { this.rebuild(); } catch (error) {
@@ -187,7 +190,7 @@
       const chosen = new Set(ids); const moving = [...chosen].map(id => this.nodes.get(id)).filter(Boolean);
       for (const n of moving) {
         const occupant = this.at(n.layer, n.x + dx, n.y + dy);
-        if (occupant && !chosen.has(occupant.id)) throw new Error('A destination grid square is occupied.');
+        if (n.type!=='COMMENT'&&occupant && !chosen.has(occupant.id)) throw new Error('A destination grid square is occupied.');
       }
       const old = moving.map(n => ({ ...n }));
       moving.forEach(n => { n.x += dx; n.y += dy; });
@@ -216,7 +219,10 @@
       const w = this.incoming.get(id)?.[port]; return w ? +!!this.signal(w.from,w.fromPort||0,values) : 0;
     }
     evaluate(n, values = this.values) {
-      if(n.type==='SCREEN')return 0;if (n.type === 'INPUT') return n.driven ?? +n.on;
+      if(n.type==='SCREEN'||n.type==='COMMENT')return 0;
+      if(n.type==='SENDTUNNEL')return this.word(n.id,0,values);
+      if(n.type==='RECEIVETUNNEL'){const peer=this.peers.get(n.id),v=Array.from({length:n.inputs},(_,p)=>peer?this.word(peer,p,values):0);this.portsChanged=v.some((x,p)=>x!==n.portValues[p]);n.portValues=v;return v[0];}
+      if(n.type==='MULTITUNNEL'){const peer=this.peers.get(n.id),v=Array.from({length:n.inputs},(_,p)=>this.incoming.get(n.id)[p]?this.word(n.id,p,values):peer?this.word(peer,p,values):0);this.portsChanged=v.some((x,p)=>x!==n.portValues[p]);n.portValues=v;return v[0];}if (n.type === 'INPUT') return n.driven ?? +n.on;
       if(['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','CHIP','KEYBOARD','COMMAND'].includes(n.type))return this.evaluateAdvanced(n,values);
       // Sequential outputs hold during combinational propagation. Only an
       // explicit frame flips pulses; registers are sampled in parallel below.
@@ -227,7 +233,7 @@
         return color;
       }
       if (n.type === 'RGB') return values.get(this.peers.get(n.id)) || 0;
-      if (n.type === 'TUNNEL') {
+      if (n.type === 'TUNNEL'||n.type==='MULTITUNNEL') {
         if (this.incoming.get(n.id)[0]) return this.bit(n.id, 0, values);
         const peer = this.peers.get(n.id); return peer ? this.bit(peer, 0, values) : 0;
       }
@@ -335,8 +341,8 @@
       for (const raw of data.nodes) {
         const n = validateNode(raw); c.prepareChip?.(n);
         if (!n.id || n.id.length > 100 || c.nodes.has(n.id)) throw new Error('Invalid or duplicate node identifier.');
-        if (c.positions.has(key(n.layer, n.x, n.y))) throw new Error('Two nodes occupy the same grid square.');
-        c.nodes.set(n.id, n); c.positions.set(key(n.layer, n.x, n.y), n);
+        if (n.type!=='COMMENT'&&c.positions.has(key(n.layer, n.x, n.y))) throw new Error('Two nodes occupy the same grid square.');
+        c.nodes.set(n.id, n);if(n.type!=='COMMENT')c.positions.set(key(n.layer, n.x, n.y), n);
       }
       const occupied = new Set();
       for (const raw of data.wires) {
@@ -360,12 +366,16 @@
       if (Array.isArray(data.signals)) for (const entry of data.signals) {
         if (!Array.isArray(entry) || entry.length !== 2) throw new Error('Invalid signal state.');
         const [id, v] = entry; const n = c.nodes.get(id);
-        if (!n || !Number.isInteger(v) || v < 0 || v > (['RGB', 'RGBTUNNEL'].includes(n.type) ? 0xffffff : ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','CHIP'].includes(n.type) ? 65535 : 1)) throw new Error('Invalid signal state.');
+        if (!n || !Number.isInteger(v) || v < 0 || v > (['RGB', 'RGBTUNNEL'].includes(n.type) ? 0xffffff : ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','CHIP','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type) ? 65535 : 1)) throw new Error('Invalid signal state.');
         c.values.set(id, v);
       }
       return c;
     }
   }
+  Circuit.prototype.ensureSendReceivers=function(ids){for(const id of ids){const n=this.nodes.get(id);if(n?.type!=='SENDTUNNEL')continue;const layer=n.layer+n.direction;if([...this.nodes.values()].some(r=>r.type==='RECEIVETUNNEL'&&r.sourceId===id&&r.layer===layer))continue;let pos;const free=(dx,dy)=>{const x=n.x+BigInt(dx),y=n.y+BigInt(dy);if(this.at(layer,x,y))return false;pos={x,y};return true;};let found=free(0,0);for(let radius=1;radius<=256&&!found;radius++)for(let k=-radius;k<=radius&&!found;k++)found=free(k,-radius)||free(k,radius)||free(-radius,k)||free(radius,k);if(!found)throw Error('No nearby free square for the receiver.');this.addNode({type:'RECEIVETUNNEL',sourceId:id,layer,...pos,inputs:n.inputs,channelBits:n.channelBits,direction:-n.direction});}};
+  const updateTunnelNode=Circuit.prototype.updateNode;
+  Circuit.prototype.updateNode=function(id,changes){const old=this.nodes.get(id);if(old?.type==='RECEIVETUNNEL'&&changes.sourceId){const source=this.nodes.get(changes.sourceId);if(source?.type!=='SENDTUNNEL'||source.layer+source.direction!==(changes.layer??old.layer))throw Error('Select a sender targeting this layer.');changes={...changes,inputs:source.inputs,channelBits:source.channelBits,direction:source.layer-(changes.layer??old.layer)};}
+   if(old?.type!=='SENDTUNNEL')return updateTunnelNode.call(this,id,changes);const saved=this.toJSON();try{const receivers=[...this.nodes.values()].filter(n=>n.type==='RECEIVETUNNEL'&&n.sourceId===id);const sender=updateTunnelNode.call(this,id,changes);for(const r of receivers){const layer=sender.layer+sender.direction;if(layer!==r.layer&&[...this.wires.values()].some(w=>w.from===r.id))throw Error('Disconnect receiver wires before changing destination.');updateTunnelNode.call(this,r.id,{inputs:sender.inputs,channelBits:sender.channelBits,layer,direction:-sender.direction});}this.ensureSendReceivers([id]);return sender;}catch(error){Object.assign(this,Circuit.fromJSON(saved));throw error;}};
   function example(name = 'adder') {
     const c = new Circuit();
     const node = (type, x, y, more = {}) => c.addNode({ type, x, y, ...more });
