@@ -175,6 +175,7 @@
       else if (n.type === 'TUNNEL') desc += `${n.direction === 1 ? 'Up' : 'Down'} → layer ${n.layer + n.direction + 1}\n${c.peers.has(n.id) ? 'Tunnel linked' : 'Place facing tunnel at target'}`;
       else if (n.type === 'PULSE') desc += `Signal ${c.values.get(n.id) || 0} · flips every simulation frame\nPause freezes it; Step flips once.`;
       else if (n.type === 'REGISTER') desc += `Q ${c.values.get(n.id) || 0} · stored bit\nD: top input · CLK: bottom input\nCaptures D on a rising CLK edge.`;
+      else if(n.type==='OUTPUT')desc+='Signal '+Logic.formatOutput(n,c.values.get(n.id)||0);
       else desc += `Signal ${c.values.get(n.id) || 0}${n.type === 'INPUT' ? ` · switch ${n.on ? 'on' : 'off'}` : ''}`;
       $('selected-description').textContent = desc; $('selected-description').style.whiteSpace = 'pre-line';
       if(n.type==='CHIP')addAction('Edit chip contents',()=>advancedUI.edit(n));
@@ -562,7 +563,11 @@
           ctx.font=`${s*.12}px Consolas,monospace`;const text=n.type==='KEYBOARD'?(n.keyCode||'KeyW'):n.type==='COMMAND'?(n.command==='release_keyboard'?'RELEASE':'CAPTURE'):n.type==='CHIP'?(state.circuit.chips.get(n.chipId)?.name||'CHIP'):value.toString(16).toUpperCase().padStart((n.bits||8)/4,'0');ctx.fillText(text.slice(0,16),p.x+s*.5,p.y+s*(n.type==='CHIP'?.5:.61));
           ctx.font=`${s*.08}px Arial`;ctx.fillText(n.type==='CHIP'?`${inputCount(n)} IN / ${outputCount(n)} OUT`:n.type==='KEYBOARD'?String(value):n.type==='COMMAND'?'ENABLE ↑':`${n.bits||8} BITS`,p.x+s*.5,p.y+s*(n.type==='CHIP'?.83:.79));
         } else if (['INPUT', 'OUTPUT'].includes(n.type)) {
-          ctx.font = `${s * (n.type==='OUTPUT'&&n.bits>1?.14:.23)}px Arial,sans-serif`; ctx.fillStyle = ink; ctx.fillText(n.type==='OUTPUT'&&n.bits>1?'0x'+value.toString(16).toUpperCase().padStart(n.bits/4,'0'):String(value), p.x + s * .5, p.y + s * .65);if(n.type==='OUTPUT'&&n.bits>1){ctx.font=`${s*.075}px Arial`;ctx.fillText(n.bits+' BITS',p.x+s*.5,p.y+s*.83);}
+          const wide=n.type==='OUTPUT'&&n.bits>1, text=Logic.formatOutput(n,value), split=wide&&n.displayBase===2&&n.bits===16;
+          ctx.font=`${s*(wide?.14:.23)}px Arial,sans-serif`;ctx.fillStyle=ink;
+          if(split){ctx.fillText(text.slice(0,8),p.x+s*.5,p.y+s*.55,s*.7);ctx.fillText(text.slice(8),p.x+s*.5,p.y+s*.7,s*.7);}
+          else ctx.fillText(text,p.x+s*.5,p.y+s*.65,s*.7);
+          if(wide){ctx.font=`${s*.075}px Arial`;ctx.fillText(n.bits+' BITS / '+({2:'BIN',8:'OCT',10:'INT',16:'HEX'}[n.displayBase||16]),p.x+s*.5,p.y+s*.83);}
         } else if (['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL','RGBTUNNEL'].includes(n.type)) {
           ctx.fillStyle = ink; ctx.font = `${s * .24}px Arial,sans-serif`; ctx.fillText(n.direction === 1 ? '↑' : '↓', p.x + s * .5, p.y + s * .61);
           ctx.font = `${s * .075}px Consolas,monospace`; ctx.fillText(n.type==='MULTITUNNEL'?`${n.inputs} x ${n.channelBits} bit`:`L${String(n.layer + n.direction + 1).padStart(3, '0')}`, p.x + s * .5, p.y + s * .8);
@@ -681,6 +686,7 @@
     $('property-label').value = n.label;
     const editable = ['INPUT', 'REGISTER'].includes(n.type);
     $('property-state-field').hidden = !editable;
+    $('property-base-field').hidden=n.type!=='OUTPUT'||n.bits===1;$('property-base').value=String(n.displayBase||16);
     $('property-state-label').textContent = n.type === 'REGISTER' ? 'Stored bit (Q)' : 'Switch state';
     $('property-state').value = String(n.type === 'INPUT' ? +n.on : state.circuit.values.get(n.id) || 0);
     $('property-note').textContent = n.type === 'REGISTER' ? 'Sets the stored bit now. The next rising clock edge can capture new data.' : 'Labels appear above the node.';
@@ -691,6 +697,7 @@
     e.preventDefault();
     const c = state.circuit, n = c.nodes.get(propertyNodeId); if (!n) return;
     const value = Number($('property-state').value), changes = { label: $('property-label').value };
+    if(n.type==='OUTPUT')changes.displayBase=Number($('property-base').value);
     if (n.type === 'INPUT') changes.on = !!value;
     if (n.type === 'REGISTER') changes.clock = c.bit(n.id, 1);
     let success = false;

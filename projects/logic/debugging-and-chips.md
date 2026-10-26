@@ -1,4 +1,4 @@
-# Debugging and chips / Logic Studio 2.8
+# Debugging and chips / Logic Studio 2.8.1
 
 These controls are available in both the local web edition and the Windows app.
 
@@ -36,8 +36,12 @@ and Components tab. Placed copies continue working, including after save/load.
 Undo restores the library entry. To delete an instance, delete its canvas node.
 
 The ordinary **OUTPUT** node accepts **1, 8, or 16 bits through its single pin**.
-It takes its width from the connected wire and displays the full value; bus
-values appear in hexadecimal. OUTPUT nodes also expose that width when used
+It takes its width from the connected wire and displays the full value.
+Right-click it and open **Properties > Display base** to choose **Binary**,
+**Oct**, **Hex**, or **Int** (unsigned decimal). Hex is the default. Binary
+shows every bit, including leading zeros; 16 bits use two rows of eight,
+with the most significant byte on top. Octal uses `0o` and hex uses `0x`.
+Each node saves its display choice, which also survives copy/paste. OUTPUT nodes also expose that width when used
 as a chip's output pins. JOIN combines individual bits into an 8- or 16-bit
 wire. Each input still has one driver. Relay output groups show every bit,
 most significant first within each node.

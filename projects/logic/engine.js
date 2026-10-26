@@ -71,7 +71,7 @@
       ...(data.type === 'REGISTER' ? { clock: data.clock ?? 0 } : {}),
       ...(['RAM', 'ROM'].includes(data.type) ? { memory, ...(addressBits !== 8 ? { addressBits } : {}), ...(data.type === 'RAM' ? { clock: data.clock ?? 0 } : {}) } : {})
     };
-    if(n.type==='OUTPUT'){n.bits=data.bits??1;if(![1,8,16].includes(n.bits))throw Error('OUTPUT supports 1, 8 or 16 bits.');}
+    if(n.type==='OUTPUT'){n.bits=data.bits??1;n.displayBase=data.displayBase??16;if(![1,8,16].includes(n.bits))throw Error('OUTPUT supports 1, 8 or 16 bits.');if(![2,8,10,16].includes(n.displayBase))throw Error('Choose binary, octal, hex or integer display.');}
     if(n.type==='LOG'){n.targetId=data.targetId??'';n.targetPort=data.targetPort??0;n.logHigh=data.logHigh??0;if(typeof n.targetId!=='string'||n.targetId.length>100||!Number.isInteger(n.targetPort)||n.targetPort<0||n.targetPort>23||![0,1].includes(n.logHigh))throw Error('Invalid log attachment.');n.label=typeof data.label==='string'?data.label.slice(0,2048):'Signal became 1';}
     if(n.type==='COMMENT'){for(const [key,value]of Object.entries({commentOX:0,commentOY:0,commentWidth:3,commentHeight:1.5})){n[key]=data[key]??value;if(typeof n[key]!=='number'||!Number.isFinite(n[key]))throw Error('Invalid comment geometry.');}if(n.commentOX<0||n.commentOX>=1||n.commentOY<0||n.commentOY>=1||n.commentWidth<.5||n.commentWidth>10000||n.commentHeight<.4||n.commentHeight>10000)throw Error('Invalid comment bounds.');}
     if(['MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)){n.sourceId=data.sourceId??'';if(typeof n.sourceId!=='string'||n.sourceId.length>100)throw Error('Invalid tunnel source.');n.channelBits=data.channelBits??1;if(n.type!=='MULTITUNNEL'&&n.channelBits!==1)throw Error('Send and receive tunnels use one bit per input. Use SPLIT for a bus.');if(!Number.isInteger(n.inputs)||n.inputs<(n.type==='MULTITUNNEL'?2:1)||n.inputs>16||![1,8,16].includes(n.channelBits))throw Error(n.type==='MULTITUNNEL'?'Use 2-16 channels of 1, 8 or 16 bits.':'Use 1-16 one-bit tunnel pins.');n.portValues=data.portValues??Array(n.inputs).fill(0);if(!Array.isArray(n.portValues)||n.portValues.length!==n.inputs||n.portValues.some(v=>!Number.isInteger(v)||v<0||v>=2**n.channelBits))throw Error('Invalid tunnel channel state.');n.portValues=[...n.portValues];}
@@ -425,5 +425,12 @@
     }
     c.settle(); return c;
   }
-  return { Circuit, MAX_LAYERS, GATES, inputCount, hasOutput, outputCount, inputWidth, outputWidth, nodeSize, gate, example, key, comparePosition };
+  function formatOutput(n,value=0) {
+    if(n.type!=='OUTPUT'||n.bits===1)return String(value);
+    const base=n.displayBase||16;
+    if(base===10)return String(value);
+    const width=base===2?n.bits:base===8?Math.ceil(n.bits/3):n.bits/4;
+    return (base===16?'0x':base===8?'0o':'')+value.toString(base).toUpperCase().padStart(width,'0');
+  }
+  return { formatOutput, Circuit, MAX_LAYERS, GATES, inputCount, hasOutput, outputCount, inputWidth, outputWidth, nodeSize, gate, example, key, comparePosition };
 });
