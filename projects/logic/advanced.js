@@ -3,9 +3,9 @@
 const {Circuit,inputWidth,outputWidth,comparePosition}=L;
 function pins(data){
  const list=(data.nodes||[]).map(n=>({...n,x:BigInt(n.x||0),y:BigInt(n.y||0)})).sort(comparePosition);
- const get=(types,prefix)=>{const seen=new Set();return list.filter(n=>types.includes(n.type)).map((n,i)=>{const name=n.label?.trim()||prefix+(i+1);if(seen.has(name))throw Error('Give each chip pin a unique label.');seen.add(name);return {nodeId:n.id,name,width:n.type.startsWith('BUS')?(n.bits||8):1};});};
+ const get=(types,prefix)=>{const seen=new Set();return list.filter(n=>types.includes(n.type)).map((n,i)=>{const name=n.label?.trim()||prefix+(i+1);if(seen.has(name))throw Error('Give each chip pin a unique label.');seen.add(name);return {nodeId:n.id,name,width:n.type==='OUTPUT'?(n.bits||1):n.type.startsWith('BUS')?(n.bits||8):1};});};
  const inputs=get(['INPUT','BUSINPUT'],'IN'),outputs=get(['OUTPUT','BUSOUTPUT'],'OUT');
- if(inputs.length>16||!outputs.length||outputs.length>16)throw Error('A chip needs 1–16 outputs and up to 16 inputs. Use INPUT / OUTPUT or BUSINPUT / BUSOUTPUT as pins.');
+ if(inputs.length>16||outputs.length>16)throw Error('A chip needs 1–16 outputs and up to 16 inputs. Use INPUT / OUTPUT or BUSINPUT / BUSOUTPUT as pins.');
  return {inputs,outputs};
 }
 L.chipPins=pins;
@@ -24,7 +24,7 @@ Circuit.prototype.evaluateAdvanced=function(n,values){switch(n.type){
  case 'JOIN':{let v=0;for(let b=0;b<n.bits;b++)v|=this.bit(n.id,b,values)<<b;return v;}
  case 'KEYBOARD':return +(this.keyboardCaptured&&this.keyDown.has(n.keyCode));
  case 'COMMAND':return +this.keyboardCaptured;
- case 'CHIP':{const c=this.children.get(n.id);if(!c)return 0;const before=n.pinsOut.map(p=>c.values.get(p.nodeId)||0);n.pinsIn.forEach((p,i)=>{const q=c.nodes.get(p.nodeId),v=this.word(n.id,i,values);if(q.driven!==v){q.driven=v;c.needsSettle=true;}});if(c.needsSettle){const r=c.settle(undefined,false);if(!r.stable)this.childUnstable=true;}this.portsChanged=n.pinsOut.some((p,i)=>(c.values.get(p.nodeId)||0)!==before[i]);return c.values.get(n.pinsOut[0].nodeId)||0;}
+ case 'CHIP':{const c=this.children.get(n.id);if(!c)return 0;const before=n.pinsOut.map(p=>c.values.get(p.nodeId)||0);n.pinsIn.forEach((p,i)=>{const q=c.nodes.get(p.nodeId),v=this.word(n.id,i,values);if(q.driven!==v){q.driven=v;c.needsSettle=true;}});if(c.needsSettle){const r=c.settle(undefined,false);if(!r.stable)this.childUnstable=true;}this.portsChanged=n.pinsOut.some((p,i)=>(c.values.get(p.nodeId)||0)!==before[i]);return c.values.get(n.pinsOut[0]?.nodeId)||0;}
 }};
 Circuit.prototype.captureOnly=function(){
  const rs=[...this.registers].map(id=>{const n=this.nodes.get(id);return [n,this.sampleRegister(n)];});

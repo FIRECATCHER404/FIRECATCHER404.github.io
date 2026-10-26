@@ -24,8 +24,8 @@
   components.push({type:'SCREEN',screenPixels:1,name:'SCREEN PIXEL',category:'color'});
   for(const type of ['RAM','ROM'])components.push({type,addressBits:16,name:type+' (64K)',category:'io'});
   for(const type of ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND','SENDTUNNEL','RECEIVETUNNEL'])components.push({type,name:type,category:'io',...(['SENDTUNNEL','RECEIVETUNNEL'].includes(type)?{inputs:1}:{})});
-  components.push({type:'COMMENT',name:'COMMENT',category:'notes'});
-  let advancedUI;
+  components.push({type:'COMMENT',name:'COMMENT',category:'notes'},{type:'LOG',name:'LOG',category:'notes'});
+  let advancedUI,debugUI;
   document.querySelector('.tiny-badge').textContent = components.length;
   const state = {
     circuit: example(initialExample === 'rgb-lights' ? 'rgb-lights' : 'adder'), layer: initialExample === 'rgb-lights' ? 1 : 0, camera: { x: 0n, y: 0n, ox: 0, oy: 0, scale: 1 },
@@ -188,7 +188,7 @@
     if (io.length) addAction('Group / title', () => groupDialog());
     $('io-selection-actions').hidden = !state.ioSelection || !!state.drag || !io.length;
     $('io-selection-summary').textContent = io.length ? `${io.length} ${io[0].type === 'INPUT' ? 'input' : 'output'}${io.length === 1 ? '' : 's'} selected` : '';
-    updateRelay(); advancedUI?.process();
+    updateRelay(); advancedUI?.process();debugUI?.process();
   }
   function addAction(label, onClick) { const b = document.createElement('button'); b.className = 'action'; b.textContent = label; b.onclick = onClick; $('selected-actions').append(b); }
   const normalizeBinary = text => text.replace(/[\s_]/g, '');
@@ -310,8 +310,8 @@
   function renderLibrary() {
     document.querySelector('.tiny-badge').textContent=components.length+state.circuit.chips.size;
     const query = $('search').value.trim().toUpperCase(), list = $('component-list'); list.replaceChildren();
-    const symbols = { COMMENT:'T',MULTITUNNEL:'?', INPUT: '01', OUTPUT: '◉', TUNNEL: '⇅', RGB: '◈', RGBTUNNEL: '▦', RAM: 'M', ROM: 'R', SCREEN: '▣' };
-    const custom = [...state.circuit.chips.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(d=>{
+    const symbols = { LOG:'L',COMMENT:'T',MULTITUNNEL:'?', INPUT: '01', OUTPUT: '◉', TUNNEL: '⇅', RGB: '◈', RGBTUNNEL: '▦', RAM: 'M', ROM: 'R', SCREEN: '▣' };
+    const custom = [...state.circuit.chips.values()].filter(d=>!d.hidden).sort((a,b)=>a.name.localeCompare(b.name)).map(d=>{
       const pins=Logic.chipPins(d.circuit);
       return {type:'CHIP',chipId:d.id,name:d.name,label:d.name,pinsIn:pins.inputs,pinsOut:pins.outputs,category:'custom'};
     });
@@ -319,7 +319,7 @@
     for (const spec of [...components,...custom]) {
       if ((state.activeFilter !== 'all' && spec.category !== state.activeFilter) || (query && !spec.name.toUpperCase().includes(query))) continue;
       if (spec.category !== lastGroup) {
-        const h = document.createElement('div'); h.className = 'component-group'; h.textContent = { gates: 'LOGIC GATES', io: 'INPUT / OUTPUT', color: '24-BIT COLOR', custom:'CUSTOM NODES', notes:'COMMENTS' }[spec.category]; list.append(h); lastGroup = spec.category;
+        const h = document.createElement('div'); h.className = 'component-group'; h.textContent = { gates: 'LOGIC GATES', io: 'INPUT / OUTPUT', color: '24-BIT COLOR', custom:'CUSTOM NODES', notes:'NOTES / DEBUG' }[spec.category]; list.append(h); lastGroup = spec.category;
       }
       const active=state.placing===spec||(spec.type==='CHIP'&&state.placing?.type==='CHIP'&&state.placing.chipId===spec.chipId);
       const b = document.createElement('button'); b.className = `component${active ? ' active' : ''}`; b.dataset.component = spec.name;
@@ -413,7 +413,8 @@
   let commentEditId=null;
   function editComment(n){state.drag=null;state.wire=null;commentEditId=n.id;$('comment-text').value=n.label;$('comment-dialog').showModal();$('comment-text').focus();}
   $('comment-form').onsubmit=e=>{e.preventDefault();const id=commentEditId;if(!state.circuit.nodes.has(id))return;edit(()=>state.circuit.updateNode(id,{label:$('comment-text').value}));$('comment-dialog').close();};
-  function hit(x, y) {
+  function hit(x, y, skipLogs=false) {
+    if(!skipLogs){const log=debugUI?.hit(x,y);if(log)return log;}
     const w = screenToWorld(x, y), c = state.circuit, s = cellSize();
     if (s < 8) { const n = c.at(state.layer, w.x, w.y); return n ? { node: n } : commentHit(x,y); }
     const radius = Math.max(4, Math.min(10, s * .06));
@@ -513,6 +514,7 @@
     }ctx.stroke();
   }
   function drawNode(n, ghost = false, preview = false, dx = 0n, dy = 0n) {
+    if(n.type==='LOG')return;
     if(n.type==='COMMENT')return;
     const pose = !ghost && !preview ? nodePose(n) : null;
     const s = pose?.size || cellSize()*(nodeSize(n)), p = pose ? { x: pose.x, y: pose.y } : worldToScreen(n.x + dx, n.y + dy);
@@ -560,7 +562,7 @@
           ctx.font=`${s*.12}px Consolas,monospace`;const text=n.type==='KEYBOARD'?(n.keyCode||'KeyW'):n.type==='COMMAND'?(n.command==='release_keyboard'?'RELEASE':'CAPTURE'):n.type==='CHIP'?(state.circuit.chips.get(n.chipId)?.name||'CHIP'):value.toString(16).toUpperCase().padStart((n.bits||8)/4,'0');ctx.fillText(text.slice(0,16),p.x+s*.5,p.y+s*(n.type==='CHIP'?.5:.61));
           ctx.font=`${s*.08}px Arial`;ctx.fillText(n.type==='CHIP'?`${inputCount(n)} IN / ${outputCount(n)} OUT`:n.type==='KEYBOARD'?String(value):n.type==='COMMAND'?'ENABLE ↑':`${n.bits||8} BITS`,p.x+s*.5,p.y+s*(n.type==='CHIP'?.83:.79));
         } else if (['INPUT', 'OUTPUT'].includes(n.type)) {
-          ctx.font = `${s * .23}px Arial,sans-serif`; ctx.fillStyle = ink; ctx.fillText(String(value), p.x + s * .5, p.y + s * .65);
+          ctx.font = `${s * (n.type==='OUTPUT'&&n.bits>1?.14:.23)}px Arial,sans-serif`; ctx.fillStyle = ink; ctx.fillText(n.type==='OUTPUT'&&n.bits>1?'0x'+value.toString(16).toUpperCase().padStart(n.bits/4,'0'):String(value), p.x + s * .5, p.y + s * .65);if(n.type==='OUTPUT'&&n.bits>1){ctx.font=`${s*.075}px Arial`;ctx.fillText(n.bits+' BITS',p.x+s*.5,p.y+s*.83);}
         } else if (['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL','RGBTUNNEL'].includes(n.type)) {
           ctx.fillStyle = ink; ctx.font = `${s * .24}px Arial,sans-serif`; ctx.fillText(n.direction === 1 ? '↑' : '↓', p.x + s * .5, p.y + s * .61);
           ctx.font = `${s * .075}px Consolas,monospace`; ctx.fillText(n.type==='MULTITUNNEL'?`${n.inputs} x ${n.channelBits} bit`:`L${String(n.layer + n.direction + 1).padStart(3, '0')}`, p.x + s * .5, p.y + s * .8);
@@ -608,6 +610,7 @@
     for (const id of floating || []) { const n = c.nodes.get(id); if (n?.layer === state.layer) drawNode(n); }
     if (state.placing?.type==='COMMENT'&&state.pointer.y>20){const w=screenToWorld(state.pointer.x,state.pointer.y);drawComment({id:'preview',type:'COMMENT',x:w.x,y:w.y,commentOX:w.fx,commentOY:w.fy,label:'Comment'});}
     else if (state.placing && state.pointer.y > 72) { const w = screenToWorld(state.pointer.x, state.pointer.y); drawNode({ ...state.placing, id: 'preview', x: w.x, y: w.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 }, false, true); }
+    debugUI?.draw();
     if (state.wire) {
       const n = c.nodes.get(state.wire.node), port = state.wire.port;
       if (n) { const p = portPoint(n, port), end = state.pointer;
@@ -671,7 +674,7 @@
   }
   let propertyNodeId = null;
   function properties(n) {
-    if(n.type==='COMMENT'){editComment(n);return;}if(['SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)){settings(n);return;}
+    if(n.type==='LOG'){debugUI.settings(n);return;}if(n.type==='COMMENT'){editComment(n);return;}if(['SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)){settings(n);return;}
     if(advancedUI.isAdvanced(n)){advancedUI.settings(n);return;}
     propertyNodeId = n.id;
     $('properties-title').textContent = `${n.type} properties`;
@@ -699,7 +702,7 @@
     if (success) { $('properties-dialog').close(); propertyNodeId = null; }
   };
   function settings(n, placing = false) {
-    if(n.type==='COMMENT'){editComment(n);return;}
+    if(n.type==='LOG'){debugUI.settings(n);return;}if(n.type==='COMMENT'){editComment(n);return;}
     if(advancedUI.settings(n,placing))return;
     pendingSettings = { node: n, placing }; $('settings-title').textContent = placing ? `Place ${n.type}` : `Edit ${n.type}`;
     const fields = $('settings-fields'); fields.replaceChildren();
@@ -733,6 +736,7 @@
     if (success) { $('settings-dialog').close(); pendingSettings = null; }
   };
   function place(x, y) {
+    if(state.placing?.type==='LOG'){const w=screenToWorld(x,y);debugUI.settings({type:'LOG',x:w.x,y:w.y,layer:state.layer,label:'Signal became 1'},true);return;}
     const pos = screenToWorld(x, y), spec = state.placing;
     if (spec.type!=='COMMENT'&&state.circuit.at(state.layer, pos.x, pos.y)) { toast('That grid square is occupied.'); return; }
     const node = { ...spec, x: pos.x, y: pos.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 };
@@ -760,7 +764,7 @@
       if (touchGesture !== g || g.moved || pointers.size !== 1 || document.querySelector('dialog[open]')) return;
       g.fired = true; lastTouchTap = null; state.drag = null; state.wire = null; dropMotion = null;
       const n = state.circuit.nodes.get(g.node);
-      if(n?.type==='COMMENT')editComment(n);else if (n?.type === 'INPUT') toggleInput(n);
+      if(n?.type==='LOG')debugUI.settings(n);else if(n?.type==='COMMENT')editComment(n);else if (n?.type === 'INPUT') toggleInput(n);
       else { g.pan = true; state.drag = { kind: 'pan', last: { x: g.x, y: g.y } }; }
       document.body.classList.toggle('dragging', !!g.pan); render();
     }, TOUCH_HOLD);
@@ -781,9 +785,10 @@
       updateUI(); renderLibrary(); render(); return;
     }
     state.ioSelection = false;
-    if (event.button === 1) { event.preventDefault(); if(h?.node.type==='COMMENT'){editComment(h.node);state.drag=null;return;}if (h?.node.type === 'INPUT') { toggleInput(h.node); state.drag = null; return; } }
+    if (event.button === 1) { event.preventDefault(); if(h?.node.type==='LOG'){debugUI.settings(h.node);state.drag=null;return;}if(h?.node.type==='COMMENT'){editComment(h.node);state.drag=null;return;}if (h?.node.type === 'INPUT') { toggleInput(h.node); state.drag = null; return; } }
     if (event.button === 1 || state.space || state.tool === 'pan') { state.drag = { kind: 'pan', last: { x, y } }; document.body.classList.add('dragging'); return; }
     if (state.placing) { place(x, y); return; }
+    if(debugUI?.begin(h,x,y))return;
     if(h?.node.type==='COMMENT'){state.selected=new Set([h.node.id]);const p=commentRect(h.node);state.drag={kind:x>=p.x+p.w-14&&y>=p.y+p.h-14?'comment-resize':'comment-move',id:h.node.id,start:{x,y},dx:0,dy:0};updateUI();render();return;}
     if (h?.port) {
       if (h.port.kind === 'out') state.wire = { node: h.node.id, port: h.port, start: { x, y } };
@@ -822,6 +827,7 @@
       const ps = [...pointers.values()], d = Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y), midpoint = { x: (ps[0].x + ps[1].x) / 2, y: (ps[0].y + ps[1].y) / 2 };
       if (drag.distance > 0) zoomAt(d / drag.distance, drag.midpoint.x, drag.midpoint.y); pan(midpoint.x - drag.midpoint.x, midpoint.y - drag.midpoint.y); drag.distance = d; drag.midpoint = midpoint; return;
     }
+    if(drag?.kind==='log-attach'){drag.moved ||= Math.hypot(x-drag.start.x,y-drag.start.y)>4;render();return;}
     const w = screenToWorld(x, y); $('cursor-position').textContent = `X ${shorten(w.x)} · Y ${shorten(w.y)}`;
     if (drag?.kind === 'pan') { pan(x - drag.last.x, y - drag.last.y); drag.last = { x, y }; return; }
     if(drag?.kind==='comment-move'||drag?.kind==='comment-resize'){drag.dx=x-drag.start.x;drag.dy=y-drag.start.y;render();return;}
@@ -856,7 +862,7 @@
       if (g.fired && !g.pan || showTouchMenu) { state.drag = null; state.wire = null; dropMotion = null; }
       touchGesture = null;
     } else if (canceled || event.pointerType === 'touch') clearTouchGesture();
-    pointers.delete(event.pointerId); const drag = state.drag;
+    pointers.delete(event.pointerId); if(debugUI?.end(event,canceled))return;const drag = state.drag;
     if (drag?.kind === 'select' && drag.io) {
       if (canceled) { state.selected = drag.before; state.ioSelection = false; }
       else if (drag.moved) { selectIOInBox(drag.start, { x: event.clientX, y: event.clientY }); state.ioSelection = !!state.selected.size; }
@@ -905,7 +911,7 @@
     else if (e.code === 'Space') { e.preventDefault(); state.space = true; document.body.classList.add('space-held'); canvas.style.cursor = 'grab'; }
     else if (key === 'delete' || key === 'backspace') { e.preventDefault(); removeSelected(); }
     else if (key === 'escape') cancel();
-    else if (key === 'enter') { const n = state.circuit.nodes.get([...state.selected][0]); if(n?.type==='COMMENT')editComment(n);else if (n?.type === 'INPUT') toggleInput(n); }
+    else if (key === 'enter') { const n = state.circuit.nodes.get([...state.selected][0]); if(n?.type==='LOG')debugUI.settings(n);else if(n?.type==='COMMENT')editComment(n);else if (n?.type === 'INPUT') toggleInput(n); }
     else if (key === 'f') fit();
     else if (key === '0') { state.camera = { x: 0n, y: 0n, ox: 0, oy: 0, scale: 1 }; render(); saveSoon(); }
     else if (key === 'v') chooseTool('select');
@@ -931,11 +937,11 @@
     if (!state.clipboard) return;
     const c = state.circuit, clip = state.clipboard, before = snapshot(), ids = new Map(), added = [];
     let offset = 1n;
-    while (clip.nodes.some(n => {if(n.type==='COMMENT')return false;const size=nodeSize(n);for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(c.at(state.layer,n.x+offset+BigInt(x),n.y+offset+BigInt(y)))return true;return false;})) offset++;
+    while (clip.nodes.some(n => {if(n.type==='COMMENT'||n.type==='LOG')return false;const size=nodeSize(n);for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(c.at(state.layer,n.x+offset+BigInt(x),n.y+offset+BigInt(y)))return true;return false;})) offset++;
     try {
       const chipMap=new Map();for(const def of clip.chips||[]){const old=c.chips.get(def.id);if(!old)c.chips.set(def.id,def);else if(JSON.stringify(old)!==JSON.stringify(def)){const id=c.id('chip');c.chips.set(id,{...def,id});chipMap.set(def.id,id);}}
       for (const n of clip.nodes) { const copy = c.addNode({ ...n, ...(n.type==='CHIP'?{chipId:chipMap.get(n.chipId)||n.chipId}: {}), id: undefined, x: n.x + offset, y: n.y + offset, layer: state.layer, direction: state.layer === 255 ? -1 : state.layer === 0 ? 1 : n.direction },{autoReceiver:false}); c.values.set(copy.id, clip.signals.get(n.id) || 0); ids.set(n.id, copy.id); added.push(copy.id); }
-      for(const old of clip.nodes){const n=c.nodes.get(ids.get(old.id));if(n.type==='RECEIVETUNNEL'&&ids.has(n.sourceId))n.sourceId=ids.get(n.sourceId);}c.rebuild();c.ensureSendReceivers(added);
+      for(const old of clip.nodes){const n=c.nodes.get(ids.get(old.id));if(n.type==='RECEIVETUNNEL'&&ids.has(n.sourceId))n.sourceId=ids.get(n.sourceId);if(n.type==='LOG'){n.targetId=ids.get(old.targetId)||old.targetId||'';n.logHigh=0;}}c.rebuild();c.ensureSendReceivers(added);
       for (const w of clip.wires) c.connect(ids.get(w.from), ids.get(w.to), w.port, w.fromPort||0);
       for(const w of clip.externalInputs||[]){const source=c.nodes.get(w.from),to=ids.get(w.to);if(source&&to&&source.layer===state.layer&&hasOutput(source))c.connect(w.from,to,w.port,w.fromPort||0);}
       const taken = new Set([...c.wires.values()].map(w => `${w.to}:${w.port}`));
@@ -1041,7 +1047,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   const toolElements = {
     components: [$('library')], control: [document.querySelector('.right-panels')],
     canvas: [document.querySelector('.tools'), document.querySelector('.bottom-controls'), document.querySelector('.statusbar')],
-    project: [document.querySelector('.topbar')], relay: [$('relay-panel')]
+    project: [document.querySelector('.topbar')], relay: [$('relay-panel')],console:[$('console-panel')]
   };
   function setDrawer(open) {
     document.body.classList.toggle('drawer-open', open); $('tool-drawer').inert = !open;
@@ -1059,7 +1065,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
     if (open && name === 'control') openTool('relay', false);
     const button = document.querySelector(`[data-open-tool="${name}"]`); button.setAttribute('aria-pressed', String(open)); button.querySelector('.drawer-indicator').textContent = open ? '−' : '+';
     if (name === 'components') { document.body.classList.remove('library-hidden'); if (!open) { state.placing = null; state.wire = null; updateUI(); } renderLibrary(); }
-    setDrawer(false); render();
+    setDrawer(false);debugUI?.refresh(); render();
   }
   document.querySelectorAll('[data-open-tool]').forEach(b => b.onclick = () => openTool(b.dataset.openTool));
   document.querySelectorAll('[data-close-tool]').forEach(b => b.onclick = () => openTool(b.dataset.closeTool, false));
@@ -1086,6 +1092,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   $('drawer-handle').addEventListener('pointercancel', () => { const open = drawerDrag?.open || false; drawerDrag = null; document.body.classList.remove('drawer-dragging'); setDrawer(open); });
   $('drawer-handle').onclick = e => { if (e.detail === 0 && !suppressDrawerClick) setDrawer(!document.body.classList.contains('drawer-open')); suppressDrawerClick = false; };
   canvas.addEventListener('pointerdown', () => { if (document.body.classList.contains('drawer-open')) setDrawer(false); });
+  debugUI=LogicDebugUI.install({state,$,ctx,COLORS,edit,render,updateUI,nodePose,screenToWorld,hit,toast});
   advancedUI=LogicAdvancedUI.install({state,$,edit,changed,toast,snapshot,restore,fit,render,updateUI,renderLibrary,requestSimulation,requestReplacement,checkpointBefore:before=>{state.history.push(before);state.future=[];}});
   applyTheme();
   let loaded = false;
@@ -1105,5 +1112,5 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   renderLibrary(); updateUI(); if (!loaded) fit(); render(); scheduleTick();
   // Read-only hooks for integration checks and diagnostics; all editing uses the UI/model.
   $('wire-mode').value=state.wireMode;
-  window.logicStudio = { get circuit() { return state.circuit; }, get state() { return state; }, screenToWorld, worldToScreen, ports, portPoint, fit, render, snapshot,wireMetrics:()=>({...wireRenderer.metrics}) };
+  window.logicStudio = { get circuit() { return state.circuit; }, get state() { return state; }, screenToWorld, worldToScreen, ports, portPoint, fit, render, snapshot,debug:debugUI,wireMetrics:()=>({...wireRenderer.metrics}) };
 })();
