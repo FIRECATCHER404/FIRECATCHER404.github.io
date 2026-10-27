@@ -6,7 +6,7 @@
   const canvas = $('canvas'), ctx = canvas.getContext('2d');
   const CELL = 96;const wireRenderer=new LogicWires.Renderer();const portCache=new Map();
   const requestedExample = new URL(location.href).searchParams.get('example');
-  const initialExample = ['rgb-lights','rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io','comments-tunnels'].includes(requestedExample) ? requestedExample : null;
+  const initialExample = ['rgb-lights','rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io','comments-tunnels','pixel-256'].includes(requestedExample) ? requestedExample : null;
   const STORE = initialExample ? `logic-studio-example-${initialExample}-${initialExample==='computer16'?'v3':'v1'}` : 'logic-studio-v1';
   const COLORS = { bg: '#ffffff', grid: '#eeeeee', on: '#c5efad', off: '#777777', text: '#222222', muted: '#777777', line: '#777777', panel: '#f6f6f6' };
   let preferences = { theme: 'light', simSpeed: 50, simBatch: 1 };
@@ -23,7 +23,7 @@
   for (const type of ['INPUT', 'OUTPUT', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN']) components.push({ type, name: type, category: type.startsWith('RGB')||type==='SCREEN' ? 'color' : 'io' });
   components.push({type:'SCREEN',screenPixels:1,name:'SCREEN PIXEL',category:'color'});
   for(const type of ['RAM','ROM'])components.push({type,addressBits:16,name:type+' (64K)',category:'io'});
-  for(const type of ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND','SENDTUNNEL','RECEIVETUNNEL'])components.push({type,name:type,category:'io',...(['SENDTUNNEL','RECEIVETUNNEL'].includes(type)?{inputs:1}:{})});
+  for(const type of ['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND','CPU8','RAM8','ROM8','VIDEO8','SENDTUNNEL','RECEIVETUNNEL'])components.push({type,name:type,category:'io',...(['SENDTUNNEL','RECEIVETUNNEL'].includes(type)?{inputs:1}:{})});
   components.push({type:'COMMENT',name:'COMMENT',category:'notes'},{type:'LOG',name:'LOG',category:'notes'});
   let advancedUI,debugUI;
   document.querySelector('.tiny-badge').textContent = components.length;
@@ -52,7 +52,7 @@
     clearTimeout(simulationTimer); cancelAnimationFrame(simulationFrame);
     simulationTimer = simulationFrame = null;
   }
-  function signature() { return [...state.circuit.nodes.values()].map(n => `${state.circuit.values.get(n.id) || 0}${n.type === 'REGISTER' ? ':' + n.clock : ''}`).join(','); }
+  function signature() { return state.circuit.logicNodes.map(id=>state.circuit.nodes.get(id)).map(n => `${state.circuit.values.get(n.id) || 0}${n.type === 'REGISTER' ? ':' + n.clock : ''}`).join(','); }
   function scheduleTick() {
     if (simulationTimer || simulationFrame || !state.running || state.lastSimulation.oscillating || (!state.simulationPending && !hasPulses())) return;
     if (state.simSpeed === 0 && hasPulses()) simulationFrame = requestAnimationFrame(simulationTick);
@@ -90,7 +90,7 @@
   }
   function toast(message) { $('toast').textContent = message; $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 3500); }
   function snapshot() {
-    return JSON.stringify({ ...state.circuit.toJSON(), editor: { layer: state.layer, camera: { ...state.camera, x: String(state.camera.x), y: String(state.camera.y) }, ghost: state.ghost, running: state.running, simSpeed: state.simSpeed, simBatch: state.simBatch,wireMode:state.wireMode,chipEditParents:advancedUI?.context()||[] } });
+    return JSON.stringify({ ...(state.circuit.computers8.size?LogicPixels.snapshot(state.circuit):state.circuit.toJSON()), editor: { layer: state.layer, camera: { ...state.camera, x: String(state.camera.x), y: String(state.camera.y) }, ghost: state.ghost, running: state.running, simSpeed: state.simSpeed, simBatch: state.simBatch,wireMode:state.wireMode,chipEditParents:advancedUI?.context()||[] } });
   }
   function checkpoint() {
     state.history.push(snapshot());
@@ -118,7 +118,7 @@
   function saveSoon() {
     if (restoring) return;
     state.modified = true; $('save-state').textContent = 'Saving…';
-    if (!hasPulses() || !saveTimer) { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow,state.circuit.largeMemory?3000:350); }
+    if ((!hasPulses()&&!state.circuit.computers8.size) || !saveTimer) { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow,state.circuit.largeMemory||state.circuit.computers8.size?3000:350); }
   }
   function saveNow() {
     clearTimeout(saveTimer); saveTimer = null;
@@ -559,7 +559,8 @@
         ctx.fillStyle = ink; ctx.font = `${s * (small ? .095 : .13)}px Arial,sans-serif`;
         const symbol = Logic.GATES.includes(n.type) || ['PULSE', 'REGISTER'].includes(n.type);
         ctx.fillText(n.type === 'RGBTUNNEL' ? 'RGB BUS' : n.type, p.x + s * .5, p.y + s * (symbol || n.type==='CHIP' ? .165 : .38));
-        if (['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND','CHIP'].includes(n.type)) {
+        if(['CPU8','RAM8','ROM8','VIDEO8'].includes(n.type)){ctx.font=`${s*.11}px Arial`;ctx.fillText(n.type==='CPU8'?'LS8 / 8-bit':n.type==='RAM8'?'2 GiB':n.type==='ROM8'?'64 KiB':(state.circuit.computers8.get(n.computerId)?.size||256)+' x '+(state.circuit.computers8.get(n.computerId)?.size||256),p.x+s*.5,p.y+s*.65);}
+        else if (['BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND','CHIP'].includes(n.type)) {
           ctx.font=`${s*.12}px Consolas,monospace`;const text=n.type==='KEYBOARD'?(n.keyCode||'KeyW'):n.type==='COMMAND'?(n.command==='release_keyboard'?'RELEASE':'CAPTURE'):n.type==='CHIP'?(state.circuit.chips.get(n.chipId)?.name||'CHIP'):value.toString(16).toUpperCase().padStart((n.bits||8)/4,'0');ctx.fillText(text.slice(0,16),p.x+s*.5,p.y+s*(n.type==='CHIP'?.5:.61));
           ctx.font=`${s*.08}px Arial`;ctx.fillText(n.type==='CHIP'?`${inputCount(n)} IN / ${outputCount(n)} OUT`:n.type==='KEYBOARD'?String(value):n.type==='COMMAND'?'ENABLE ↑':`${n.bits||8} BITS`,p.x+s*.5,p.y+s*(n.type==='CHIP'?.83:.79));
         } else if (['INPUT', 'OUTPUT'].includes(n.type)) {
@@ -611,7 +612,8 @@
     LogicScreens.beginFrame(c);
     wireRenderer.draw(ctx,c,state,{cellSize,screenToWorld,wireGeometry},COLORS);
     const floating = state.drag?.kind === 'move' && state.drag.moved ? state.selected : dropMotion?.ids;
-    visibleNodes(state.layer).forEach(n => { if (!floating?.has(n.id)) drawNode(n); });
+    const batched=LogicScreens.drawBatches(ctx,c,state,worldToScreen,cellSize(),floating);
+    (batched||visibleNodes(state.layer)).forEach(n => { if (!floating?.has(n.id)) drawNode(n); });
     for (const id of floating || []) { const n = c.nodes.get(id); if (n?.layer === state.layer) drawNode(n); }
     if (state.placing?.type==='COMMENT'&&state.pointer.y>20){const w=screenToWorld(state.pointer.x,state.pointer.y);drawComment({id:'preview',type:'COMMENT',x:w.x,y:w.y,commentOX:w.fx,commentOY:w.fy,label:'Comment'});}
     else if (state.placing && state.pointer.y > 72) { const w = screenToWorld(state.pointer.x, state.pointer.y); drawNode({ ...state.placing, id: 'preview', x: w.x, y: w.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 }, false, true); }
@@ -679,7 +681,7 @@
   }
   let propertyNodeId = null;
   function properties(n) {
-    if(n.type==='LOG'){debugUI.settings(n);return;}if(n.type==='COMMENT'){editComment(n);return;}if(['SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)){settings(n);return;}
+    if(['CPU8','RAM8','ROM8','VIDEO8'].includes(n.type)){computerUI.open(n.type==='RAM8');return;}if(n.type==='LOG'){debugUI.settings(n);return;}if(n.type==='COMMENT'){editComment(n);return;}if(['SENDTUNNEL','RECEIVETUNNEL'].includes(n.type)){settings(n);return;}
     if(advancedUI.isAdvanced(n)){advancedUI.settings(n);return;}
     propertyNodeId = n.id;
     $('properties-title').textContent = `${n.type} properties`;
@@ -746,10 +748,10 @@
     if(state.placing?.type==='LOG'){const w=screenToWorld(x,y);debugUI.settings({type:'LOG',x:w.x,y:w.y,layer:state.layer,label:'Signal became 1'},true);return;}
     const pos = screenToWorld(x, y), spec = state.placing;
     if (spec.type!=='COMMENT'&&state.circuit.at(state.layer, pos.x, pos.y)) { toast('That grid square is occupied.'); return; }
-    const node = { ...spec, x: pos.x, y: pos.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 };
+    const node = { ...spec,...(['CPU8','RAM8','ROM8','VIDEO8'].includes(spec.type)?{computerId:[...state.circuit.computers8.keys()][0]}:{}), x: pos.x, y: pos.y, layer: state.layer, direction: state.layer === 255 ? -1 : 1 };
     if(spec.type==='COMMENT'){let n;edit(()=>{n=state.circuit.addNode({...node,label:'Comment',commentOX:pos.fx,commentOY:pos.fy});state.selected=new Set([n.id]);});if(n)editComment(n);return;}
     if (spec.extendible || ['TUNNEL','MULTITUNNEL','SENDTUNNEL','RECEIVETUNNEL','RGBTUNNEL','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','KEYBOARD','COMMAND'].includes(spec.type)) settings(node, true);
-    else edit(() => { const n = state.circuit.addNode(node); state.selected = new Set([n.id]); });
+    else edit(() => { if(['CPU8','RAM8','ROM8','VIDEO8'].includes(node.type)&&!state.circuit.computers8.size){const m=new LogicComputer8.Computer8({id:'BYTE8',architecture:'LS8',romHex:'01000000'});state.circuit.computers8.set(m.id,m);node.computerId=m.id;}const n = state.circuit.addNode(node); state.selected = new Set([n.id]); });
   }
   function finishWire(target) {
     if (!state.wire || !target?.port) return false;
@@ -1000,11 +1002,11 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   setInterval(programStatus,150);
   let memoryPage=0;
   function refreshMemory(){try{const c=state.circuit,values=LogicProgram.memory(c),bits=programBits(),hex=n=>n.toString(16).padStart(bits===16?4:2,'0').toUpperCase();memoryPage=Math.max(0,Math.min(values.length-256,memoryPage))&~255;let text='      '+Array.from({length:16},(_,i)=>hex(i)).join(' ')+'\n';for(let a=memoryPage;a<memoryPage+256;a+=16)text+=hex(a)+': '+values.slice(a,a+16).map(hex).join(' ')+'\n';$('memory-grid').value=text;$('memory-note').textContent=bits===16?'64K words / 128 KiB. Screen RAM is C000–FFFF (RGB565).':'256 bytes.';$('memory-error').textContent='';}catch(error){$('memory-grid').value='';$('memory-error').textContent=error.message;}}
-  $('memory-open').onclick=()=>{setDrawer(false);refreshMemory();$('memory-dialog').showModal();};$('memory-go').onclick=()=>{const h=$('memory-page').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(h)){ $('memory-error').textContent='Use a hex page address.';return;}memoryPage=parseInt(h,16);refreshMemory();};$('memory-write').onclick=()=>{try{const a=$('memory-address').value.trim(),v=$('memory-value').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(a)||!/^[0-9a-f]{1,4}$/i.test(v))throw Error('Use hexadecimal addresses and values.');let ok=false;edit(()=>{LogicProgram.writeMemory(state.circuit,parseInt(a,16),parseInt(v,16));ok=true;});if(ok)refreshMemory();}catch(error){$('memory-error').textContent=error.message;}};
-  async function loadFileExample(name){const global={'comments-tunnels':'LogicCommentsTunnels','rgb-counter':'LogicRGBCounter',computer16:'LogicComputer16','computer16-keyboard':'LogicComputer16Keyboard','chips-io':'LogicChipsIO','computer-v2':'LogicComputerV2','graphical-computer':'LogicGraphicalComputer'}[name];if(window[global])return window[global];return await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='examples/'+name+'.js';script.onload=()=>resolve(window[global]);script.onerror=()=>reject(Error('Example file is missing'));document.head.append(script);});}
+  $('memory-open').onclick=()=>{setDrawer(false);if(state.circuit.computers8.size){computerUI.open(true);return;}refreshMemory();$('memory-dialog').showModal();};$('memory-go').onclick=()=>{const h=$('memory-page').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(h)){ $('memory-error').textContent='Use a hex page address.';return;}memoryPage=parseInt(h,16);refreshMemory();};$('memory-write').onclick=()=>{try{const a=$('memory-address').value.trim(),v=$('memory-value').value.trim();if(!/^[0-9a-f]{1,4}$/i.test(a)||!/^[0-9a-f]{1,4}$/i.test(v))throw Error('Use hexadecimal addresses and values.');let ok=false;edit(()=>{LogicProgram.writeMemory(state.circuit,parseInt(a,16),parseInt(v,16));ok=true;});if(ok)refreshMemory();}catch(error){$('memory-error').textContent=error.message;}};
+  async function loadFileExample(name){const global={'pixel-256':'LogicPixel256','comments-tunnels':'LogicCommentsTunnels','rgb-counter':'LogicRGBCounter',computer16:'LogicComputer16','computer16-keyboard':'LogicComputer16Keyboard','chips-io':'LogicChipsIO','computer-v2':'LogicComputerV2','graphical-computer':'LogicGraphicalComputer'}[name];if(window[global])return window[global];return await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='examples/'+name+'.js';script.onload=()=>resolve(window[global]);script.onerror=()=>reject(Error('Example file is missing'));document.head.append(script);});}
   function showCounter(){const n=[...state.circuit.nodes.values()].find(n=>n.type==='RGB');if(n){setLayer(n.layer);focusAt(n.x,n.y);}toast('RGB counter: open Control panel and press Run to start.');}
   function requestReplacement(which) {
-    const names = { 'comments-tunnels':'comments and directional tunnels', 'rgb': 'RGB bus', 'rgb-lights': 'RGB lights', 'tunnel': 'layer tunnel', 'adder': 'half adder', 'rgb-counter':'RGB 24-bit counter', 'computer16':'programmable 16-bit computer (128×128 screen)', 'computer16-keyboard':'keyboard-controlled 16-bit computer', 'chips-io':'chips, buses and keyboard commands', 'computer-v2':'RGB-8 v2 computer', 'graphical-computer':'original graphical computer' };
+    const names = {'pixel-256':'Pixel-256 computer', 'comments-tunnels':'comments and directional tunnels', 'rgb': 'RGB bus', 'rgb-lights': 'RGB lights', 'tunnel': 'layer tunnel', 'adder': 'half adder', 'rgb-counter':'RGB 24-bit counter', 'computer16':'programmable 16-bit computer (128×128 screen)', 'computer16-keyboard':'keyboard-controlled 16-bit computer', 'chips-io':'chips, buses and keyboard commands', 'computer-v2':'RGB-8 v2 computer', 'graphical-computer':'original graphical computer' };
     pendingReplacement = which; $('confirm-title').textContent = which === 'blank' ? 'Start a blank circuit?' : `Open the ${names[which] || 'half adder'} example?`;
     $('confirm-replace').textContent = which === 'blank' ? 'Start new' : 'Open example';
     $('help-dialog').close(); $('confirm-dialog').showModal();
@@ -1012,7 +1014,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   $('confirm-dialog').addEventListener('close', async () => {
     if ($('confirm-dialog').returnValue === 'export') { exportFile(); $('confirm-dialog').showModal(); return; }
     if ($('confirm-dialog').returnValue !== 'replace') return;
-    let imported;try{if(['rgb-counter','computer-v2','computer16','computer16-keyboard','chips-io','graphical-computer','comments-tunnels'].includes(pendingReplacement))imported=await loadFileExample(pendingReplacement);}catch(error){toast(error.message);return;}checkpoint();if(imported){restore(JSON.stringify(imported));if(pendingReplacement==='rgb-counter')showCounter();changed(false);return;}state.circuit = pendingReplacement === 'blank' ? new Circuit() : example(pendingReplacement);
+    let imported;try{if(['rgb-counter','computer-v2','computer16','computer16-keyboard','chips-io','graphical-computer','comments-tunnels','pixel-256'].includes(pendingReplacement))imported=await loadFileExample(pendingReplacement);}catch(error){toast(error.message);return;}checkpoint();if(imported){restore(JSON.stringify(imported));if(pendingReplacement==='rgb-counter')showCounter();changed(false);return;}state.circuit = pendingReplacement === 'blank' ? new Circuit() : example(pendingReplacement);
     stopTicks(); state.simulationPending = false; state.simulationSeen.clear();
     state.layer = pendingReplacement === 'rgb-lights' ? 1 : 0; state.selected.clear(); state.wire = null; state.placing = null; state.running = true; state.ioSelection = false; state.relayDrafts.clear(); state.relayOrders.clear(); state.relayGroupId = ''; relayOrderKey = '';
     $('project-name').value = state.circuit.name; state.lastSimulation = state.circuit.settle(); fit(); changed(false); renderLibrary();
@@ -1063,7 +1065,7 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   }
   function openTool(name, force) {
     if(name==='chips'){setDrawer(false);advancedUI.open();return;}
-    if (name === 'program') { setDrawer(false); openProgram(); return; }
+    if (name === 'program'||name==='computer8') { setDrawer(false); if(state.circuit.computers8.size||name==='computer8')computerUI.open();else openProgram();return; }
     if (name === 'help') { setDrawer(false); $('help-dialog').showModal(); return; }
     if (name === 'settings') { setDrawer(false); $('sim-speed').value = state.simSpeed; $('sim-batch').value = state.simBatch; $('theme-select').value = state.theme; $('wire-mode').value=state.wireMode; $('preferences-dialog').showModal(); return; }
     const elements = toolElements[name]; if (!elements) return;
@@ -1101,12 +1103,15 @@ A ${h(r.a)}   X ${h(r.x)}   Y ${h(r.y)}   OUT ${h(r.out)}   CARRY ${r.carry}`;co
   canvas.addEventListener('pointerdown', () => { if (document.body.classList.contains('drawer-open')) setDrawer(false); });
   debugUI=LogicDebugUI.install({state,$,ctx,COLORS,edit,render,updateUI,nodePose,screenToWorld,hit,toast});
   advancedUI=LogicAdvancedUI.install({state,$,edit,changed,toast,snapshot,restore,fit,render,updateUI,renderLibrary,requestSimulation,requestReplacement,checkpointBefore:before=>{state.history.push(before);state.future=[];}});
+  const computerUI=LogicComputerUI.install({state,$,edit,changed,toast,render,updateUI,advancedUI,requestReplacement});
+  let lastFastUpdate=0;
+  setInterval(()=>{if(!state.running||!state.circuit.computers8.size)return;try{if(state.circuit.fastFrame()){state.lastSimulation=state.circuit.lastResult;advancedUI.process();const now=performance.now();if(now-lastFastUpdate>150){updateUI();lastFastUpdate=now;}render();saveSoon();}}catch(e){state.running=false;toast(e.message);}},1000/30);
   applyTheme();
   let loaded = false;
   try { const saved = localStorage.getItem(STORE); if (saved) { restoring = true; restore(saved); loaded = true; } }
   catch { toast('The saved circuit could not be restored. Import an exported copy if needed.'); }
   finally { restoring = false; }
-  if (!loaded && ['rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io','comments-tunnels'].includes(initialExample)) {
+  if (!loaded && ['rgb-counter','graphical-computer','computer-v2','computer16','computer16-keyboard','chips-io','comments-tunnels','pixel-256'].includes(initialExample)) {
     try {
       // A local script works on file:// without a server or blocked JSON fetch.
       const data=await loadFileExample(initialExample);

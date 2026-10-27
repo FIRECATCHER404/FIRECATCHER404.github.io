@@ -1,17 +1,21 @@
 /* Logic Studio: dependency-free circuit model. Works from file:// and in Node. */
 (function (root, factory) {
   const api = factory();
-  if (typeof module === 'object' && module.exports) { module.exports = api; require('./advanced.js'); require('./debug.js'); }
+  if (typeof module === 'object' && module.exports) { module.exports = api; require('./advanced.js'); require('./debug.js'); require('./computer8-core.js'); }
   else root.Logic = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const migrateTunnels = typeof module === 'object' && module.exports ? require('./tunnel-migration.js').migrate : globalThis.LogicTunnelMigration.migrate;
+  const LS8=typeof module==='object'&&module.exports?require('./computer8.js'):globalThis.LogicComputer8;
+  const KeyCodes=typeof module==='object'&&module.exports?require('./keyboard-codes.js'):globalThis.LogicKeyCodes;
+  const Pixels=typeof module==='object'&&module.exports?require('./pixel-matrices.js'):globalThis.LogicPixels;
   const MAX_LAYERS = 256;
   const GATES = ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR'];
-  const SPECIAL = ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN', 'BUSINPUT', 'BUSOUTPUT', 'JOIN', 'SPLIT', 'CHIP', 'KEYBOARD', 'COMMAND', 'COMMENT', 'MULTITUNNEL', 'SENDTUNNEL', 'RECEIVETUNNEL', 'LOG'];
+  const SPECIAL = ['INPUT', 'OUTPUT', 'TUNNEL', 'RGB', 'RGBTUNNEL', 'PULSE', 'REGISTER', 'RAM', 'ROM', 'SCREEN', 'BUSINPUT', 'BUSOUTPUT', 'JOIN', 'SPLIT', 'CHIP', 'KEYBOARD', 'COMMAND', 'COMMENT', 'MULTITUNNEL', 'SENDTUNNEL', 'RECEIVETUNNEL', 'LOG', 'CPU8', 'RAM8', 'ROM8', 'VIDEO8'];
   const key = (layer, x, y) => `${layer}:${x}:${y}`;
   const comparePosition = (a, b) => a.x < b.x ? -1 : a.x > b.x ? 1 : a.y < b.y ? -1 : a.y > b.y ? 1 : a.id.localeCompare(b.id);
   function inputCount(node) {
+    if(node.type==='CPU8')return 5+(node.keyboardPorts||0);if(['RAM8','ROM8','VIDEO8'].includes(node.type))return 0;
     if(node.type==='LOG'||node.type==='COMMENT'||node.type==='RECEIVETUNNEL')return 0;if(node.type==='MULTITUNNEL'||node.type==='SENDTUNNEL')return node.inputs;
     if (node.type === 'CHIP') return (node.pinsIn || []).length;
     if (['BUSINPUT','KEYBOARD'].includes(node.type)) return 0;
@@ -26,9 +30,9 @@
     return node.inputs;
   }
   function hasOutput(node) { return !['LOG','SENDTUNNEL','COMMENT', 'OUTPUT', 'RGB', 'RGBTUNNEL', 'SCREEN', 'BUSOUTPUT'].includes(node.type); }
-  function outputCount(n) { return ['MULTITUNNEL','RECEIVETUNNEL'].includes(n.type)?n.inputs:n.type === 'CHIP' ? (n.pinsOut || []).length : n.type === 'SPLIT' ? n.bits || 8 : +hasOutput(n); }
-  function inputWidth(n, p = 0) { return n.type==='OUTPUT'?n.bits||1:n.type==='MULTITUNNEL'?n.channelBits:n.type === 'CHIP' ? n.pinsIn[p]?.width : ['SPLIT','BUSOUTPUT'].includes(n.type) ? n.bits || 8 : 1; }
-  function outputWidth(n, p = 0) { return n.type==='MULTITUNNEL'?n.channelBits:n.type === 'CHIP' ? n.pinsOut[p]?.width : ['JOIN','BUSINPUT'].includes(n.type) ? n.bits || 8 : 1; }
+  function outputCount(n) { return n.type==='CPU8'?12: ['MULTITUNNEL','RECEIVETUNNEL'].includes(n.type)?n.inputs:n.type === 'CHIP' ? (n.pinsOut || []).length : n.type === 'SPLIT' ? n.bits || 8 : +hasOutput(n); }
+  function inputWidth(n, p = 0) { return n.type==='CPU8'?(p===3||p>=5?8:1): n.type==='OUTPUT'?n.bits||1:n.type==='MULTITUNNEL'?n.channelBits:n.type === 'CHIP' ? n.pinsIn[p]?.width : ['SPLIT','BUSOUTPUT'].includes(n.type) ? n.bits || 8 : 1; }
+  function outputWidth(n, p = 0) { return n.type==='CPU8'?(p<8?8:1):['RAM8','ROM8'].includes(n.type)?8: n.type==='MULTITUNNEL'?n.channelBits:n.type === 'CHIP' ? n.pinsOut[p]?.width : ['JOIN','BUSINPUT'].includes(n.type) ? n.bits || 8 : 1; }
   function nodeSize(node) { return node.type === 'SCREEN' && node.screenPixels !== 1 ? 8 : 1; }
   function gate(type, bits) {
     switch (type) {
@@ -71,6 +75,7 @@
       ...(data.type === 'REGISTER' ? { clock: data.clock ?? 0 } : {}),
       ...(['RAM', 'ROM'].includes(data.type) ? { memory, ...(addressBits !== 8 ? { addressBits } : {}), ...(data.type === 'RAM' ? { clock: data.clock ?? 0 } : {}) } : {})
     };
+    if(['CPU8','RAM8','ROM8','VIDEO8'].includes(n.type)){n.computerId=data.computerId||'BYTE8';n.keyboardPorts=data.keyboardPorts||0;if(typeof n.computerId!=='string'||![0,16].includes(n.keyboardPorts))throw Error('Invalid computer hardware');}
     if(n.type==='OUTPUT'){n.bits=data.bits??1;n.displayBase=data.displayBase??16;if(![1,8,16].includes(n.bits))throw Error('OUTPUT supports 1, 8 or 16 bits.');if(![2,8,10,16].includes(n.displayBase))throw Error('Choose binary, octal, hex or integer display.');}
     if(n.type==='LOG'){n.targetId=data.targetId??'';n.targetPort=data.targetPort??0;n.logHigh=data.logHigh??0;if(typeof n.targetId!=='string'||n.targetId.length>100||!Number.isInteger(n.targetPort)||n.targetPort<0||n.targetPort>23||![0,1].includes(n.logHigh))throw Error('Invalid log attachment.');n.label=typeof data.label==='string'?data.label.slice(0,2048):'Signal became 1';}
     if(n.type==='COMMENT'){for(const [key,value]of Object.entries({commentOX:0,commentOY:0,commentWidth:3,commentHeight:1.5})){n[key]=data[key]??value;if(typeof n[key]!=='number'||!Number.isFinite(n[key]))throw Error('Invalid comment geometry.');}if(n.commentOX<0||n.commentOX>=1||n.commentOY<0||n.commentOY>=1||n.commentWidth<.5||n.commentWidth>10000||n.commentHeight<.4||n.commentHeight>10000)throw Error('Invalid comment bounds.');}
@@ -81,7 +86,7 @@
       n.bits=data.bits??8;if(![8,16].includes(n.bits))throw Error('Buses use 8 or 16 bits.');
       n.busValue=data.busValue??0;if(!Number.isInteger(n.busValue)||n.busValue<0||n.busValue>=2**n.bits)throw Error('Bus value is out of range.');
     }
-    if(n.type==='KEYBOARD'){n.keyCode=data.keyCode??'KeyW';if(!/^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Enter|Escape|Backspace|Shift(Left|Right)|Control(Left|Right)|Alt(Left|Right))$/.test(n.keyCode))throw Error('Choose a supported keyboard key.');}
+    if(n.type==='KEYBOARD'){n.keyCode=data.keyCode??'KeyW';if(!KeyCodes.includes(n.keyCode))throw Error('Choose a supported keyboard key.');}
     if(n.type==='COMMAND'){n.command=data.command??'capture_keyboard';n.clock=data.clock??0;if(!['capture_keyboard','release_keyboard'].includes(n.command)||![0,1].includes(n.clock))throw Error('Invalid command settings.');}
     if(n.type==='CHIP'){n.chipId=String(data.chipId??'');if(data.chipState)n.chipState=data.chipState;}
     return n;
@@ -89,7 +94,7 @@
   class Circuit {
     constructor() {
       this.nodes = new Map(); this.wires = new Map(); this.groups = new Map(); this.nextId = 1;
-      this.chips = new Map(); this.children = new Map(); this.keyDown = new Set(); this.keyboardCaptured = false; this.commands = [];
+      this.computers8=new Map();this.chips = new Map(); this.children = new Map(); this.keyDown = new Set(); this.keyboardCaptured = false; this.commands = [];
       this.values = new Map(); this.name = 'Untitled circuit'; this.rebuild();
     }
     id(prefix) { let id; do { id = `${prefix}${this.nextId++}`; } while (this.nodes.has(id) || this.wires.has(id) || this.groups.has(id) || this.chips.has(id)); return id; }
@@ -129,7 +134,7 @@
     }
     rebuild() {
       this.needsSettle = true;
-      this.prepareChips?.();
+      this.prepareChips?.();this.cpuNodes=[...this.nodes.values()].filter(n=>n.type==='CPU8');
       this.largeMemory=[...this.nodes.values()].some(n=>n.addressBits===16);this.topologyVersion=(this.topologyVersion||0)+1;this.wireLayers=new Map();this.screens=new Set();this.positions = new Map(); this.layers = new Map(); this.incoming = new Map(); this.dependents = new Map();
       this.comments=new Set([...this.nodes.values()].filter(n=>n.type==='COMMENT').map(n=>n.id));this.logicNodes=[];this.pulses = new Set(); this.registers = new Set(); this.memories = new Set();
       for (const n of this.nodes.values()) {
@@ -223,6 +228,7 @@
       const w = this.incoming.get(id)?.[port]; return w ? +!!this.signal(w.from,w.fromPort||0,values) : 0;
     }
     evaluate(n, values = this.values) {
+      if(['CPU8','RAM8','ROM8','VIDEO8'].includes(n.type))return this.computerOutput(n);
       if(n.type==='SCREEN'||n.type==='COMMENT'||n.type==='LOG')return 0;
       if(n.type==='SENDTUNNEL')return this.word(n.id,0,values);
       if(n.type==='RECEIVETUNNEL'){const peer=this.peers.get(n.id),v=Array.from({length:n.inputs},(_,p)=>peer?this.word(peer,p,values):0);this.portsChanged=v.some((x,p)=>x!==n.portValues[p]);n.portValues=v;return v[0];}
@@ -333,18 +339,20 @@
       for(const id of this.flipChildren?.()||[])affected.add(id);
       const result = this.settle(affected); result.changes += changedSources; return result;
     }
-    toJSON() {
+    toJSON(options={}) {
       return { format: 'logic-studio', version: 1, name: this.name, nextId: this.nextId,
+        ...(this.computers8.size?{computers8:[...this.computers8.values()].map(c=>c.save())}:{}),
         ...(this.chips.size?{chips:[...this.chips.values()]}:{}),
-        nodes: [...this.nodes.values()].map(n=>{if(n.type==='CHIP'){const child=this.children.get(n.id);return {...n,x:String(n.x),y:String(n.y),pinsIn:undefined,pinsOut:undefined,...(child?{chipState:child.toJSON()}: {})};}if(!n.storage)return {...n,x:String(n.x),y:String(n.y)};const data={};for(const k of Object.keys(n))if(k!=='memory'&&k!=='memoryVersion')data[k]=n[k];data.x=String(n.x);data.y=String(n.y);let packed='';const digits='0123456789ABCDEF';for(let a=0;a<65536;a+=4)packed+=digits[(n.storage[a]<<3)|(n.storage[a+1]<<2)|(n.storage[a+2]<<1)|n.storage[a+3]];data.memoryHex=packed;return data;}), wires: [...this.wires.values()].map(w => ({ ...w })),
+        nodes: [...(options.nodes||this.nodes.values())].map(n=>{if(n.type==='CHIP'){const child=this.children.get(n.id);return {...n,x:String(n.x),y:String(n.y),pinsIn:undefined,pinsOut:undefined,...(child?{chipState:child.toJSON()}: {})};}if(!n.storage)return {...n,x:String(n.x),y:String(n.y)};const data={};for(const k of Object.keys(n))if(k!=='memory'&&k!=='memoryVersion')data[k]=n[k];data.x=String(n.x);data.y=String(n.y);let packed='';const digits='0123456789ABCDEF';for(let a=0;a<65536;a+=4)packed+=digits[(n.storage[a]<<3)|(n.storage[a+1]<<2)|(n.storage[a+2]<<1)|n.storage[a+3]];data.memoryHex=packed;return data;}), wires: [...this.wires.values()].map(w => ({ ...w })),
         signals: [...this.values.entries()], groups: [...this.groups.values()].map(g => ({ ...g, nodeIds: this.groupNodes(g.id).map(n => n.id) })) };
     }
     static fromJSON(data) {
       if (!data || data.format !== 'logic-studio' || data.version !== 1 || !Array.isArray(data.nodes) || !Array.isArray(data.wires)) throw new Error('This is not a supported Logic Studio circuit.');
-      data = migrateTunnels(data);
+      data = migrateTunnels(Pixels.expand(data));
       const c = new Circuit(); if(data.chips!==undefined){if(!Array.isArray(data.chips))throw Error('Invalid chip library.');for(const def of data.chips){if(!def.id||c.chips.has(def.id))throw Error('Invalid or duplicate chip definition.');c.chips.set(def.id,def);}} c.name = typeof data.name === 'string' ? data.name.slice(0, 100) : 'Imported circuit';
+      for(const m of data.computers8||[]){const c8=new LS8.Computer8(m);if(c.computers8.has(c8.id))throw Error('Duplicate computer');c.computers8.set(c8.id,c8);}
       for (const raw of data.nodes) {
-        const n = validateNode(raw); c.prepareChip?.(n);
+        const n = validateNode(raw);if(['CPU8','RAM8','ROM8','VIDEO8'].includes(n.type)&&!c.computers8.has(n.computerId))throw Error('Missing computer hardware');c.prepareChip?.(n);
         if (!n.id || n.id.length > 100 || c.nodes.has(n.id)) throw new Error('Invalid or duplicate node identifier.');
         if (!['COMMENT','LOG'].includes(n.type)&&c.positions.has(key(n.layer, n.x, n.y))) throw new Error('Two nodes occupy the same grid square.');
         c.nodes.set(n.id, n);if(!['COMMENT','LOG'].includes(n.type))c.positions.set(key(n.layer, n.x, n.y), n);
@@ -371,7 +379,7 @@
       if (Array.isArray(data.signals)) for (const entry of data.signals) {
         if (!Array.isArray(entry) || entry.length !== 2) throw new Error('Invalid signal state.');
         const [id, v] = entry; const n = c.nodes.get(id);
-        if (!n || !Number.isInteger(v) || v < 0 || v > (['RGB', 'RGBTUNNEL'].includes(n.type) ? 0xffffff : ['OUTPUT','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','CHIP','MULTITUNNEL'].includes(n.type) ? 65535 : 1)) throw new Error('Invalid signal state.');
+        if (!n || !Number.isInteger(v) || v < 0 || v > (['RGB', 'RGBTUNNEL'].includes(n.type) ? 0xffffff : ['CPU8','RAM8','ROM8','OUTPUT','BUSINPUT','BUSOUTPUT','JOIN','SPLIT','CHIP','MULTITUNNEL'].includes(n.type) ? 65535 : 1)) throw new Error('Invalid signal state.');
         c.values.set(id, v);
       }
       return c;
