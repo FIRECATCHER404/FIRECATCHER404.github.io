@@ -8,6 +8,12 @@ Open [Skin Studio](https://firecatcher404.github.io/projects/skin-studio/) to cr
 
 Its static files live in `projects/skin-studio/`, including vendored MIT-licensed fflate and skinview3d libraries and the Expressionful 1.2.0 mod download. No uploaded skins or drafts are sent to a backend. Export a ZIP to back up your work or move it between browsers.
 
+## EasySA
+
+Open [EasySA](https://firecatcher404.github.io/projects/easysa/) to draw notes, layer synths, piano, drums, and imported samples inside one pattern, arrange a song, mix effects, and export WAV, MP3, or OGG. It runs in the browser, saves projects on the device, and supports portable `.easysa` files.
+
+The production build lives in `projects/easysa/`, with bundled audio encoders and an offline cache scoped to that app. The original Music Maker remains at `projects/music/`.
+
 ## Messenger backend deployment
 
 The messenger uses Firebase Authentication and Realtime Database for groups, friends, direct messages, read markers, and authenticated on-demand file attachments. The attachment limit is intentionally 1 MB per file (up to three files per message) so the feature works on Firebase's no-cost plan without a Cloud Storage bucket. Oversized JPEG, PNG, and WebP photos up to 12 MB are compressed locally before upload; original files never leave the browser when compression fails.
