@@ -2,6 +2,12 @@
 
 Static site published through GitHub Pages. The Firebase-backed messenger lives at `message.html`.
 
+## Interactive backgrounds
+
+The homepage has a local Matter.js physics background. Clicking outside links creates a random grey shape; holding grows it, and dragging sets its launch velocity. Buttons and individual text lines are static collision bodies. The bio runs a shared Langton's ant grid, adding an ant on each non-interactive click. Both backgrounds use `#474747` and pause in hidden tabs.
+
+The scripts and isolated styles live in `assets/backgrounds/`; the MIT-licensed Matter.js 0.20.0 build is vendored in `assets/vendor/matter-js/`. `window.pageBackground.snapshot()` exposes read-only diagnostics for browser verification. Run `node scripts/test-page-backgrounds.mjs` for the ant rule and resize regression checks.
+
 ## Useful files
 
 `useful-files/` contains downloadable collections with browser previews. Its first collection includes all note-block source audio from Minecraft Java 26.3: 20 instruments, 19 mob-head clips, and 2 alternate samples. Original OGG files are verified against the installed asset index; PCM16 WAV copies are decoded with VGMstream. Both formats have individual downloads and complete ZIPs.
