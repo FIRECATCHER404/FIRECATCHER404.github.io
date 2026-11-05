@@ -86,7 +86,8 @@ p { color: var(--muted); }
   gap: 0.75rem;
   margin-top: 2rem;
 }
-.home-links { max-width: 600px; }
+.home-links { flex-direction: column; flex-wrap: nowrap; max-width: 320px; }
+.home-links .btn { width: 100%; max-width: 250px; }
 .btn {
   display: inline-flex;
   align-items: center;
@@ -192,6 +193,21 @@ p { color: var(--muted); }
   overflow-wrap: anywhere;
 }
 .project-link p { font-size: 0.84rem; line-height: 1.55; }
+
+.green-accent {
+  --accent: #447a41;
+  --accent-text: #b2cfad;
+  --line: #3c4b3a;
+}
+.green-accent h1,
+.green-accent .bio-contacts h2,
+.green-accent .category-head h2 { color: var(--accent-text); }
+.green-accent .btn { border-color: var(--accent); }
+.green-accent .btn:hover { background: var(--accent); color: var(--text); }
+.green-accent a:focus-visible { outline-color: var(--accent-text); }
+.green-accent .project-link:hover { border-color: var(--accent); background: #2c322b; }
+.green-accent .project-link:hover h3 { color: var(--accent-text); }
+.green-accent ::selection { background: var(--accent); color: var(--text); }
 
 @media (max-width: 900px) {
   .category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
