@@ -1,4 +1,5 @@
 import { INK, collectSolids, createStage, documentPoint, documentSize, exposeDiagnostics, isInteractable, watchLayout } from "./common.js";
+import { collisionPairs, createCircle, createPill, separateBodies } from "./physics-contacts.js";
 
 async function loadMatter() {
   if (window.Matter) return window.Matter;
@@ -13,7 +14,8 @@ async function loadMatter() {
 }
 
 async function start() {
-  const { Bodies, Body, Composite, Engine, Events, Query, Sleeping } = await loadMatter();
+  const Matter = await loadMatter();
+  const { Bodies, Body, Composite, Engine, Events, Query, Sleeping } = Matter;
   const stage = createStage(document.getElementById("page-background"));
   const engine = Engine.create({ enableSleeping: true, positionIterations: 10, velocityIterations: 8 });
   engine.gravity.y = 1;
@@ -22,6 +24,7 @@ async function start() {
   const previousPoses = new Map();
   const contacts = { text: 0, button: 0, wall: 0, shapes: 0 };
   const contactLabels = new Map();
+  const separation = { corrections: 0, rollbacks: 0 };
   let world = documentSize();
   let solids = [];
   let frameId = 0;
@@ -52,7 +55,8 @@ async function start() {
       });
       return Query.collides(body, obstacles).length === 0;
     }
-    if (test(point.x, point.y)) return;
+    const original = { ...body.position };
+    if (test(point.x, point.y)) return true;
     // A click on solid text, or a large held shape between buttons, is moved to
     // the nearest free space instead of leaving a body trapped inside the UI.
     const limit = Math.hypot(world.width, world.height);
@@ -60,25 +64,30 @@ async function start() {
       const samples = Math.max(12, Math.ceil(distance / 4));
       for (let index = 0; index < samples; index += 1) {
         const angle = index * Math.PI * 2 / samples;
-        if (test(point.x + Math.cos(angle) * distance, point.y + Math.sin(angle) * distance)) return;
+        if (test(point.x + Math.cos(angle) * distance, point.y + Math.sin(angle) * distance)) return true;
       }
     }
-    Body.setPosition(body, point);
+    Body.setPosition(body, original);
+    return false;
   }
 
   function syncLayout() {
     stage.resize();
     const previous = world;
     world = documentSize();
+    const footer = document.querySelector(".site-footer");
+    if (footer) world.height = Math.min(world.height, footer.getBoundingClientRect().top + window.scrollY);
     for (const solid of solids) Composite.remove(engine.world, solid);
-    solids = collectSolids().map(rect => Bodies.rectangle(
-      rect.x + rect.width / 2, rect.y + rect.height / 2, rect.width, rect.height,
-      {
+    solids = collectSolids().map(rect => {
+      const options = {
         isStatic: true, label: rect.label, restitution: 0.3, friction: 0.4,
-        chamfer: rect.rounded ? { radius: Math.min(rect.height / 2, rect.width / 2) - 0.5 } : undefined,
+        slop: 0,
         plugin: { kind: rect.label.startsWith("button:") ? "button" : "text", rectangle: rect }
-      }
-    ));
+      };
+      return rect.rounded ? createPill(Matter, rect, options) : Bodies.rectangle(
+        rect.x + rect.width / 2, rect.y + rect.height / 2, rect.width, rect.height, options
+      );
+    });
     const thickness = 100;
     const walls = [
       [-thickness / 2, world.height / 2, thickness, world.height + thickness * 2],
@@ -86,31 +95,28 @@ async function start() {
       [world.width / 2, -thickness / 2, world.width + thickness * 2, thickness],
       [world.width / 2, world.height + thickness / 2, world.width + thickness * 2, thickness]
     ].map(([x, y, width, height]) => Bodies.rectangle(x, y, width, height, {
-      isStatic: true, label: "wall", restitution: 0.3, friction: 0.4, plugin: { kind: "wall" }
+      isStatic: true, label: "wall", restitution: 0.3, friction: 0.4, slop: 0, plugin: { kind: "wall" }
     }));
     solids.push(...walls);
     Composite.add(engine.world, solids);
-    for (const body of objects) {
+    const placed = [];
+    for (const body of [...objects]) {
       const point = { x: body.position.x * world.width / previous.width, y: body.position.y * world.height / previous.height };
-      clearPosition(body, point);
+      if (!clearPosition(body, point, [...solids, ...placed])) {
+        Composite.remove(engine.world, body);
+        objects.splice(objects.indexOf(body), 1);
+        previousPoses.delete(body.id);
+        continue;
+      }
+      placed.push(body);
       previousPoses.set(body.id, { ...body.position, angle: body.angle });
       Sleeping.set(body, false);
     }
     wake();
   }
 
-  function drawObject(body, alpha = 1) {
+  function drawObject(body) {
     const context = stage.context;
-    const previous = previousPoses.get(body.id);
-    context.save();
-    if (previous && !body.isSleeping) {
-      const x = previous.x + (body.position.x - previous.x) * alpha;
-      const y = previous.y + (body.position.y - previous.y) * alpha;
-      const angle = previous.angle + (body.angle - previous.angle) * alpha;
-      context.translate(x, y);
-      context.rotate(angle - body.angle);
-      context.translate(-body.position.x, -body.position.y);
-    }
     context.fillStyle = INK;
     context.beginPath();
     if (body.circleRadius) context.arc(body.position.x, body.position.y, body.circleRadius, 0, Math.PI * 2);
@@ -119,16 +125,15 @@ async function start() {
       context.closePath();
     }
     context.fill();
-    context.restore();
   }
 
   function makeShape(shape, point, size) {
     const options = {
-      restitution: 0.42, friction: 0.4, frictionStatic: 0.7, frictionAir: 0.004, slop: 0.015,
+      restitution: 0.42, friction: 0.4, frictionStatic: 0.7, frictionAir: 0.004, slop: 0,
       render: { fillStyle: INK, strokeStyle: INK },
       plugin: { shape, size, color: INK }
     };
-    if (shape === "circle") return Bodies.circle(point.x, point.y, size, options, 32);
+    if (shape === "circle") return createCircle(Matter, point.x, point.y, size, options);
     if (shape === "square") return Bodies.rectangle(point.x, point.y, size * 2, size * 2, options);
     return Bodies.polygon(point.x, point.y, 3, size * 4 / 3, options);
   }
@@ -139,15 +144,17 @@ async function start() {
     const scale = size / body.plugin.size;
     Body.scale(body, scale, scale);
     body.plugin.size = size;
-    clearPosition(body, drag.start, [...solids, ...objects]);
-    return body;
+    return clearPosition(body, drag.start, [...solids, ...objects]) ? body : null;
   }
 
   function render() {
     stage.clear();
-    for (const body of objects) drawObject(body, accumulator / fixedStep);
+    // Draw only the resolved physics state. Interpolated rotations can cut
+    // through a neighbour even when both end poses are collision-free.
+    for (const body of objects) drawObject(body);
     if (drag) {
       const preview = updatePreview();
+      if (!preview) return;
       drawObject(preview);
       stage.context.strokeStyle = INK;
       stage.context.lineWidth = 2;
@@ -180,6 +187,21 @@ async function start() {
         }
       }
       Engine.update(engine, fixedStep);
+      const result = separateBodies(Matter, objects, solids);
+      separation.corrections += result.corrections;
+      if (!result.valid) {
+        // A jammed pile must stay in its last valid state rather than displaying
+        // interpenetration while the iterative solver tries to resolve it.
+        separation.rollbacks += 1;
+        for (const body of objects) {
+          const pose = previousPoses.get(body.id);
+          Body.setPosition(body, pose);
+          Body.setAngle(body, pose.angle);
+          Body.setVelocity(body, { x: 0, y: 0 });
+          Body.setAngularVelocity(body, 0);
+          body.positionImpulse.x = body.positionImpulse.y = 0;
+        }
+      }
       accumulator -= fixedStep;
     }
     render();
@@ -222,6 +244,7 @@ async function start() {
     if (!drag || event.pointerId !== drag.id) return;
     drag.end = documentPoint(event);
     const body = updatePreview();
+    if (!body) { cancelDrag(); return; }
     const velocity = { x: (drag.end.x - drag.start.x) * 0.1, y: (drag.end.y - drag.start.y) * 0.1 };
     Body.setVelocity(body, velocity);
     clampSpeed(body);
@@ -259,6 +282,7 @@ async function start() {
     kind: "physics", color: INK, world: { ...world }, dragging: Boolean(drag),
     lastSpawn: lastSpawn ? { ...lastSpawn, origin: { ...lastSpawn.origin }, velocity: { ...lastSpawn.velocity } } : null,
     contacts: { ...contacts }, contactLabels: Object.fromEntries(contactLabels),
+    separation: { ...separation, overlaps: collisionPairs(Matter, objects, solids).length },
     bodies: objects.map(body => ({
       id: body.id, shape: body.plugin.shape, size: body.plugin.size, color: body.plugin.color,
       x: body.position.x, y: body.position.y, velocity: { ...Body.getVelocity(body) },
