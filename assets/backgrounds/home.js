@@ -15,10 +15,11 @@ async function loadMatter() {
 async function start() {
   const { Bodies, Body, Composite, Engine, Events, Query, Sleeping } = await loadMatter();
   const stage = createStage(document.getElementById("page-background"));
-  const engine = Engine.create({ enableSleeping: true, positionIterations: 8, velocityIterations: 8 });
+  const engine = Engine.create({ enableSleeping: true, positionIterations: 10, velocityIterations: 8 });
   engine.gravity.y = 1;
   engine.gravity.scale = 0.0008;
   const objects = [];
+  const previousPoses = new Map();
   const contacts = { text: 0, button: 0, wall: 0, shapes: 0 };
   const contactLabels = new Map();
   let world = documentSize();
@@ -28,7 +29,7 @@ async function start() {
   let accumulator = 0;
   let drag = null;
   let lastSpawn = null;
-  const fixedStep = 1000 / 120;
+  const fixedStep = 1000 / 240;
   const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
   const heldSize = () => Math.min(40, 5 + (performance.now() - drag.started) * 0.03);
 
@@ -42,14 +43,14 @@ async function start() {
     }
   });
 
-  function clearPosition(body, point) {
+  function clearPosition(body, point, obstacles = solids) {
     const radius = body.plugin.size * (body.plugin.shape === "square" ? Math.SQRT2 : 1.4) + 2;
     function test(x, y) {
       Body.setPosition(body, {
         x: clamp(x, radius, Math.max(radius, world.width - radius)),
         y: clamp(y, radius, Math.max(radius, world.height - radius))
       });
-      return Query.collides(body, solids).length === 0;
+      return Query.collides(body, obstacles).length === 0;
     }
     if (test(point.x, point.y)) return;
     // A click on solid text, or a large held shape between buttons, is moved to
@@ -73,7 +74,7 @@ async function start() {
     solids = collectSolids().map(rect => Bodies.rectangle(
       rect.x + rect.width / 2, rect.y + rect.height / 2, rect.width, rect.height,
       {
-        isStatic: true, label: rect.label, restitution: 0.65, friction: 0.35,
+        isStatic: true, label: rect.label, restitution: 0.3, friction: 0.4,
         chamfer: rect.rounded ? { radius: Math.min(rect.height / 2, rect.width / 2) - 0.5 } : undefined,
         plugin: { kind: rect.label.startsWith("button:") ? "button" : "text", rectangle: rect }
       }
@@ -85,20 +86,31 @@ async function start() {
       [world.width / 2, -thickness / 2, world.width + thickness * 2, thickness],
       [world.width / 2, world.height + thickness / 2, world.width + thickness * 2, thickness]
     ].map(([x, y, width, height]) => Bodies.rectangle(x, y, width, height, {
-      isStatic: true, label: "wall", restitution: 0.65, friction: 0.35, plugin: { kind: "wall" }
+      isStatic: true, label: "wall", restitution: 0.3, friction: 0.4, plugin: { kind: "wall" }
     }));
     solids.push(...walls);
     Composite.add(engine.world, solids);
     for (const body of objects) {
       const point = { x: body.position.x * world.width / previous.width, y: body.position.y * world.height / previous.height };
       clearPosition(body, point);
+      previousPoses.set(body.id, { ...body.position, angle: body.angle });
       Sleeping.set(body, false);
     }
     wake();
   }
 
-  function drawObject(body) {
+  function drawObject(body, alpha = 1) {
     const context = stage.context;
+    const previous = previousPoses.get(body.id);
+    context.save();
+    if (previous && !body.isSleeping) {
+      const x = previous.x + (body.position.x - previous.x) * alpha;
+      const y = previous.y + (body.position.y - previous.y) * alpha;
+      const angle = previous.angle + (body.angle - previous.angle) * alpha;
+      context.translate(x, y);
+      context.rotate(angle - body.angle);
+      context.translate(-body.position.x, -body.position.y);
+    }
     context.fillStyle = INK;
     context.beginPath();
     if (body.circleRadius) context.arc(body.position.x, body.position.y, body.circleRadius, 0, Math.PI * 2);
@@ -107,11 +119,12 @@ async function start() {
       context.closePath();
     }
     context.fill();
+    context.restore();
   }
 
   function makeShape(shape, point, size) {
     const options = {
-      restitution: 0.65, friction: 0.25, frictionAir: 0.001, slop: 0.02,
+      restitution: 0.42, friction: 0.4, frictionStatic: 0.7, frictionAir: 0.004, slop: 0.015,
       render: { fillStyle: INK, strokeStyle: INK },
       plugin: { shape, size, color: INK }
     };
@@ -120,16 +133,26 @@ async function start() {
     return Bodies.polygon(point.x, point.y, 3, size * 4 / 3, options);
   }
 
+  function updatePreview() {
+    const body = drag.preview;
+    const size = heldSize();
+    const scale = size / body.plugin.size;
+    Body.scale(body, scale, scale);
+    body.plugin.size = size;
+    clearPosition(body, drag.start, [...solids, ...objects]);
+    return body;
+  }
+
   function render() {
     stage.clear();
-    for (const body of objects) drawObject(body);
+    for (const body of objects) drawObject(body, accumulator / fixedStep);
     if (drag) {
-      const preview = makeShape(drag.shape, drag.start, heldSize());
+      const preview = updatePreview();
       drawObject(preview);
       stage.context.strokeStyle = INK;
       stage.context.lineWidth = 2;
       stage.context.beginPath();
-      stage.context.moveTo(drag.start.x, drag.start.y);
+      stage.context.moveTo(preview.position.x, preview.position.y);
       stage.context.lineTo(drag.end.x, drag.end.y);
       stage.context.stroke();
     }
@@ -149,7 +172,13 @@ async function start() {
     accumulator += Math.min(50, Math.max(0, now - lastTime));
     lastTime = now;
     while (accumulator >= fixedStep) {
-      for (const body of objects) if (!body.isSleeping) clampSpeed(body);
+      for (const body of objects) {
+        previousPoses.set(body.id, { ...body.position, angle: body.angle });
+        if (!body.isSleeping) {
+          clampSpeed(body);
+          Body.setAngularVelocity(body, Body.getAngularVelocity(body) * Math.pow(0.992, fixedStep / (1000 / 60)));
+        }
+      }
       Engine.update(engine, fixedStep);
       accumulator -= fixedStep;
     }
@@ -180,6 +209,7 @@ async function start() {
       id: event.pointerId, pointerType: event.pointerType, start: point, end: point,
       started: performance.now(), shape: ["circle", "square", "triangle"][Math.floor(Math.random() * 3)]
     };
+    drag.preview = makeShape(drag.shape, point, 5);
     stage.canvas.setPointerCapture(event.pointerId);
     wake();
   });
@@ -191,13 +221,13 @@ async function start() {
   document.addEventListener("pointerup", event => {
     if (!drag || event.pointerId !== drag.id) return;
     drag.end = documentPoint(event);
-    const body = makeShape(drag.shape, drag.start, heldSize());
-    clearPosition(body, drag.start);
+    const body = updatePreview();
     const velocity = { x: (drag.end.x - drag.start.x) * 0.1, y: (drag.end.y - drag.start.y) * 0.1 };
     Body.setVelocity(body, velocity);
     clampSpeed(body);
     lastSpawn = { shape: drag.shape, size: body.plugin.size, origin: { ...drag.start }, velocity: { ...Body.getVelocity(body) } };
     objects.push(body);
+    previousPoses.set(body.id, { ...body.position, angle: body.angle });
     Composite.add(engine.world, body);
     cancelDrag();
     wake();

@@ -40,6 +40,7 @@ export function createStage(canvas) {
 export function collectSolids() {
   const solids = [];
   const bounds = documentSize();
+  const measure = document.createElement("canvas").getContext("2d");
   function append(rect, label, rounded = false) {
     const x = rect.left + window.scrollX;
     const y = rect.top + window.scrollY;
@@ -50,17 +51,35 @@ export function collectSolids() {
     if (!element.checkVisibility()) continue;
     append(element.getBoundingClientRect(), "button:" + element.textContent.trim(), element.classList.contains("btn"));
   }
-  // Ranges follow the actual text lines, rather than the full width of a heading
-  // or paragraph. Empty layout space remains available to the simulation.
+  // A text Range includes the font's invisible ascent/descent and spaces. Use
+  // each visible glyph's ink metrics so shapes meet the letters themselves.
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
     const node = walker.currentNode;
     const element = node.parentElement;
     if (!node.textContent.trim() || !element || element.closest("script, style, canvas, noscript, [hidden]")) continue;
     if (isInteractable(element) || !element.checkVisibility()) continue;
+    const style = getComputedStyle(element);
+    measure.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
     const range = document.createRange();
-    range.selectNodeContents(node);
-    for (const rect of range.getClientRects()) append(rect, "text:" + node.textContent.trim());
+    let offset = 0;
+    for (const character of node.textContent) {
+      const start = offset;
+      offset += character.length;
+      if (!character.trim()) continue;
+      range.setStart(node, start);
+      range.setEnd(node, offset);
+      const metrics = measure.measureText(character);
+      const ascent = metrics.actualBoundingBoxAscent;
+      const descent = metrics.actualBoundingBoxDescent;
+      const fontAscent = metrics.fontBoundingBoxAscent ?? parseFloat(style.fontSize) * 0.8;
+      for (const rect of range.getClientRects()) append({
+        left: rect.left - metrics.actualBoundingBoxLeft,
+        top: rect.top + fontAscent - ascent,
+        width: metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight,
+        height: ascent + descent
+      }, "text:" + character);
+    }
   }
   return solids;
 }

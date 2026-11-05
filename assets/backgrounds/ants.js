@@ -24,19 +24,6 @@ function render() {
   const context = stage.context;
   context.imageSmoothingEnabled = false;
   context.drawImage(cells, 0, 0, world.columns * cellSize, world.rows * cellSize);
-  context.fillStyle = "#f1f1ee";
-  for (const ant of world.ants) {
-    context.save();
-    context.translate((ant.x + 0.5) * cellSize, (ant.y + 0.5) * cellSize);
-    context.rotate(ant.direction * Math.PI / 2);
-    context.beginPath();
-    context.moveTo(0, -3);
-    context.lineTo(2.5, 2.5);
-    context.lineTo(-2.5, 2.5);
-    context.closePath();
-    context.fill();
-    context.restore();
-  }
 }
 
 function syncLayout() {

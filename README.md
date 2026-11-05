@@ -4,7 +4,7 @@ Static site published through GitHub Pages. The Firebase-backed messenger lives 
 
 ## Interactive backgrounds
 
-The homepage has a local Matter.js physics background. Clicking outside links creates a random grey shape; holding grows it, and dragging sets its launch velocity. Buttons and individual text lines are static collision bodies. The bio runs a shared Langton's ant grid, adding an ant on each non-interactive click. Both backgrounds use `#474747` and pause in hidden tabs.
+The homepage has a local Matter.js physics background. Clicking outside links creates a random grey shape; holding grows it, and dragging sets its launch velocity. Buttons and visible text glyphs are static collision bodies. Physics uses small fixed steps, interpolated drawing, and damped bounce and rotation; the growing preview stays in a free spawn position. The bio runs a shared Langton's ant grid, adding an invisible ant on each non-interactive click and drawing only the changed cells. Both backgrounds use `#474747` and pause in hidden tabs.
 
 The scripts and isolated styles live in `assets/backgrounds/`; the MIT-licensed Matter.js 0.20.0 build is vendored in `assets/vendor/matter-js/`. `window.pageBackground.snapshot()` exposes read-only diagnostics for browser verification. Run `node scripts/test-page-backgrounds.mjs` for the ant rule and resize regression checks.
 
