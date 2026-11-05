@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const Matter = require("../assets/vendor/matter-js/matter.min.js");
 const source = await readFile(new URL("../assets/backgrounds/physics-contacts.js", import.meta.url), "utf8");
-const { collisionPairs, createCircle, createPill, separateBodies } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+const { collisionPairs, createCircle, createPill, motionSubsteps, separateBodies } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 const { Bodies, Body, Composite, Engine, Vertices } = Matter;
 
 // Independent SAT check; do not use the same query that performs correction.
@@ -43,6 +43,22 @@ for (let angle = -Math.PI / 2; angle < Math.PI / 2; angle += 0.01) {
   assert(Vertices.contains(pill.vertices, { x: 24 - 24 * Math.cos(angle), y: 24 + 24 * Math.sin(angle) }));
 }
 
+for (const direction of [1, -1]) {
+  const engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
+  engine.gravity.y = 0;
+  const line = Bodies.rectangle(100, 100.5, 200, 1, { isStatic: true, slop: 0 });
+  const circle = createCircle(Matter, 100, direction === 1 ? 94.8 : 106.2, 5, { slop: 0, restitution: 0.42, plugin: { size: 5 } });
+  Body.setVelocity(circle, { x: 0, y: 30 * direction });
+  Composite.add(engine.world, [line, circle]);
+  const count = motionSubsteps(Matter, [circle], 1000 / 240);
+  assert(count > 1, "A fast small body needs substeps for a thin separator");
+  for (let i = 0; i < count; i += 1) {
+    Engine.update(engine, 1000 / 240 / count);
+    assert(separateBodies(Matter, [circle], [line]).valid);
+    assert(circle.vertices.every(v => direction === 1 ? v.y <= 100 + 1e-6 : v.y >= 101 - 1e-6), "Do not cross a one-pixel separator from either side");
+  }
+}
+
 const floorY = 500;
 const floor = Bodies.rectangle(250, floorY + 100, 700, 200, { isStatic: true, slop: 0 });
 const walls = [floor, Bodies.rectangle(-50, 250, 100, 700, { isStatic: true, slop: 0 }), Bodies.rectangle(550, 250, 100, 700, { isStatic: true, slop: 0 })];
@@ -75,4 +91,4 @@ for (let i = 0; i < 2400; i += 1) {
   }
 }
 assert(corrections > 0, "The pile must exercise separation corrections");
-console.log(`PASS circle coverage, rounded button coverage, touching circles, and 2400 pile steps with no pair or floor penetration (${corrections} corrections).`);
+console.log(`PASS collision outlines, thin-separator impacts from both sides, and 2400 pile steps with no pair or floor penetration (${corrections} corrections).`);

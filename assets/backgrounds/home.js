@@ -1,5 +1,5 @@
 import { INK, collectSolids, createStage, documentPoint, documentSize, exposeDiagnostics, isInteractable, watchLayout } from "./common.js";
-import { collisionPairs, createCircle, createPill, separateBodies } from "./physics-contacts.js";
+import { collisionPairs, createCircle, createPill, motionSubsteps, separateBodies } from "./physics-contacts.js";
 
 async function loadMatter() {
   if (window.Matter) return window.Matter;
@@ -22,7 +22,7 @@ async function start() {
   engine.gravity.scale = 0.0008;
   const objects = [];
   const previousPoses = new Map();
-  const contacts = { text: 0, button: 0, wall: 0, shapes: 0 };
+  const contacts = { text: 0, button: 0, separator: 0, wall: 0, shapes: 0 };
   const contactLabels = new Map();
   const separation = { corrections: 0, rollbacks: 0 };
   let world = documentSize();
@@ -71,12 +71,13 @@ async function start() {
     return false;
   }
 
-  function syncLayout() {
-    stage.resize();
+  function syncLayout(scaleObjects = true) {
+    if (scaleObjects) stage.resize();
     const previous = world;
     world = documentSize();
+    const documentHeight = world.height;
+    world.height = window.scrollY + window.innerHeight;
     const footer = document.querySelector(".site-footer");
-    if (footer) world.height = Math.min(world.height, footer.getBoundingClientRect().top + window.scrollY);
     for (const solid of solids) Composite.remove(engine.world, solid);
     solids = collectSolids().map(rect => {
       const options = {
@@ -88,10 +89,25 @@ async function start() {
         rect.x + rect.width / 2, rect.y + rect.height / 2, rect.width, rect.height, options
       );
     });
+    if (footer) {
+      const bounds = footer.getBoundingClientRect();
+      const height = parseFloat(getComputedStyle(footer).borderTopWidth);
+      if (height > 0) {
+        const rectangle = {
+          x: bounds.left + window.scrollX, y: bounds.top + window.scrollY,
+          width: bounds.width, height, label: "separator"
+        };
+        solids.push(Bodies.rectangle(rectangle.x + rectangle.width / 2, rectangle.y + height / 2, rectangle.width, height, {
+          isStatic: true, label: "separator", restitution: 0.3, friction: 0.4, slop: 0,
+          plugin: { kind: "separator", rectangle }
+        }));
+      }
+    }
     const thickness = 100;
+    const sideHeight = Math.max(documentHeight, world.height);
     const walls = [
-      [-thickness / 2, world.height / 2, thickness, world.height + thickness * 2],
-      [world.width + thickness / 2, world.height / 2, thickness, world.height + thickness * 2],
+      [-thickness / 2, sideHeight / 2, thickness, sideHeight + thickness * 2],
+      [world.width + thickness / 2, sideHeight / 2, thickness, sideHeight + thickness * 2],
       [world.width / 2, -thickness / 2, world.width + thickness * 2, thickness],
       [world.width / 2, world.height + thickness / 2, world.width + thickness * 2, thickness]
     ].map(([x, y, width, height]) => Bodies.rectangle(x, y, width, height, {
@@ -101,7 +117,9 @@ async function start() {
     Composite.add(engine.world, solids);
     const placed = [];
     for (const body of [...objects]) {
-      const point = { x: body.position.x * world.width / previous.width, y: body.position.y * world.height / previous.height };
+      const point = scaleObjects
+        ? { x: body.position.x * world.width / previous.width, y: body.position.y * world.height / previous.height }
+        : { ...body.position };
       if (!clearPosition(body, point, [...solids, ...placed])) {
         Composite.remove(engine.world, body);
         objects.splice(objects.indexOf(body), 1);
@@ -186,10 +204,17 @@ async function start() {
           Body.setAngularVelocity(body, Body.getAngularVelocity(body) * Math.pow(0.992, fixedStep / (1000 / 60)));
         }
       }
-      Engine.update(engine, fixedStep);
-      const result = separateBodies(Matter, objects, solids);
-      separation.corrections += result.corrections;
-      if (!result.valid) {
+      // Fast small shapes need shorter steps to meet a one-pixel separator
+      // before their centre crosses to its other side.
+      const substeps = motionSubsteps(Matter, objects, fixedStep);
+      let valid = true;
+      for (let step = 0; step < substeps; step += 1) {
+        Engine.update(engine, fixedStep / substeps);
+        const result = separateBodies(Matter, objects, solids);
+        separation.corrections += result.corrections;
+        if (!result.valid) { valid = false; break; }
+      }
+      if (!valid) {
         // A jammed pile must stay in its last valid state rather than displaying
         // interpenetration while the iterative solver tries to resolve it.
         separation.rollbacks += 1;
@@ -267,7 +292,14 @@ async function start() {
   }
   document.addEventListener("contextmenu", event => { if (drag) event.preventDefault(); });
   window.addEventListener("blur", cancelDrag);
-  window.addEventListener("scroll", wake, { passive: true });
+  let scrollFrame = 0;
+  window.addEventListener("scroll", () => {
+    if (scrollFrame) return;
+    scrollFrame = requestAnimationFrame(() => {
+      scrollFrame = 0;
+      syncLayout(false);
+    });
+  }, { passive: true });
   function pause() {
     cancelDrag();
     cancelAnimationFrame(frameId);

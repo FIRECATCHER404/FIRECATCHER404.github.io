@@ -1,6 +1,18 @@
 const GAP = 0.05;
 const EPSILON = 1e-7;
 
+export function motionSubsteps(Matter, objects, delta) {
+  let steps = 1;
+  for (const body of objects) {
+    if (body.isSleeping) continue;
+    const size = body.plugin.size;
+    const velocity = Matter.Body.getVelocity(body);
+    const travel = (Math.hypot(velocity.x, velocity.y) + Math.abs(Matter.Body.getAngularVelocity(body)) * size * Math.SQRT2) * delta / (1000 / 60);
+    steps = Math.max(steps, Math.ceil(travel / (size * 0.4)));
+  }
+  return steps;
+}
+
 export function createCircle(Matter, x, y, radius, options) {
   // Matter's regular circle mesh is inscribed, which lets the painted circle
   // enter other bodies. A circumscribed mesh contains every painted pixel edge.
