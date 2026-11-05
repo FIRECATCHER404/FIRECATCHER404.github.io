@@ -2,6 +2,12 @@
 
 Static site published through GitHub Pages. The Firebase-backed messenger lives at `message.html`.
 
+## Useful files
+
+`useful-files/` contains downloadable collections with browser previews. Its first collection includes all note-block source audio from Minecraft Java 26.3: 20 instruments, 19 mob-head clips, and 2 alternate samples. Original OGG files are verified against the installed asset index; PCM16 WAV copies are decoded with VGMstream. Both formats have individual downloads and complete ZIPs.
+
+To rebuild the audio collection from an installed copy of Minecraft, run `python scripts/build-note-block-files.py --version 26.3 --vgmstream "C:\path\to\vgmstream-cli.exe"`. Pass `--minecraft-dir` for a nonstandard game directory. The catalog and ZIPs include the source asset paths, event pitches, and checksums.
+
 ## Expressionful Skin Studio
 
 Open [Skin Studio](https://firecatcher404.github.io/projects/skin-studio/) to create animated Minecraft skin packs. It runs entirely in your browser with a dark interface, 3D player preview, frame uploads, rule builder, ZIP import/export, and a draft stored on your device. No server setup or account is required.

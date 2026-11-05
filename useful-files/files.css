@@ -1,0 +1,35 @@
+.file-collection {
+  max-width: 940px;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.file-meta { margin-bottom: 0.75rem; font-family: var(--mono); font-size: 0.7rem; }
+.file-collection h2 { margin-bottom: 0.75rem; font-size: 1.5rem; font-weight: 500; line-height: 1.3; }
+.collection-description { max-width: 70ch; font-size: 0.95rem; }
+.file-downloads { margin-top: 1.5rem; }
+.file-downloads .btn { flex-wrap: wrap; gap: 0.4rem 0.75rem; }
+.file-size { color: var(--muted); font-family: var(--mono); font-size: 0.7rem; }
+.file-downloads .btn:hover .file-size { color: inherit; }
+.collection-note { margin-top: 1rem; font-size: 0.82rem; }
+.collection-credit { margin-top: 1.5rem; font-size: 0.72rem; }
+.sound-group { margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px solid var(--line); }
+.sound-group summary { min-height: 44px; padding-block: 0.5rem; color: var(--accent-text); font-weight: 500; cursor: pointer; }
+.sound-group summary:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 4px; }
+.sound-count { margin-left: 0.5rem; color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
+.sound-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 0.75rem; }
+.sound-card { min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: 6px; background: var(--background); }
+.sound-card h3 { font-size: 1rem; font-weight: 500; line-height: 1.35; }
+.sound-filename { margin-top: 0.25rem; font-family: var(--mono); font-size: 0.7rem; overflow-wrap: anywhere; }
+.sound-card audio { display: block; width: 100%; height: 40px; margin-top: 0.75rem; }
+.sound-actions { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 0.5rem; }
+.sound-actions a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-text); font-size: 0.82rem; }
+[hidden] { display: none !important; }
+@media (max-width: 700px) {
+  .sound-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 420px) {
+  .file-collection { padding: 1rem; }
+  .file-downloads .btn { width: 100%; padding-inline: 0.75rem; }
+}

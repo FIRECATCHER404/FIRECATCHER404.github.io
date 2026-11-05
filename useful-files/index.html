@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Random useful files, starting with Minecraft note block sounds in OGG and WAV formats.">
+  <meta name="theme-color" content="#242424">
+  <title>Useful files</title>
+  <link rel="preload" href="../assets/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../site.css">
+  <link rel="stylesheet" href="files.css">
+  <script src="/analytics.js" defer></script>
+  <script src="files.js" defer></script>
+</head>
+<body class="projects-layout green-accent">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <main class="projects-page site-width" id="main-content">
+    <div class="page-heading">
+      <h1>Useful files.</h1>
+      <p class="lead">Random stuff that might come in handy.</p>
+      <nav class="button-group" aria-label="Page navigation">
+        <a class="btn" href="../index.html">Back to home</a>
+      </nav>
+    </div>
+
+    <section class="file-collection" aria-labelledby="note-block-heading">
+      <p class="file-meta">MINECRAFT JAVA 26.3 &middot; 41 SOUNDS</p>
+      <h2 id="note-block-heading">Minecraft note block sounds</h2>
+      <p class="collection-description">All 20 instrument recordings, 19 mob-head clips, and 2 alternate samples. Download the complete collection or pick individual sounds below.</p>
+      <div class="button-group file-downloads">
+        <a class="btn" href="minecraft-note-blocks/minecraft-note-blocks-java-26.3-ogg.zip" download>Download OGG ZIP <span class="file-size">434 KB</span></a>
+        <a class="btn" href="minecraft-note-blocks/minecraft-note-blocks-java-26.3-wav.zip" download>Download WAV ZIP <span class="file-size">2.6 MB</span></a>
+      </div>
+      <p class="collection-note">Original base samples in OGG, plus WAV copies decoded with VGMstream. The game changes playback speed to produce different note pitches.</p>
+
+      <p id="preview-status" class="collection-note" role="status" hidden>Loading sound previews...</p>
+      <details class="sound-group">
+        <summary>Instrument sounds <span class="sound-count">20</span></summary>
+        <div class="sound-grid" id="instruments-list"></div>
+      </details>
+      <details class="sound-group">
+        <summary>Mob-head sounds <span class="sound-count">19</span></summary>
+        <div class="sound-grid" id="mob-heads-list"></div>
+      </details>
+      <details class="sound-group">
+        <summary>Alternate samples <span class="sound-count">2</span></summary>
+        <div class="sound-grid" id="alternates-list"></div>
+      </details>
+      <noscript><p class="collection-note">The ZIP downloads work without JavaScript. Enable JavaScript to browse individual previews.</p></noscript>
+      <p class="collection-credit">Unofficial collection of original Minecraft game audio. Not approved by or associated with Mojang or Microsoft.</p>
+    </section>
+  </main>
+  <footer class="site-footer site-width">
+    <span>Made by Neoj.</span>
+  </footer>
+</body>
+</html>
