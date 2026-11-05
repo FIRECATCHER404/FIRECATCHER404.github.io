@@ -1,372 +1,51 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Tic-Tac-Toe Online</title>
-
-<style>
-:root {
-  --bg: #0f1220;
-  --card: #1a1f3c;
-  --accent: #6cf2c2;
-  --danger: #ff6b6b;
-  --text: #eaeaff;
-}
-
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
-  background: radial-gradient(circle at top, #1b1f4a, var(--bg));
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-}
-
-.card {
-  background: var(--card);
-  padding: 28px;
-  border-radius: 18px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.4);
-  width: 340px;
-  text-align: center;
-}
-
-h1 {
-  margin-top: 0;
-}
-
-button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 10px;
-  font-size: 16px;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  background: var(--accent);
-  color: #003b2a;
-  font-weight: 600;
-}
-
-button.secondary {
-  background: #2b3170;
-  color: var(--text);
-}
-
-#status {
-  margin: 12px 0;
-  font-weight: 500;
-}
-
-#board {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-.cell {
-  aspect-ratio: 1;
-  font-size: 42px;
-  background: #11153a;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform .1s, background .2s;
-}
-
-.cell:hover {
-  background: #181d55;
-  transform: scale(1.04);
-}
-
-.cell.win {
-  background: var(--accent);
-  color: #003b2a;
-}
-</style>
-<script src="/analytics.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#242424">
+  <meta name="description" content="Play tic-tac-toe against the computer or an online opponent.">
+  <title>Tic-tac-toe</title>
+  <link rel="stylesheet" href="../site.css">
+  <style>
+    [hidden] { display: none !important; }
+    .game-page { align-items: center; justify-content: center; padding: 1.25rem; }
+    .game-card { width: min(100%, 460px); padding: clamp(1.25rem, 5vw, 2rem); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); text-align: center; }
+    .game-card h1 { font-size: clamp(1.8rem, 6vw, 2.3rem); }
+    .game-description { font-size: 0.95rem; }
+    .mode-buttons { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
+    #status { min-height: 1.65em; margin-block: 1.25rem; color: var(--text); font-size: 0.95rem; }
+    #board { display: grid; width: 100%; max-width: 340px; margin-inline: auto; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+    .cell { display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--background); color: var(--text); font-family: var(--mono); font-size: clamp(2rem, 10vw, 3rem); line-height: 1; cursor: pointer; }
+    .cell:not(:disabled):hover { background: #383838; border-color: var(--text); }
+    .cell:disabled { cursor: default; opacity: 1; }
+    .cell[data-symbol="O"] { color: #acd5bc; }
+    .cell.win { background: var(--text); color: var(--background); }
+    button:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
+    .game-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
+    .game-actions .btn { font-size: 0.85rem; padding-inline: 1rem; cursor: pointer; }
+    .projects-link { margin-top: 1.5rem; }
+  </style>
+  <script src="/analytics.js" defer></script>
+  <script type="module" src="ticktacktoe.js"></script>
 </head>
-
-<body>
-<div id="banner" style="
-  position: absolute;
-  top: 20px;
-  font-weight: 600;
-  color: #ffb4b4;
-  display: none;
-">
-  Opponent quit round
-</div>
-<div class="card">
-  <h1>Tic-Tac-Toe</h1>
-
-  <div id="menu">
-    <button onclick="startAI()">Play vs AI</button>
-    <button class="secondary" onclick="startOnline()">Play Online</button>
-  </div>
-
-  <div id="status"></div>
-  <div id="board"></div>
-</div>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-  getDatabase,
-  ref,
-  set,
-  get,
-  update,
-  onValue,
-  remove,
-  onDisconnect
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-/* ---------- Firebase ---------- */
-
-const firebaseConfig = {
-  apiKey: "AIzaSyC4HaUzTDQsz1AKUCsv1ieY5G9WrCyTHrw",
-  authDomain: "website-11b5c.firebaseapp.com",
-  databaseURL: "https://website-11b5c-default-rtdb.firebaseio.com",
-  projectId: "website-11b5c",
-  storageBucket: "website-11b5c.appspot.com",
-  messagingSenderId: "821866548441",
-  appId: "1:821866548441:web:d6941bf79099255f7902c8"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-/* ---------- Game Data ---------- */
-
-const WIN_LINES = [
-  [0,1,2],[3,4,5],[6,7,8],
-  [0,3,6],[1,4,7],[2,5,8],
-  [0,4,8],[2,4,6]
-];
-
-let board = Array(9).fill("");
-let mySymbol = "X";
-let myTurn = true;
-let gameOver = false;
-let gameRef = null;
-
-/* ---------- Elements ---------- */
-
-const boardEl = document.getElementById("board");
-const statusEl = document.getElementById("status");
-const menuEl = document.getElementById("menu");
-const bannerEl = document.getElementById("banner");
-
-/* ---------- Helpers ---------- */
-
-function other(s) {
-  return s === "X" ? "O" : "X";
-}
-
-function drawBoard(winLine = null) {
-  boardEl.innerHTML = "";
-  board.forEach((v,i) => {
-    const cell = document.createElement("div");
-    cell.className = "cell";
-    if (winLine && winLine.includes(i)) cell.classList.add("win");
-    cell.textContent = v;
-    cell.onclick = () => clickCell(i);
-    boardEl.appendChild(cell);
-  });
-}
-
-function checkWinner() {
-  for (const line of WIN_LINES) {
-    const [a,b,c] = line;
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return { winner: board[a], line };
-    }
-  }
-  if (board.every(c => c)) return { winner: "draw" };
-  return null;
-}
-
-function endGame(result) {
-  gameOver = true;
-  statusEl.textContent =
-    result.winner === "draw"
-      ? "Draw!"
-      : result.winner + " wins!";
-}
-
-function showQuitBanner() {
-  bannerEl.style.display = "block";
-  setTimeout(() => bannerEl.style.display = "none", 4000);
-}
-
-function resetToMenu() {
-  gameOver = true;
-  gameRef = null;
-  board = Array(9).fill("");
-  drawBoard();
-  statusEl.textContent = "";
-  menuEl.style.display = "block";
-}
-
-/* ---------- Gameplay ---------- */
-
-function clickCell(i) {
-  if (board[i] || !myTurn || gameOver) return;
-
-  board[i] = mySymbol;
-  myTurn = false;
-
-  const result = checkWinner();
-  if (result) endGame(result);
-
-  drawBoard(result?.line);
-
-  if (gameRef) {
-    update(gameRef, {
-      board,
-      turn: other(mySymbol)
-    });
-  }
-}
-
-/* ---------- AI ---------- */
-
-window.startAI = () => {
-  menuEl.style.display = "none";
-  statusEl.textContent = "You are X";
-  board = Array(9).fill("");
-  mySymbol = "X";
-  myTurn = true;
-  gameOver = false;
-  gameRef = null;
-  drawBoard();
-};
-
-function aiMove() {
-  if (gameOver) return;
-
-  const empty = board.map((v,i)=>v===""?i:null).filter(i=>i!==null);
-
-  for (const i of empty) {
-    board[i] = "O";
-    if (checkWinner()?.winner === "O") return finalizeAIMove(i);
-    board[i] = "";
-  }
-
-  for (const i of empty) {
-    board[i] = "X";
-    if (checkWinner()?.winner === "X") return finalizeAIMove(i);
-    board[i] = "";
-  }
-
-  if (board[4] === "") return finalizeAIMove(4);
-
-  finalizeAIMove(empty[Math.floor(Math.random()*empty.length)]);
-}
-
-function finalizeAIMove(i) {
-  board[i] = "O";
-  myTurn = true;
-  const result = checkWinner();
-  if (result) endGame(result);
-  drawBoard(result?.line);
-}
-
-/* ---------- Online ---------- */
-
-function listenGame() {
-  statusEl.textContent = "You are " + mySymbol;
-
-  const presenceRef = ref(db, "games/" + gameRef.key + "/players/" + mySymbol);
-  set(presenceRef, true);
-  onDisconnect(presenceRef).remove();
-
-  onValue(gameRef, snap => {
-    const data = snap.val();
-    if (!data) return;
-
-    board = data.board;
-    myTurn = data.turn === mySymbol;
-
-    const result = checkWinner();
-    if (result) endGame(result);
-
-    drawBoard(result?.line);
-  });
-
-  const opponentRef = ref(
-    db,
-    "games/" + gameRef.key + "/players/" + other(mySymbol)
-  );
-
-  onValue(opponentRef, snap => {
-    if (!snap.exists() && !gameOver) {
-      showQuitBanner();
-      resetToMenu();
-    }
-  });
-}
-
-window.startOnline = async () => {
-  menuEl.style.display = "none";
-  statusEl.textContent = "Searching for opponent…";
-
-  board = Array(9).fill("");
-  gameOver = false;
-  drawBoard();
-
-  const myId = crypto.randomUUID();
-  const waitingRoot = ref(db, "waiting");
-  const waitingSnap = await get(waitingRoot);
-
-  if (waitingSnap.exists()) {
-    const entries = Object.entries(waitingSnap.val());
-    for (const [id, data] of entries) {
-      if (!data.gameId) {
-        const gameId = crypto.randomUUID();
-        gameRef = ref(db, "games/" + gameId);
-        mySymbol = "O";
-        myTurn = false;
-
-        await set(gameRef, {
-          board: Array(9).fill(""),
-          turn: "X"
-        });
-
-        await update(ref(db, "waiting/" + id), { gameId });
-        listenGame();
-        return;
-      }
-    }
-  }
-
-  const myWaitingRef = ref(db, "waiting/" + myId);
-  await set(myWaitingRef, { gameId: null });
-
-  mySymbol = "X";
-  myTurn = true;
-
-  onValue(myWaitingRef, async snap => {
-    const data = snap.val();
-    if (data?.gameId && !gameRef) {
-      gameRef = ref(db, "games/" + data.gameId);
-      await remove(myWaitingRef);
-
-      const gameSnap = await get(gameRef);
-      if (gameSnap.exists()) {
-        board = gameSnap.val().board;
-        drawBoard();
-      }
-
-      listenGame();
-    }
-  });
-};
-</script>
+<body class="game-page">
+  <main class="game-card">
+    <h1>Tic-tac-toe</h1>
+    <div id="menu">
+      <p class="game-description">Play against the computer or find an online opponent.</p>
+      <div class="mode-buttons">
+        <button class="btn" id="play-ai" type="button">Play vs AI</button>
+        <button class="btn" id="play-online" type="button">Play online</button>
+      </div>
+    </div>
+    <p id="status" role="status" aria-live="polite" aria-atomic="true">Choose a game to get started.</p>
+    <div id="board" role="group" aria-label="Tic-tac-toe board" hidden></div>
+    <div class="game-actions" id="game-actions" hidden>
+      <button class="btn" id="new-round" type="button">New round</button>
+      <button class="btn" id="change-mode" type="button">Back to menu</button>
+    </div>
+    <a class="btn projects-link" href="index.html">Back to projects</a>
+  </main>
 </body>
 </html>

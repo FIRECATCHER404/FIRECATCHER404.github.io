@@ -1,4 +1,4 @@
-# FIRECATCHER404.github.io
+# Personal website
 
 Static site published through GitHub Pages. The Firebase-backed messenger lives at `message.html`.
 
@@ -13,6 +13,12 @@ Its static files live in `projects/skin-studio/`, including vendored MIT-license
 Open [EasySA](https://firecatcher404.github.io/projects/easysa/) to draw notes, layer synths, piano, drums, and imported samples inside one pattern, arrange a song, mix effects, and export WAV, MP3, or OGG. It runs in the browser, saves projects on the device, and supports portable `.easysa` files.
 
 The production build lives in `projects/easysa/`, with bundled audio encoders and an offline cache scoped to that app. The original Music Maker remains at `projects/music/`.
+
+## Tic-tac-toe
+
+The game at `projects/ticktacktoe.html` supports computer opponents and online matchmaking. Computer play works without Firebase. Online browser checks can use `?emulator=1` on localhost with the existing Database emulator; this switch is ignored on hosted domains.
+
+Run `node scripts/test-ticktacktoe.mjs` to check winning lines, draws, and every human move sequence against the computer.
 
 ## Messenger backend deployment
 

@@ -4,19 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Videos</title>
-  <meta id="metaDescription" name="description" content="Watch videos from FIRECATCHER404.">
+  <meta id="metaDescription" name="description" content="Watch videos from Neoj.">
   <meta id="themeColor" name="theme-color" content="#f7f7f2">
   <meta id="ogTitle" property="og:title" content="Videos">
-  <meta id="ogDescription" property="og:description" content="Watch videos from FIRECATCHER404.">
+  <meta id="ogDescription" property="og:description" content="Watch videos from Neoj.">
   <meta id="ogType" property="og:type" content="website">
   <meta id="ogUrl" property="og:url" content="https://firecatcher404.github.io/videos/">
   <meta id="ogImage" property="og:image" content="https://firecatcher404.github.io/videos/preview.svg">
   <meta property="og:image:type" content="image/svg+xml">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:site_name" content="FIRECATCHER404">
+  <meta property="og:site_name" content="Videos">
   <meta id="twitterTitle" name="twitter:title" content="Videos">
-  <meta id="twitterDescription" name="twitter:description" content="Watch videos from FIRECATCHER404.">
+  <meta id="twitterDescription" name="twitter:description" content="Watch videos from Neoj.">
   <meta id="twitterImage" name="twitter:image" content="https://firecatcher404.github.io/videos/preview.svg">
   <meta name="twitter:card" content="summary_large_image">
   <script>
@@ -1111,20 +1111,20 @@
     function applyLibraryMeta() {
       removeDynamicVideoMeta();
       document.title = "Videos";
-      setMetaContent("metaDescription", "Watch videos from FIRECATCHER404.");
+      setMetaContent("metaDescription", "Watch videos from Neoj.");
       setMetaContent("ogTitle", "Videos");
-      setMetaContent("ogDescription", "Watch videos from FIRECATCHER404.");
+      setMetaContent("ogDescription", "Watch videos from Neoj.");
       setMetaContent("ogType", "website");
       setMetaContent("ogUrl", SELFTUBE_CONFIG.siteBaseUrl);
       setMetaContent("ogImage", SELFTUBE_CONFIG.defaultPreviewImage);
       setMetaContent("twitterTitle", "Videos");
-      setMetaContent("twitterDescription", "Watch videos from FIRECATCHER404.");
+      setMetaContent("twitterDescription", "Watch videos from Neoj.");
       setMetaContent("twitterImage", SELFTUBE_CONFIG.defaultPreviewImage);
     }
 
     function applyItemMeta(item) {
       const title = `${item.title} - Videos`;
-      const description = item.description || `Open ${item.title} from FIRECATCHER404.`;
+      const description = item.description || `Open ${item.title} from Neoj.`;
       const image = item.thumbnailUrl || SELFTUBE_CONFIG.defaultPreviewImage;
       removeDynamicVideoMeta();
       document.title = title;
@@ -1967,7 +1967,7 @@
             <section class="comments-panel" aria-label="Comments">
               <h3>Comments</h3>
               <div class="comments-fallback">
-                <p>Embedded comments need the utterances GitHub App installed on ${escapeHtml(SELFTUBE_CONFIG.commentsRepo)}.</p>
+                <p>Embedded comments need the utterances GitHub App installed on the video repository.</p>
                 <a class="text-button" href="${escapeHtml(commentsIssueUrl(video))}" target="_blank" rel="noopener">GitHub Comments</a>
               </div>
               <div id="comments"></div>
@@ -2012,7 +2012,7 @@
         <section class="comments-panel" aria-label="Comments">
           <h3>Comments</h3>
           <div class="comments-fallback">
-            <p>Embedded comments need the utterances GitHub App installed on ${escapeHtml(SELFTUBE_CONFIG.commentsRepo)}.</p>
+            <p>Embedded comments need the utterances GitHub App installed on the video repository.</p>
             <a class="text-button" href="${escapeHtml(commentsIssueUrl(item))}" target="_blank" rel="noopener">GitHub Comments</a>
           </div>
           <div id="comments"></div>
@@ -2047,7 +2047,7 @@
         <section class="comments-panel" aria-label="Comments">
           <h3>Comments</h3>
           <div class="comments-fallback">
-            <p>Embedded comments need the utterances GitHub App installed on ${escapeHtml(SELFTUBE_CONFIG.commentsRepo)}.</p>
+            <p>Embedded comments need the utterances GitHub App installed on the video repository.</p>
             <a class="text-button" href="${escapeHtml(commentsIssueUrl(item))}" target="_blank" rel="noopener">GitHub Comments</a>
           </div>
           <div id="comments"></div>

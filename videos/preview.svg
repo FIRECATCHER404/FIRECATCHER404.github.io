@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
   <title id="title">Videos</title>
-  <desc id="desc">FIRECATCHER404 videos preview image.</desc>
+  <desc id="desc">Neoj videos preview image.</desc>
   <rect width="1200" height="630" fill="#f7f7f2"/>
   <path d="M0 0h1200v630H0z" fill="#f7f7f2"/>
   <circle cx="985" cy="88" r="210" fill="#dcefe8"/>
@@ -13,7 +13,7 @@
   </g>
   <g fill="#171714" font-family="Inter, Segoe UI, Arial, sans-serif">
     <text x="540" y="265" font-size="104" font-weight="800">Videos</text>
-    <text x="544" y="340" font-size="40" font-weight="500" fill="#4f514a">FIRECATCHER404</text>
+    <text x="544" y="340" font-size="40" font-weight="500" fill="#4f514a">Neoj</text>
     <text x="544" y="406" font-size="32" font-weight="500" fill="#65645f">GitHub-hosted video library</text>
   </g>
 </svg>
