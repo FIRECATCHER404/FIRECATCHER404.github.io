@@ -3,150 +3,138 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const Matter = require("../assets/vendor/matter-js/matter.min.js");
-const source = await readFile(new URL("../assets/backgrounds/physics-contacts.js", import.meta.url), "utf8");
-const { MATERIAL, SURFACE, captureImpact, chooseShape, collisionPairs, createCircle, createPill, finishContacts, motionSubsteps, separateBodies } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
-const { Bodies, Body, Composite, Engine, Vertices } = Matter;
+const P = require("../assets/vendor/planck/planck.min.js");
+const source = await readFile(new URL("../assets/backgrounds/physics-world.js", import.meta.url), "utf8");
+const { MATERIAL, chooseShape, createSimulation } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+const dot = (a, b) => a.x * b.x + a.y * b.y;
+const close = (actual, expected, tolerance, message) => assert(Math.abs(actual - expected) <= tolerance, `${message}: ${actual} vs ${expected}`);
+const make = (sim, shape, size, x, y, velocity = { x: 0, y: 0 }, angle = 0, material = MATERIAL) => sim.addShape({ ...sim.geometry(shape, size), x, y, angle }, velocity, material);
+const energy = body => { const v = body.getLinearVelocity(); return 0.5 * body.getMass() * v.lengthSquared() + 0.5 * body.getInertia() * body.getAngularVelocity() ** 2; };
 
 const choices = { circle: 0, square: 0, triangle: 0 };
 for (let i = 0; i < 1000; i += 1) choices[chooseShape((i + 0.5) / 1000)] += 1;
 assert.deepEqual(choices, { circle: 450, square: 450, triangle: 100 });
 
-function contactStepper(engine, objects, solids) {
-  let impacts = [];
-  Matter.Events.on(engine, "collisionStart", event => impacts.push(...event.pairs.map(pair => captureImpact(Matter, pair))));
-  return () => {
-    const count = motionSubsteps(Matter, objects, 1000 / 240);
-    let corrections = 0;
-    for (let i = 0; i < count; i += 1) {
-      impacts = [];
-      Engine.update(engine, 1000 / 240 / count);
-      finishContacts(Matter, impacts, engine.pairs.list, 1000 / 240 / count);
-      const result = separateBodies(Matter, objects, solids);
-      assert(result.valid, "Contacts must remain separated after bouncing");
-      corrections += result.corrections;
+// A frictionless impact has an analytic result in the plane's coordinates.
+// Cover mirrored diagonals, both tangent directions, flat faces, and tiny shapes.
+let impacts = 0;
+for (const angle of [-Math.PI / 3, -Math.PI / 4, -Math.PI / 6, Math.PI / 6, Math.PI / 4, Math.PI / 3]) {
+  for (const shape of ["circle", "square", "triangle"]) for (const size of [5, 20, 40]) for (const tangentSpeed of [-240, 0, 240]) {
+    const sim = createSimulation(P, { gravity: 0 });
+    sim.layout([], { width: 2000, height: 1400 });
+    const material = { density: 1, friction: 0, restitution: 0.65 };
+    sim.addStatic({ x: 200, y: 690, width: 1600, height: 20, angle, label: "ramp", kind: "wall" }, material);
+    const n = { x: Math.sin(angle), y: -Math.cos(angle) }, t = { x: Math.cos(angle), y: Math.sin(angle) };
+    const body = make(sim, shape, size, 1000 + n.x * 120, 700 + n.y * 120, { x: -n.x * 600 + t.x * tangentSpeed, y: -n.y * 600 + t.y * tangentSpeed }, angle, material);
+    body.setLinearDamping(0); body.setAngularDamping(0);
+    const beforeEnergy = energy(body);
+    let hit = false;
+    for (let i = 0; i < 80; i += 1) {
+      sim.step(1 / 120);
+      if (!sim.labels.get("ramp")) continue;
+      const velocity = sim.view(body).velocity;
+      close(dot(velocity, n), 390, 1, "Rebound must follow the actual diagonal normal");
+      close(dot(velocity, t), tangentSpeed, 0.1, "Frictionless impact must preserve the tangent direction and speed");
+      assert(energy(body) <= beforeEnergy * 1.000001, "A collision must not create kinetic energy");
+      assert.equal(sim.snapshot().separation.overlaps, 0);
+      hit = true; impacts += 1; break;
     }
-    return corrections;
-  };
+    assert(hit, "Each analytic impact must actually contact the ramp");
+  }
+}
+
+// Friction opposes contact slip, and must not reverse a non-spinning circle's
+// tangential motion or make an aligned flat box slide up its incoming tangent.
+for (const angle of [-Math.PI / 4, Math.PI / 4]) for (const shape of ["circle", "square"]) for (const direction of [-1, 1]) {
+  const sim = createSimulation(P, { gravity: 0 });
+  sim.layout([], { width: 2000, height: 1400 });
+  sim.addStatic({ x: 200, y: 690, width: 1600, height: 20, angle, label: "ramp", kind: "wall" });
+  const n = { x: Math.sin(angle), y: -Math.cos(angle) }, t = { x: Math.cos(angle), y: Math.sin(angle) };
+  const body = make(sim, shape, 20, 1000 + n.x * 120, 700 + n.y * 120, { x: -n.x * 600 + t.x * 240 * direction, y: -n.y * 600 + t.y * 240 * direction }, angle);
+  for (let i = 0; i < 80; i += 1) { sim.step(1 / 120); if (sim.labels.get("ramp")) break; }
+  const along = dot(sim.view(body).velocity, t) * direction;
+  assert(along >= -1e-5 && along < 240, "Friction must slow tangential travel without reversing it");
+}
+
+// Objects placed at rest on mirrored inclines must accelerate downhill.
+for (const angle of [-Math.PI / 4, -Math.PI / 6, Math.PI / 6, Math.PI / 4]) for (const shape of ["circle", "square"]) {
+  const sim = createSimulation(P);
+  sim.layout([], { width: 1600, height: 1200 });
+  sim.addStatic({ x: 100, y: 590, width: 1400, height: 20, angle, label: "slope", kind: "wall" });
+  const n = { x: Math.sin(angle), y: -Math.cos(angle) }, t = { x: Math.cos(angle), y: Math.sin(angle) };
+  const body = make(sim, shape, 20, 800 + n.x * 31, 600 + n.y * 31, undefined, angle);
+  for (let i = 0; i < 96; i += 1) sim.step(1 / 120);
+  assert(dot(sim.view(body).velocity, t) * Math.sign(angle) > 20, "Slope motion must follow gravity downhill");
+  assert.equal(sim.snapshot().separation.overlaps, 0);
+}
+
+// Off-centre circle impacts must deflect the two bodies in opposite directions,
+// conserve momentum, and dissipate rather than add energy.
+for (const direction of [-1, 1]) {
+  const sim = createSimulation(P, { gravity: 0 });
+  sim.layout([], { width: 1600, height: 1000 });
+  const a = make(sim, "circle", 20, 400, 400, { x: 600, y: 0 });
+  const b = make(sim, "circle", 20, 500, 400 + direction * 25);
+  for (const body of [a, b]) { body.setLinearDamping(0); body.setAngularDamping(0); }
+  const momentum = a.getMass() * a.getLinearVelocity().x, beforeEnergy = energy(a) + energy(b);
+  for (let i = 0; i < 80; i += 1) { sim.step(1 / 120); if (sim.contacts.shapes) break; }
+  const va = a.getLinearVelocity(), vb = b.getLinearVelocity();
+  assert(va.y * direction < 0 && vb.y * direction > 0, "Oblique hits must deflect away from the contact");
+  close(a.getMass() * va.x + b.getMass() * vb.x, momentum, 1e-7, "Horizontal momentum");
+  close(a.getMass() * va.y + b.getMass() * vb.y, 0, 1e-7, "Vertical momentum");
+  assert(energy(a) + energy(b) <= beforeEnergy * 1.000001);
 }
 
 for (const shape of ["circle", "square", "triangle"]) {
-  const engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
-  engine.gravity.scale = 0.0008;
-  const floor = Bodies.rectangle(500, 550, 2000, 100, { ...SURFACE, isStatic: true });
-  const options = { ...MATERIAL, plugin: { size: 20 } };
-  const body = shape === "circle" ? createCircle(Matter, 100, 100, 20, options) : shape === "square" ? Bodies.rectangle(100, 100, 40, 40, options) : Bodies.polygon(100, 100, 3, 80 / 3, options);
-  Composite.add(engine.world, [floor, body]);
-  const step = contactStepper(engine, [body], [floor]);
-  let bounced = false, apex = 500, impactSpeed = 0, reboundSpeed = 0;
-  for (let i = 0; i < 720; i += 1) {
-    const before = Body.getVelocity(body).y;
-    step();
-    const after = Body.getVelocity(body).y;
-    if (!bounced && before > 1 && after < -1) {
-      bounced = true; impactSpeed = before; reboundSpeed = -after;
-    }
-    if (bounced) apex = Math.min(apex, body.position.y);
+  const sim = createSimulation(P);
+  sim.layout([], { width: 700, height: 900 });
+  const body = make(sim, shape, 20, 150, 200);
+  let bounces = 0, previous = 0;
+  for (let i = 0; i < 840; i += 1) {
+    sim.step(1 / 120);
+    const vy = sim.view(body).velocity.y;
+    if (previous > 30 && vy < -20) bounces += 1;
+    previous = vy;
+    assert.equal(sim.snapshot().separation.overlaps, 0);
   }
-  assert(bounced && 480 - apex > 40, `${shape} must visibly rebound after falling`);
-  if (shape !== "triangle") assert(reboundSpeed / impactSpeed > 0.6 && reboundSpeed / impactSpeed < 0.7, "A flat face and a circle should retain the configured normal rebound");
+  assert(bounces >= 3, `${shape} should retain multiple visible bounces before settling`);
 }
 
-const rolling = [];
-for (const grounded of [false, true]) {
-  const engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
-  engine.gravity.scale = grounded ? 0.0008 : 0;
-  const floor = Bodies.rectangle(1000, 550, 4000, 100, { ...SURFACE, isStatic: true });
-  const circle = createCircle(Matter, 100, 479.9, 20, { ...MATERIAL, plugin: { size: 20 } });
-  Body.setVelocity(circle, { x: 6, y: 0 });
-  Body.setAngularVelocity(circle, 0.3);
-  Composite.add(engine.world, grounded ? [floor, circle] : [circle]);
-  const step = contactStepper(engine, [circle], grounded ? [floor] : []);
-  for (let i = 0; i < 360; i += 1) step();
-  rolling.push({ speed: Body.getVelocity(circle).x, spin: Body.getAngularVelocity(circle) });
-}
-assert(rolling[1].speed < rolling[0].speed / 4, "Contact resistance must slow rolling much more than free flight");
-assert(rolling[1].spin < rolling[0].spin / 4, "Surface contact must also resist rolling rotation");
-
-// Independent SAT check; do not use the same query that performs correction.
-function intersects(a, b) {
-  for (const polygon of [a.vertices, b.vertices]) {
-    for (let i = 0; i < polygon.length; i += 1) {
-      const next = polygon[(i + 1) % polygon.length];
-      const dx = next.x - polygon[i].x;
-      const dy = next.y - polygon[i].y;
-      const length = Math.hypot(dx, dy);
-      const axis = { x: -dy / length, y: dx / length };
-      const project = body => body.vertices.map(v => v.x * axis.x + v.y * axis.y);
-      const pa = project(a), pb = project(b);
-      if (Math.min(Math.max(...pa), Math.max(...pb)) - Math.max(Math.min(...pa), Math.min(...pb)) <= 1e-6) return false;
-    }
+for (const shape of ["circle", "square", "triangle"]) for (const direction of [-1, 1]) {
+  const sim = createSimulation(P, { gravity: 0 });
+  sim.layout([{ x: 50, y: 250, width: 400, height: 1, kind: "separator", label: "separator" }], { width: 500, height: 600 });
+  const body = make(sim, shape, 5, 250, direction === 1 ? 238 : 263, { x: 0, y: direction * 1800 });
+  for (let i = 0; i < 6; i += 1) {
+    sim.step(1 / 120);
+    const view = sim.view(body);
+    assert(direction === 1 ? view.y < 250 : view.y > 251, "Continuous collision must prevent passing through a one-pixel separator");
+    assert.equal(sim.snapshot().separation.overlaps, 0);
   }
-  return true;
+  assert(body.getLinearVelocity().y * direction < 0, "Fast separator impacts must rebound");
 }
 
-for (const radius of [5, 15, 40]) {
-  const circle = createCircle(Matter, 100, 100, radius, { slop: 0 });
-  for (let angle = 0; angle < Math.PI * 2; angle += 0.01) {
-    assert(Vertices.contains(circle.vertices, { x: 100 + radius * Math.cos(angle), y: 100 + radius * Math.sin(angle) }), "The collision mesh must contain the painted circle");
-  }
-}
-const a = createCircle(Matter, 100, 100, 40, { slop: 0 });
-const b = createCircle(Matter, 179.7, 100, 40, { slop: 0 });
-assert(collisionPairs(Matter, [a, b], []).length, "Detect the previously missed 0.3px painted-circle overlap");
-assert(separateBodies(Matter, [a, b], []).valid);
-assert(Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y) >= 80);
-
-const pill = createPill(Matter, { x: 0, y: 0, width: 250, height: 48 }, { isStatic: true, slop: 0 });
-for (let angle = -Math.PI / 2; angle < Math.PI / 2; angle += 0.01) {
-  assert(Vertices.contains(pill.vertices, { x: 226 + 24 * Math.cos(angle), y: 24 + 24 * Math.sin(angle) }));
-  assert(Vertices.contains(pill.vertices, { x: 24 - 24 * Math.cos(angle), y: 24 + 24 * Math.sin(angle) }));
+for (const shape of ["circle", "square"]) {
+  const sim = createSimulation(P);
+  sim.layout([], { width: 3000, height: 600 });
+  const body = make(sim, shape, 20, 100, 579.4, { x: 180, y: 0 });
+  for (let i = 0; i < 240; i += 1) sim.step(1 / 120);
+  assert(Math.abs(sim.view(body).velocity.x) < 40, "Ground contact must visibly slow sliding and rolling");
 }
 
-for (const direction of [1, -1]) {
-  const engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
-  engine.gravity.y = 0;
-  const line = Bodies.rectangle(100, 100.5, 200, 1, { isStatic: true, slop: 0 });
-  const circle = createCircle(Matter, 100, direction === 1 ? 94.8 : 106.2, 5, { slop: 0, restitution: 0.42, plugin: { size: 5 } });
-  Body.setVelocity(circle, { x: 0, y: 30 * direction });
-  Composite.add(engine.world, [line, circle]);
-  const count = motionSubsteps(Matter, [circle], 1000 / 240);
-  assert(count > 1, "A fast small body needs substeps for a thin separator");
-  for (let i = 0; i < count; i += 1) {
-    Engine.update(engine, 1000 / 240 / count);
-    assert(separateBodies(Matter, [circle], [line]).valid);
-    assert(circle.vertices.every(v => direction === 1 ? v.y <= 100 + 1e-6 : v.y >= 101 - 1e-6), "Do not cross a one-pixel separator from either side");
-  }
+const pile = createSimulation(P);
+pile.layout([], { width: 600, height: 600 });
+for (let i = 0; i < 24; i += 1) {
+  const shape = ["circle", "square", "triangle"][i % 3];
+  const preview = pile.findFree(pile.geometry(shape, 12 + i % 4 * 3), { x: 100 + i % 6 * 70, y: 70 + Math.floor(i / 6) * 70 });
+  assert(preview);
+  pile.addShape(preview, { x: (i % 2 ? 1 : -1) * 400, y: 100 });
 }
-
-const floorY = 500;
-const floor = Bodies.rectangle(250, floorY + 100, 700, 200, { ...SURFACE, isStatic: true });
-const walls = [floor, Bodies.rectangle(-50, 250, 100, 700, { ...SURFACE, isStatic: true }), Bodies.rectangle(550, 250, 100, 700, { ...SURFACE, isStatic: true })];
-const engine = Engine.create({ positionIterations: 10, velocityIterations: 8, enableSleeping: true });
-engine.gravity.scale = 0.0008;
-const shapes = [];
-for (let i = 0; i < 18; i += 1) {
-  const x = 90 + i % 6 * 60;
-  const y = 70 + Math.floor(i / 6) * 75;
-  const options = { ...MATERIAL, plugin: { size: 18 } };
-  const body = i % 3 === 0 ? createCircle(Matter, x, y, 18, options) : i % 3 === 1 ? Bodies.rectangle(x, y, 36, 36, options) : Bodies.polygon(x, y, 3, 24, options);
-  Body.setVelocity(body, { x: i % 2 ? 14 : -14, y: 12 });
-  shapes.push(body);
+for (let i = 0; i < 1200; i += 1) {
+  pile.step(1 / 120);
+  const state = pile.snapshot();
+  assert.equal(state.separation.overlaps, 0, `Painted outlines must not overlap, step ${i}`);
+  for (const body of state.bodies) assert(body.radius ? body.y + body.radius <= 600.001 : body.vertices.every(v => v.y <= 600.001), "The viewport floor must contain every painted shape");
 }
-Composite.add(engine.world, [...walls, ...shapes]);
-const stepPile = contactStepper(engine, shapes, walls);
-let corrections = 0;
-for (let i = 0; i < 2400; i += 1) {
-  corrections += stepPile();
-  assert.equal(collisionPairs(Matter, shapes, walls).length, 0, `Overlap on step ${i}`);
-  for (const body of shapes) {
-    assert(body.vertices.every(vertex => vertex.x >= -1e-6 && vertex.x <= 500 + 1e-6 && vertex.y <= floorY + 1e-6), "No shape may enter the floor or side walls");
-  }
-  if (i % 24 === 0) {
-    for (let a = 0; a < shapes.length; a += 1) {
-      for (let b = 0; b < a; b += 1) assert(!intersects(shapes[a], shapes[b]), "Independent polygon test found an overlap");
-    }
-  }
-}
-assert(corrections > 0, "The pile must exercise separation corrections");
-console.log(`PASS shape weights, all-shape rebounds, rolling resistance, collision outlines, thin separators, and 2400 pile steps without penetration (${corrections} corrections).`);
+pile.layout([{ x: 30, y: 400, width: 240, height: 1, kind: "separator", label: "separator" }], { width: 300, height: 500 });
+assert.equal(pile.snapshot().separation.overlaps, 0, "Resized scenes must keep free spawn positions");
+console.log(`PASS ${impacts} analytic diagonal impacts, mirrored friction/slopes, oblique momentum/energy, repeated rebounds, continuous thin-line collision, rolling/sliding, and 1200 dense-pile steps.`);
