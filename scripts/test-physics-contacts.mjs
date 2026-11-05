@@ -5,8 +5,68 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const Matter = require("../assets/vendor/matter-js/matter.min.js");
 const source = await readFile(new URL("../assets/backgrounds/physics-contacts.js", import.meta.url), "utf8");
-const { collisionPairs, createCircle, createPill, motionSubsteps, separateBodies } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+const { MATERIAL, SURFACE, captureImpact, chooseShape, collisionPairs, createCircle, createPill, finishContacts, motionSubsteps, separateBodies } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 const { Bodies, Body, Composite, Engine, Vertices } = Matter;
+
+const choices = { circle: 0, square: 0, triangle: 0 };
+for (let i = 0; i < 1000; i += 1) choices[chooseShape((i + 0.5) / 1000)] += 1;
+assert.deepEqual(choices, { circle: 450, square: 450, triangle: 100 });
+
+function contactStepper(engine, objects, solids) {
+  let impacts = [];
+  Matter.Events.on(engine, "collisionStart", event => impacts.push(...event.pairs.map(pair => captureImpact(Matter, pair))));
+  return () => {
+    const count = motionSubsteps(Matter, objects, 1000 / 240);
+    let corrections = 0;
+    for (let i = 0; i < count; i += 1) {
+      impacts = [];
+      Engine.update(engine, 1000 / 240 / count);
+      finishContacts(Matter, impacts, engine.pairs.list, 1000 / 240 / count);
+      const result = separateBodies(Matter, objects, solids);
+      assert(result.valid, "Contacts must remain separated after bouncing");
+      corrections += result.corrections;
+    }
+    return corrections;
+  };
+}
+
+for (const shape of ["circle", "square", "triangle"]) {
+  const engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
+  engine.gravity.scale = 0.0008;
+  const floor = Bodies.rectangle(500, 550, 2000, 100, { ...SURFACE, isStatic: true });
+  const options = { ...MATERIAL, plugin: { size: 20 } };
+  const body = shape === "circle" ? createCircle(Matter, 100, 100, 20, options) : shape === "square" ? Bodies.rectangle(100, 100, 40, 40, options) : Bodies.polygon(100, 100, 3, 80 / 3, options);
+  Composite.add(engine.world, [floor, body]);
+  const step = contactStepper(engine, [body], [floor]);
+  let bounced = false, apex = 500, impactSpeed = 0, reboundSpeed = 0;
+  for (let i = 0; i < 720; i += 1) {
+    const before = Body.getVelocity(body).y;
+    step();
+    const after = Body.getVelocity(body).y;
+    if (!bounced && before > 1 && after < -1) {
+      bounced = true; impactSpeed = before; reboundSpeed = -after;
+    }
+    if (bounced) apex = Math.min(apex, body.position.y);
+  }
+  assert(bounced && 480 - apex > 40, `${shape} must visibly rebound after falling`);
+  if (shape !== "triangle") assert(reboundSpeed / impactSpeed > 0.6 && reboundSpeed / impactSpeed < 0.7, "A flat face and a circle should retain the configured normal rebound");
+}
+
+const rolling = [];
+for (const grounded of [false, true]) {
+  const engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
+  engine.gravity.scale = grounded ? 0.0008 : 0;
+  const floor = Bodies.rectangle(1000, 550, 4000, 100, { ...SURFACE, isStatic: true });
+  const circle = createCircle(Matter, 100, 479.9, 20, { ...MATERIAL, plugin: { size: 20 } });
+  Body.setVelocity(circle, { x: 6, y: 0 });
+  Body.setAngularVelocity(circle, 0.3);
+  Composite.add(engine.world, grounded ? [floor, circle] : [circle]);
+  const step = contactStepper(engine, [circle], grounded ? [floor] : []);
+  for (let i = 0; i < 360; i += 1) step();
+  rolling.push({ speed: Body.getVelocity(circle).x, spin: Body.getAngularVelocity(circle) });
+}
+assert(rolling[1].speed < rolling[0].speed / 4, "Contact resistance must slow rolling much more than free flight");
+assert(rolling[1].spin < rolling[0].spin / 4, "Surface contact must also resist rolling rotation");
 
 // Independent SAT check; do not use the same query that performs correction.
 function intersects(a, b) {
@@ -60,26 +120,24 @@ for (const direction of [1, -1]) {
 }
 
 const floorY = 500;
-const floor = Bodies.rectangle(250, floorY + 100, 700, 200, { isStatic: true, slop: 0 });
-const walls = [floor, Bodies.rectangle(-50, 250, 100, 700, { isStatic: true, slop: 0 }), Bodies.rectangle(550, 250, 100, 700, { isStatic: true, slop: 0 })];
+const floor = Bodies.rectangle(250, floorY + 100, 700, 200, { ...SURFACE, isStatic: true });
+const walls = [floor, Bodies.rectangle(-50, 250, 100, 700, { ...SURFACE, isStatic: true }), Bodies.rectangle(550, 250, 100, 700, { ...SURFACE, isStatic: true })];
 const engine = Engine.create({ positionIterations: 10, velocityIterations: 8, enableSleeping: true });
 engine.gravity.scale = 0.0008;
 const shapes = [];
 for (let i = 0; i < 18; i += 1) {
   const x = 90 + i % 6 * 60;
   const y = 70 + Math.floor(i / 6) * 75;
-  const options = { restitution: 0.42, friction: 0.4, frictionAir: 0.004, slop: 0 };
+  const options = { ...MATERIAL, plugin: { size: 18 } };
   const body = i % 3 === 0 ? createCircle(Matter, x, y, 18, options) : i % 3 === 1 ? Bodies.rectangle(x, y, 36, 36, options) : Bodies.polygon(x, y, 3, 24, options);
   Body.setVelocity(body, { x: i % 2 ? 14 : -14, y: 12 });
   shapes.push(body);
 }
 Composite.add(engine.world, [...walls, ...shapes]);
+const stepPile = contactStepper(engine, shapes, walls);
 let corrections = 0;
 for (let i = 0; i < 2400; i += 1) {
-  Engine.update(engine, 1000 / 240);
-  const result = separateBodies(Matter, shapes, walls);
-  assert(result.valid, `Pile separation failed on step ${i}`);
-  corrections += result.corrections;
+  corrections += stepPile();
   assert.equal(collisionPairs(Matter, shapes, walls).length, 0, `Overlap on step ${i}`);
   for (const body of shapes) {
     assert(body.vertices.every(vertex => vertex.x >= -1e-6 && vertex.x <= 500 + 1e-6 && vertex.y <= floorY + 1e-6), "No shape may enter the floor or side walls");
@@ -91,4 +149,4 @@ for (let i = 0; i < 2400; i += 1) {
   }
 }
 assert(corrections > 0, "The pile must exercise separation corrections");
-console.log(`PASS collision outlines, thin-separator impacts from both sides, and 2400 pile steps with no pair or floor penetration (${corrections} corrections).`);
+console.log(`PASS shape weights, all-shape rebounds, rolling resistance, collision outlines, thin separators, and 2400 pile steps without penetration (${corrections} corrections).`);

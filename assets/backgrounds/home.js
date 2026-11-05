@@ -1,5 +1,5 @@
 import { INK, collectSolids, createStage, documentPoint, documentSize, exposeDiagnostics, isInteractable, watchLayout } from "./common.js";
-import { collisionPairs, createCircle, createPill, motionSubsteps, separateBodies } from "./physics-contacts.js";
+import { MATERIAL, SURFACE, captureImpact, chooseShape, collisionPairs, createCircle, createPill, finishContacts, motionSubsteps, separateBodies } from "./physics-contacts.js";
 
 async function loadMatter() {
   if (window.Matter) return window.Matter;
@@ -25,6 +25,7 @@ async function start() {
   const contacts = { text: 0, button: 0, separator: 0, wall: 0, shapes: 0 };
   const contactLabels = new Map();
   const separation = { corrections: 0, rollbacks: 0 };
+  const impacts = [];
   let world = documentSize();
   let solids = [];
   let frameId = 0;
@@ -38,6 +39,7 @@ async function start() {
 
   Events.on(engine, "collisionStart", event => {
     for (const pair of event.pairs) {
+      impacts.push(captureImpact(Matter, pair));
       const solid = pair.bodyA.isStatic ? pair.bodyA : pair.bodyB.isStatic ? pair.bodyB : null;
       if (!solid) { contacts.shapes += 1; continue; }
       const kind = solid.plugin.kind;
@@ -81,8 +83,7 @@ async function start() {
     for (const solid of solids) Composite.remove(engine.world, solid);
     solids = collectSolids().map(rect => {
       const options = {
-        isStatic: true, label: rect.label, restitution: 0.3, friction: 0.4,
-        slop: 0,
+        ...SURFACE, isStatic: true, label: rect.label,
         plugin: { kind: rect.label.startsWith("button:") ? "button" : "text", rectangle: rect }
       };
       return rect.rounded ? createPill(Matter, rect, options) : Bodies.rectangle(
@@ -98,7 +99,7 @@ async function start() {
           width: bounds.width, height, label: "separator"
         };
         solids.push(Bodies.rectangle(rectangle.x + rectangle.width / 2, rectangle.y + height / 2, rectangle.width, height, {
-          isStatic: true, label: "separator", restitution: 0.3, friction: 0.4, slop: 0,
+          ...SURFACE, isStatic: true, label: "separator",
           plugin: { kind: "separator", rectangle }
         }));
       }
@@ -111,7 +112,7 @@ async function start() {
       [world.width / 2, -thickness / 2, world.width + thickness * 2, thickness],
       [world.width / 2, world.height + thickness / 2, world.width + thickness * 2, thickness]
     ].map(([x, y, width, height]) => Bodies.rectangle(x, y, width, height, {
-      isStatic: true, label: "wall", restitution: 0.3, friction: 0.4, slop: 0, plugin: { kind: "wall" }
+      ...SURFACE, isStatic: true, label: "wall", plugin: { kind: "wall" }
     }));
     solids.push(...walls);
     Composite.add(engine.world, solids);
@@ -147,7 +148,7 @@ async function start() {
 
   function makeShape(shape, point, size) {
     const options = {
-      restitution: 0.42, friction: 0.4, frictionStatic: 0.7, frictionAir: 0.004, slop: 0,
+      ...MATERIAL,
       render: { fillStyle: INK, strokeStyle: INK },
       plugin: { shape, size, color: INK }
     };
@@ -201,7 +202,7 @@ async function start() {
         previousPoses.set(body.id, { ...body.position, angle: body.angle });
         if (!body.isSleeping) {
           clampSpeed(body);
-          Body.setAngularVelocity(body, Body.getAngularVelocity(body) * Math.pow(0.992, fixedStep / (1000 / 60)));
+          Body.setAngularVelocity(body, Body.getAngularVelocity(body) * Math.pow(0.997, fixedStep / (1000 / 60)));
         }
       }
       // Fast small shapes need shorter steps to meet a one-pixel separator
@@ -209,7 +210,9 @@ async function start() {
       const substeps = motionSubsteps(Matter, objects, fixedStep);
       let valid = true;
       for (let step = 0; step < substeps; step += 1) {
+        impacts.length = 0;
         Engine.update(engine, fixedStep / substeps);
+        finishContacts(Matter, impacts, engine.pairs.list, fixedStep / substeps);
         const result = separateBodies(Matter, objects, solids);
         separation.corrections += result.corrections;
         if (!result.valid) { valid = false; break; }
@@ -254,7 +257,7 @@ async function start() {
     const point = documentPoint(event);
     drag = {
       id: event.pointerId, pointerType: event.pointerType, start: point, end: point,
-      started: performance.now(), shape: ["circle", "square", "triangle"][Math.floor(Math.random() * 3)]
+      started: performance.now(), shape: chooseShape()
     };
     drag.preview = makeShape(drag.shape, point, 5);
     stage.canvas.setPointerCapture(event.pointerId);

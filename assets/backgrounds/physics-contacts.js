@@ -1,6 +1,77 @@
 const GAP = 0.05;
 const EPSILON = 1e-7;
 
+export const SURFACE = Object.freeze({ restitution: 0.65, friction: 0.65, frictionStatic: 1.2, slop: 0 });
+export const MATERIAL = Object.freeze({ ...SURFACE, frictionAir: 0.002 });
+
+export function chooseShape(roll = Math.random()) {
+  return roll < 0.45 ? "circle" : roll < 0.9 ? "square" : "triangle";
+}
+
+function pointVelocity(Matter, body, point) {
+  const velocity = Matter.Body.getVelocity(body);
+  const spin = Matter.Body.getAngularVelocity(body);
+  return { x: velocity.x - spin * (point.y - body.position.y), y: velocity.y + spin * (point.x - body.position.x) };
+}
+
+export function captureImpact(Matter, pair) {
+  const collision = pair.collision;
+  const a = collision.bodyA;
+  const b = collision.bodyB;
+  const point = { x: 0, y: 0 };
+  for (let i = 0; i < collision.supportCount; i += 1) {
+    point.x += collision.supports[i].x / collision.supportCount;
+    point.y += collision.supports[i].y / collision.supportCount;
+  }
+  const va = pointVelocity(Matter, a, point), vb = pointVelocity(Matter, b, point);
+  const normal = { ...collision.normal };
+  const approach = -((va.x - vb.x) * normal.x + (va.y - vb.y) * normal.y);
+  // Quiet contacts should settle; new impacts retain their intended rebound.
+  return approach > 1 ? { a, b, point, normal, target: approach * pair.restitution } : null;
+}
+
+export function finishContacts(Matter, impacts, pairs, delta) {
+  for (const impact of impacts) {
+    if (!impact) continue;
+    const { a, b, point, normal, target } = impact;
+    const va = pointVelocity(Matter, a, point), vb = pointVelocity(Matter, b, point);
+    const speed = (va.x - vb.x) * normal.x + (va.y - vb.y) * normal.y;
+    const armA = (point.x - a.position.x) * normal.y - (point.y - a.position.y) * normal.x;
+    const armB = (point.x - b.position.x) * normal.y - (point.y - b.position.y) * normal.x;
+    const massA = a.isStatic ? 0 : a.inverseMass;
+    const massB = b.isStatic ? 0 : b.inverseMass;
+    const inertiaA = a.isStatic ? 0 : a.inverseInertia;
+    const inertiaB = b.isStatic ? 0 : b.inverseInertia;
+    const denominator = massA + massB + armA * armA * inertiaA + armB * armB * inertiaB;
+    if (!denominator || speed >= target) continue;
+    // Matter can lose rebound when two corners contact a plane together. Apply
+    // only the missing normal impulse, including the contact's rotational mass.
+    const impulse = (target - speed) / denominator;
+    for (const [body, sign, inverseMass, inverseInertia, arm] of [[a, 1, massA, inertiaA, armA], [b, -1, massB, inertiaB, armB]]) {
+      if (body.isStatic) continue;
+      Matter.Sleeping.set(body, false);
+      const velocity = Matter.Body.getVelocity(body);
+      Matter.Body.setVelocity(body, { x: velocity.x + normal.x * impulse * sign * inverseMass, y: velocity.y + normal.y * impulse * sign * inverseMass });
+      Matter.Body.setAngularVelocity(body, Matter.Body.getAngularVelocity(body) + arm * impulse * sign * inverseInertia);
+    }
+  }
+  const damped = new Set();
+  for (const pair of pairs) {
+    if (!pair.isActive) continue;
+    const { bodyA: a, bodyB: b, normal, tangent } = pair.collision;
+    const body = a.isStatic ? b : b.isStatic ? a : null;
+    if (!body || body.isSleeping || damped.has(body.id)) continue;
+    const velocity = Matter.Body.getVelocity(body);
+    if (Math.abs(velocity.x * normal.x + velocity.y * normal.y) > 1) continue;
+    // Surface resistance slows sliding and rolling without braking free flight.
+    const along = velocity.x * tangent.x + velocity.y * tangent.y;
+    const reduction = along * (1 - Math.exp(-3.5 * delta / 1000));
+    Matter.Body.setVelocity(body, { x: velocity.x - tangent.x * reduction, y: velocity.y - tangent.y * reduction });
+    Matter.Body.setAngularVelocity(body, Matter.Body.getAngularVelocity(body) * Math.exp(-4 * delta / 1000));
+    damped.add(body.id);
+  }
+}
+
 export function motionSubsteps(Matter, objects, delta) {
   let steps = 1;
   for (const body of objects) {
