@@ -1,0 +1,73 @@
+.fractal-page { height: 100vh; height: 100dvh; overflow: hidden; }
+.app-header { display: flex; align-items: center; gap: 0.9rem; min-height: 64px; padding: 0.65rem 1rem; border-bottom: 1px solid var(--line); }
+.app-header h1 { flex: 1; min-width: 0; margin: 0; font-size: 1.05rem; line-height: 1.3; letter-spacing: -0.02em; }
+.back-link { color: var(--muted); font-size: 0.8rem; text-decoration: none; white-space: nowrap; }
+.back-link:hover { color: var(--text); }
+.small-button, .view-actions button { min-height: 36px; padding: 0.35rem 0.75rem; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--text); font: inherit; font-size: 0.78rem; cursor: pointer; }
+button:hover { border-color: var(--accent-text); }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
+.primary { border-color: var(--accent); background: #2d422c; }
+#controls-toggle { display: none; }
+.app-shell { display: grid; grid-template-columns: 310px minmax(0, 1fr); flex: 1; min-height: 0; }
+#controls { min-width: 0; overflow-y: auto; padding: 1rem; border-right: 1px solid var(--line); scrollbar-width: thin; }
+.control-section { padding-bottom: 1rem; }
+.control-section + .control-section { padding-top: 0.9rem; border-top: 1px solid var(--line); }
+.control-section label { display: block; margin-top: 0.75rem; margin-bottom: 0.35rem; color: var(--muted); font-size: 0.78rem; }
+.control-section > label:first-child { margin-top: 0; }
+.control-section select, .control-section input:not([type="range"]), textarea { width: 100%; min-width: 0; min-height: 39px; border: 1px solid var(--line); border-radius: 5px; padding: 0.4rem 0.55rem; background: #1d211e; color: var(--text); font: inherit; font-size: 0.82rem; }
+.control-section input[type="range"] { display: block; width: 100%; margin: 0.4rem 0 0.25rem; accent-color: var(--accent-text); }
+.control-section .range-label { display: flex; justify-content: space-between; align-items: baseline; }
+.range-label output { color: var(--accent-text); font-family: var(--mono); font-size: 0.85em; }
+.field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+.hint { margin-top: 0.5rem; font-size: 0.7rem; line-height: 1.5; }
+textarea { display: block; min-height: 160px; resize: vertical; font-family: var(--mono); font-size: 0.78rem; line-height: 1.6; tab-size: 2; }
+textarea[aria-invalid="true"] { border-color: #db9292; }
+#run-script { width: 100%; margin-top: 0.65rem; }
+.error { margin-top: 0.65rem; color: #efb2aa; font-size: 0.75rem; overflow-wrap: anywhere; }
+.language-help { margin-top: 0.85rem; font-size: 0.72rem; color: var(--muted); }
+.language-help summary { color: var(--accent-text); cursor: pointer; }
+.language-help p { margin-top: 0.7rem; line-height: 1.6; }
+.language-help dl { margin: 0.75rem 0; }
+.language-help dt { margin-top: 0.7rem; color: var(--text); }
+.language-help dd { margin: 0.2rem 0 0; }
+.language-help code { font-size: 0.95em; }
+.save-row { display: flex; gap: 0.5rem; }
+.save-row input { flex: 1; }
+.save-status { min-height: 1.4em; margin-top: 0.4rem; font-size: 0.7rem; }
+#saved-views { display: grid; gap: 0.5rem; margin: 0.5rem 0 0; padding: 0; list-style: none; }
+.saved-empty { color: var(--muted); font-size: 0.75rem; }
+.saved-item { display: flex; min-width: 0; gap: 0.35rem; }
+.saved-open { flex: 1; min-width: 0; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 5px; background: transparent; color: var(--text); font: inherit; font-size: 0.76rem; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.saved-open span { display: block; color: var(--muted); font-size: 0.85em; margin-top: 0.15rem; }
+.saved-delete { border: 0; background: transparent; color: var(--muted); padding: 0.35rem; font: inherit; cursor: pointer; }
+#viewport { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #101517; touch-action: none; cursor: grab; isolation: isolate; }
+#viewport.is-dragging { cursor: grabbing; }
+#viewport:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
+.fractal-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; transform-origin: center; }
+[hidden], .fractal-canvas[hidden] { display: none !important; }
+.gesture-hint { position: absolute; top: 0.7rem; left: 0.9rem; padding: 0.3rem 0.45rem; border-radius: 4px; background: #101517b8; color: #d1d8d0; font-size: 0.67rem; pointer-events: none; }
+.view-actions { position: absolute; top: 0.7rem; right: 0.7rem; display: flex; gap: 0.25rem; }
+.view-actions button { min-width: 38px; background: #1c2421e8; }
+.canvas-footer { position: absolute; bottom: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; padding: 0.6rem 0.9rem; background: #101517d9; pointer-events: none; font-size: 0.7rem; color: var(--muted); }
+.canvas-footer > div { min-width: 0; }
+#render-status { overflow-wrap: anywhere; }
+#magnification { flex-shrink: 0; color: var(--accent-text); font-family: var(--mono); }
+#render-progress { display: block; width: 110px; height: 3px; margin-top: 0.3rem; accent-color: var(--accent-text); }
+#coordinates { position: absolute; left: 0.9rem; bottom: 3.4rem; color: #d1d8d0; font-size: 0.65rem; pointer-events: none; text-shadow: 0 1px 4px #000; }
+.no-script { position: fixed; inset: 30% 10% auto; padding: 2rem; background: var(--background); z-index: 10; }
+@media (max-width: 800px) {
+  .app-shell { display: block; position: relative; }
+  #viewport { width: 100%; height: 100%; }
+  #controls-toggle { display: inline-flex; align-items: center; }
+  #controls { display: none; position: absolute; z-index: 5; left: 0; top: 0; bottom: 0; width: min(330px, 88vw); background: var(--background); box-shadow: 10px 0 30px #0006; }
+  .controls-open #controls { display: block; }
+  .controls-open #viewport { cursor: default; }
+  .app-header { min-height: 60px; padding-inline: 0.65rem; gap: 0.5rem; }
+  .app-header h1 { font-size: 0.95rem; }
+  .back-link span { display: none; }
+  .desktop-text { display: none; }
+  .app-header .small-button { padding-inline: 0.55rem; font-size: 0.7rem; }
+  .gesture-hint { top: auto; bottom: 3.2rem; left: 0.5rem; font-size: 0.6rem; }
+  #coordinates { display: none; }
+}

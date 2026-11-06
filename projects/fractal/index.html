@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#242424">
+  <meta name="description" content="Explore Mandelbrot and Julia sets, zoom into fractals, save locations, and create your own recursive curves with a small scripting language.">
+  <title>Fractal Explorer</title>
+  <link rel="preload" href="../../assets/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../../site.css">
+  <link rel="stylesheet" href="app.css">
+  <script src="/analytics.js" defer></script>
+  <script type="module" src="app.js?v=1"></script>
+</head>
+<body class="green-accent fractal-page">
+  <header class="app-header">
+    <a class="back-link" href="../" aria-label="Back to projects">← <span>Projects</span></a>
+    <h1>Fractal Explorer</h1>
+    <button id="controls-toggle" class="small-button" type="button" aria-controls="controls" aria-expanded="false">Controls</button>
+    <button id="download-image" class="small-button" type="button" aria-label="Save PNG image" disabled><span class="desktop-text">Save </span>PNG</button>
+  </header>
+  <div class="app-shell">
+    <aside id="controls" aria-label="Fractal controls">
+      <section class="control-section">
+        <label for="mode">Fractal</label>
+        <select id="mode">
+          <option value="mandelbrot">Mandelbrot set</option>
+          <option value="julia">Julia set</option>
+          <option value="ship">Burning Ship</option>
+          <option value="script">Custom script</option>
+        </select>
+        <label for="palette">Palette</label>
+        <select id="palette"><option value="aurora">Aurora</option><option value="ember">Ember</option><option value="ocean">Ocean</option><option value="mono">Monochrome</option></select>
+        <div id="escape-controls">
+          <label class="range-label" for="iterations">Iterations <output id="iterations-value">384</output></label>
+          <input id="iterations" type="range" min="64" max="2048" step="32" value="384">
+        </div>
+        <div id="julia-controls" class="field-pair" hidden>
+          <div><label for="julia-x">Julia real</label><input id="julia-x" type="number" min="-2" max="2" step="0.001" value="-0.8"></div>
+          <div><label for="julia-y">Julia imaginary</label><input id="julia-y" type="number" min="-2" max="2" step="0.001" value="0.156"></div>
+        </div>
+      </section>
+
+      <section id="script-controls" class="control-section" hidden>
+        <label class="range-label" for="depth">Generations <output id="depth-value">16</output></label>
+        <input id="depth" type="range" min="0" max="32" step="1" value="16">
+        <p class="hint">Visible detail adapts as you zoom.</p>
+        <label class="range-label" for="stroke">Line width <output id="stroke-value">1.1</output></label>
+        <input id="stroke" type="range" min="0.5" max="4" step="0.1" value="1.1">
+        <label for="example">Example</label>
+        <select id="example"><option value="dragon">Dragon curve</option><option value="gasket">Sierpinski triangle</option><option value="branches">Branching form</option><option value="spiral">Shrinking folds</option><option value="" disabled>Custom</option></select>
+        <label for="script">Algorithm</label>
+        <textarea id="script" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="script-hint script-error">clone
+turn right</textarea>
+        <button id="run-script" class="small-button primary" type="button">Run script</button>
+        <p id="script-hint" class="hint">Ctrl+Enter runs your changes.</p>
+        <p id="script-error" class="error" role="alert" hidden></p>
+        <details class="language-help">
+          <summary>Language reference</summary>
+          <p>Start with a line. Each generation copies the previous drawing. By default, a copy joins at the previous curve’s endpoint.</p>
+          <dl>
+            <dt><code>clone</code></dt><dd>Make a new copy to transform.</dd>
+            <dt><code>turn right</code> / <code>turn left</code></dt><dd>Rotate the copy 90°. Add an angle for another turn: <code>turn left 45</code>.</dd>
+            <dt><code>scale 0.5</code></dt><dd>Resize the copy around its pivot.</dd>
+            <dt><code>move 1 0</code></dt><dd>Move the copy right by one seed unit. Positive Y moves up.</dd>
+            <dt><code>flip x</code> / <code>flip y</code></dt><dd>Mirror the copy horizontally or vertically.</dd>
+            <dt><code>pivot end</code></dt><dd>Choose <code>start</code>, <code>end</code>, <code>center</code>, or <code>origin</code> for the following copies.</dd>
+            <dt><code>clear</code></dt><dd>Replace the old drawing with the copies you make next.</dd>
+            <dt><code>seed triangle</code></dt><dd>Choose <code>line</code>, <code>triangle</code>, or <code>square</code> on the first line.</dd>
+          </dl>
+          <p>Transformations affect the latest copy. Each <code>clone</code> reads the previous generation. Use <code>#</code> for comments.</p>
+        </details>
+      </section>
+
+      <section class="control-section saved-section">
+        <form id="save-form">
+          <label for="view-name">Save this location</label>
+          <div class="save-row"><input id="view-name" maxlength="48" placeholder="Name this view" autocomplete="off"><button id="save-view" class="small-button" type="submit" disabled>Save</button></div>
+        </form>
+        <p class="hint">Saved on this device, including the script and settings.</p>
+        <p id="save-status" class="save-status" role="status" aria-atomic="true"></p>
+        <ul id="saved-views" aria-label="Saved locations"></ul>
+      </section>
+    </aside>
+
+    <main id="viewport" tabindex="0" aria-label="Fractal canvas. Drag to pan, scroll or pinch to zoom. Arrow keys pan, plus and minus zoom, and Home fits the view.">
+      <canvas id="gpu-canvas" class="fractal-canvas" aria-hidden="true"></canvas>
+      <canvas id="cpu-canvas" class="fractal-canvas" aria-hidden="true" hidden></canvas>
+      <canvas id="curve-canvas" class="fractal-canvas" aria-hidden="true" hidden></canvas>
+      <div class="gesture-hint">Drag to pan · Scroll or pinch to zoom</div>
+      <div class="view-actions" aria-label="View controls">
+        <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+        <button id="fit-view" type="button">Fit</button>
+        <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+      </div>
+      <div class="canvas-footer">
+        <div><span id="render-status" role="status">Rendering…</span><progress id="render-progress" aria-label="Fractal rendering progress"></progress></div>
+        <output id="magnification">×1</output>
+      </div>
+      <code id="coordinates" aria-hidden="true"></code>
+    </main>
+  </div>
+  <noscript><p class="no-script">Fractal Explorer needs JavaScript to draw fractals. <a href="../">Back to projects</a>.</p></noscript>
+</body>
+</html>

@@ -14,6 +14,12 @@ The scripts and isolated styles live in `assets/backgrounds/`; the MIT-licensed 
 
 To rebuild the audio collection from an installed copy of Minecraft, run `python scripts/build-note-block-files.py --version 26.3 --vgmstream "C:\path\to\vgmstream-cli.exe"`. Pass `--minecraft-dir` for a nonstandard game directory. The catalog and ZIPs include the source asset paths, event pitches, and checksums.
 
+## Fractal Explorer
+
+Open [Fractal Explorer](https://firecatcher404.github.io/projects/fractal/) to explore Mandelbrot, Julia, and Burning Ship fractals or write recursive curve scripts. It includes cursor and pinch zoom, local saved locations, palettes, and PNG export. `clone` followed by `turn right` generates the endpoint-joined dragon curve.
+
+The app lives in `projects/fractal/`; its [language reference](projects/fractal/README.md) describes the scripting rules and rendering limits. Run `node scripts/test-fractal-explorer.mjs` for the math, parser, saved-state, and camera checks. Future selected ideas are recorded in [PROJECT_IDEAS.md](PROJECT_IDEAS.md).
+
 ## Expressionful Skin Studio
 
 Open [Skin Studio](https://firecatcher404.github.io/projects/skin-studio/) to create animated Minecraft skin packs. It runs entirely in your browser with a dark interface, 3D player preview, frame uploads, rule builder, ZIP import/export, and a draft stored on your device. No server setup or account is required.
