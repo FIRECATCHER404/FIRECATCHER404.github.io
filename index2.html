@@ -8,9 +8,11 @@
   <title>About me</title>
   <link rel="preload" href="assets/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="site.css">
+  <link rel="stylesheet" href="assets/contacts.css">
   <link rel="stylesheet" href="assets/backgrounds/backgrounds.css">
   <script src="/analytics.js" defer></script>
   <script type="module" src="assets/backgrounds/ants.js"></script>
+  <script type="module" src="assets/contacts.js"></script>
 </head>
 <body class="centered-page green-accent interactive-page ant-page">
   <canvas class="interactive-background" id="page-background" aria-hidden="true"></canvas>
@@ -29,9 +31,10 @@
           <a class="btn" href="https://youtube.com/@FIRECATCHER_303" target="_blank" rel="noopener noreferrer">YouTube</a>
         </nav>
         <dl class="contact-details">
-          <div><dt>Discord</dt><dd><code>firecatcher_303</code></dd></div>
-          <div><dt>Minecraft</dt><dd><code>FIRECATCHER303</code></dd></div>
+          <div><dt>Discord</dt><dd><button class="copy-contact" type="button" data-copy-username data-service="Discord" aria-label="Copy Discord username" title="Copy Discord username"><code>firecatcher_303</code><span class="copy-feedback" aria-hidden="true">Copy</span></button></dd></div>
+          <div><dt>Minecraft</dt><dd><button class="copy-contact" type="button" data-copy-username data-service="Minecraft" aria-label="Copy Minecraft username" title="Copy Minecraft username"><code>NeojGaming_</code><span class="copy-feedback" aria-hidden="true">Copy</span></button></dd></div>
         </dl>
+        <span class="copy-status" id="contact-copy-status" role="status" aria-atomic="true"></span>
       </section>
       <nav class="button-group page-actions" aria-label="Page navigation">
         <a class="btn" href="index.html">Back to home</a>

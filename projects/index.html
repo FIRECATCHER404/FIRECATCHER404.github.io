@@ -8,7 +8,9 @@
   <title>My projects</title>
   <link rel="preload" href="../assets/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../site.css">
+  <link rel="stylesheet" href="project-search.css">
   <script src="/analytics.js" defer></script>
+  <script type="module" src="project-search.js"></script>
 </head>
 <body class="projects-layout green-accent">
   <a class="skip-link" href="#main-content">Skip to content</a>
@@ -20,8 +22,15 @@
       <nav class="button-group" aria-label="Page navigation">
         <a class="btn" href="../index.html">Back to home</a>
       </nav>
+      <form class="project-search" role="search" aria-label="Project search" hidden>
+        <label for="project-search">Search projects</label>
+        <input type="search" id="project-search" name="q" placeholder="Name, description, or category" autocomplete="off" aria-controls="project-results" aria-describedby="project-search-status">
+        <p class="search-status" id="project-search-status" role="status" aria-atomic="true"></p>
+      </form>
     </div>
 
+    <p class="search-empty" id="project-search-empty" hidden>No projects found. Try a different search.</p>
+    <div id="project-results">
     <section class="category">
       <div class="category-head">
         <div>
@@ -231,6 +240,7 @@
         </a>
       </div>
     </section>
+    </div>
   </main>
 
   <footer class="site-footer site-width">

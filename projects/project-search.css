@@ -1,0 +1,21 @@
+.project-search { max-width: 520px; margin-top: 2rem; }
+.project-search label { display: block; margin-bottom: 0.45rem; color: var(--accent-text); font-family: var(--mono); font-size: 0.78rem; }
+.project-search input {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+}
+.project-search input::placeholder { color: var(--muted); opacity: 1; }
+.project-search input:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
+.search-status { min-height: 1.5em; margin-top: 0.5rem; font-size: 0.8rem; }
+.search-empty { padding-block: 0.5rem 2rem; }
+#project-results { display: grid; gap: 2.75rem; }
+#project-results > .category { min-width: 0; margin-top: 0; }
+#project-results [hidden], .project-search[hidden], .search-empty[hidden] { display: none; }
