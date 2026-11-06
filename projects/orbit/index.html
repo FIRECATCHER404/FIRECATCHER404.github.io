@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#242424">
+  <meta name="description" content="Build miniature solar systems. Launch planets, add moons in circular orbits, change their masses, and follow their trails in a browser gravity sandbox.">
+  <title>Orbital Sandbox</title>
+  <link rel="preload" href="../../assets/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../../site.css">
+  <link rel="stylesheet" href="app.css?v=1">
+  <script src="/analytics.js" defer></script>
+  <script type="module" src="app.js?v=1"></script>
+</head>
+<body class="green-accent orbit-page">
+  <header class="app-header">
+    <a class="back-link" href="../" aria-label="Back to projects">← <span>Projects</span></a>
+    <h1>Orbital Sandbox</h1>
+    <button id="controls-toggle" type="button" aria-controls="controls" aria-expanded="false">Controls</button>
+    <button id="pause" type="button">Pause</button>
+  </header>
+  <div class="app-shell">
+    <aside id="controls" aria-label="Sandbox controls">
+      <section class="control-section">
+        <label for="preset">Starting system</label>
+        <div class="joined"><select id="preset"><option value="solar">Mini solar system</option><option value="moon">Planet &amp; moon</option><option value="binary">Binary stars</option><option value="empty">Empty space</option></select><button id="load-preset" type="button">Load</button></div>
+        <div class="tool-picker" role="group" aria-label="Canvas tool">
+          <button type="button" data-tool="place" aria-pressed="true">Place</button><button type="button" data-tool="orbit" aria-pressed="false">Orbit</button><button type="button" data-tool="select" aria-pressed="false">Select</button>
+        </div>
+        <p id="tool-help" class="hint">Drag in empty space to launch a body. Click to place it at rest.</p>
+        <label for="body-type">New body</label>
+        <select id="body-type"><option value="planet">Planet</option><option value="moon">Moon</option><option value="star">Star</option></select>
+        <div class="field-pair"><div><label for="new-mass">Mass</label><input id="new-mass" type="number" min="0.001" max="1000000" step="any" value="4" required></div><div><label for="new-color">Color</label><input id="new-color" type="color" value="#85bce5"></div></div>
+        <label class="check-row" id="clockwise-row" hidden><input id="clockwise" type="checkbox"> Clockwise orbit</label>
+      </section>
+      <section class="control-section">
+        <label for="speed">Time speed</label>
+        <div class="joined"><select id="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select><button id="step" type="button">Step</button><button id="undo" type="button" disabled>Undo</button></div>
+        <div class="joined trail-controls"><label class="check-row"><input id="trails" type="checkbox" checked> Trails</label><button id="clear-trails" type="button">Clear trails</button></div>
+        <p class="hint">Touching bodies merge. Space pauses; Shift-drag or two fingers moves the view.</p>
+      </section>
+      <section class="control-section inspector">
+        <h2>Selected body</h2>
+        <p id="selection-empty" class="hint">Click a body to inspect it or make something orbit it.</p>
+        <form id="body-form" hidden>
+          <label for="body-name">Name</label><input id="body-name" maxlength="32" required>
+          <label for="body-mass">Mass</label><input id="body-mass" type="number" min="0.001" max="128000000" step="any" required>
+          <div class="field-pair"><div><label for="body-vx">Velocity X</label><input id="body-vx" type="number" min="-10000" max="10000" step="any" required></div><div><label for="body-vy">Velocity Y</label><input id="body-vy" type="number" min="-10000" max="10000" step="any" required></div></div>
+          <div class="joined body-actions"><button id="apply-body" class="primary" type="submit">Apply changes</button><button id="delete-body" type="button">Delete</button></div>
+          <label class="check-row"><input id="follow" type="checkbox"> Follow this body</label>
+          <p class="hint mono" id="body-info"></p>
+        </form>
+      </section>
+      <section class="control-section files">
+        <div class="joined"><button id="save-file" type="button">Save system</button><button id="open-file" type="button">Open system</button></div>
+        <input id="file-input" type="file" accept=".orbit,.json,application/json" hidden>
+        <p class="hint">Your current system is saved on this device. Save a file to keep a separate copy.</p>
+        <p id="storage-status" class="hint" role="status"></p>
+      </section>
+    </aside>
+    <main id="viewport" tabindex="0" aria-label="Orbital sandbox. Use Place to drag and launch, Orbit to add a circular orbit, or Select to select bodies and pan. Scroll or pinch to zoom. Space pauses, Home fits the system, and arrow keys pan.">
+      <canvas id="space" aria-hidden="true"></canvas>
+      <div class="scene-actions"><button id="zoom-out" type="button" aria-label="Zoom out">−</button><button id="fit" type="button">Fit system</button><button id="zoom-in" type="button" aria-label="Zoom in">+</button></div>
+      <div id="empty-hint" hidden><p>A little space for your own solar system.</p><span>Place a star, then choose Orbit to add planets.</span></div>
+      <div class="scene-footer"><span id="stats" class="mono"></span><span id="scale" class="mono"></span></div>
+      <p id="notice" role="status" aria-live="polite"></p>
+    </main>
+  </div>
+  <noscript><p class="no-script">This sandbox needs JavaScript. <a href="../">Back to projects</a>.</p></noscript>
+</body>
+</html>

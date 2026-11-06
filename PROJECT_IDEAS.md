@@ -7,6 +7,8 @@ Selected on 2026-11-06 for future projects in the website's projects section.
 Create planets, moons, and miniature solar systems. Experiment with masses,
 starting velocities, orbital trails, and stable orbits.
 
+Website project: [Orbital Sandbox](projects/orbit/).
+
 ## 21. Note-block composer
 
 Arrange Minecraft instruments into songs. Reuse the note-block recordings in

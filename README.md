@@ -20,6 +20,12 @@ Open [Fractal Explorer](https://firecatcher404.github.io/projects/fractal/) to e
 
 The app lives in `projects/fractal/`; its [language reference](projects/fractal/README.md) describes the scripting rules and rendering limits. Run `node scripts/test-fractal-explorer.mjs` for the math, parser, saved-state, and camera checks. Future selected ideas are recorded in [PROJECT_IDEAS.md](PROJECT_IDEAS.md).
 
+## Orbital Sandbox
+
+Open [Orbital Sandbox](https://firecatcher404.github.io/projects/orbit/) to build miniature solar systems. Drag to launch bodies, add circular starting orbits around a selected body, edit masses and velocities, and follow orbital trails. It includes solar-system, planet-and-moon, binary-star, and empty presets, pause/step/speed controls, undo, and local `.orbit` save files.
+
+The app lives in `projects/orbit/`. See its [controls and physics notes](projects/orbit/README.md), and run `node scripts/test-orbital-sandbox.mjs` for orbit stability, force, collision, persistence, and camera checks.
+
 ## Expressionful Skin Studio
 
 Open [Skin Studio](https://firecatcher404.github.io/projects/skin-studio/) to create animated Minecraft skin packs. It runs entirely in your browser with a dark interface, 3D player preview, frame uploads, rule builder, ZIP import/export, and a draft stored on your device. No server setup or account is required.
