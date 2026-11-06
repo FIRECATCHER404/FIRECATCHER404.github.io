@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#242424">
-  <meta name="description" content="Explore Mandelbrot and Julia sets, zoom into fractals, save locations, and create your own recursive curves with a small scripting language.">
+  <meta name="description" content="Explore Mandelbrot and Julia sets, a 3D Menger sponge and Sierpinski tetrahedron, or script your own recursive curves. Detail adapts automatically as you zoom.">
   <title>Fractal Explorer</title>
   <link rel="preload" href="../../assets/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../../site.css">
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=2">
   <script src="/analytics.js" defer></script>
-  <script type="module" src="app.js?v=1"></script>
+  <script type="module" src="app.js?v=2"></script>
 </head>
 <body class="green-accent fractal-page">
   <header class="app-header">
@@ -27,14 +27,14 @@
           <option value="mandelbrot">Mandelbrot set</option>
           <option value="julia">Julia set</option>
           <option value="ship">Burning Ship</option>
+          <option value="menger">Menger sponge · 3D</option>
+          <option value="tetra">Sierpinski tetrahedron · 3D</option>
+          <option value="gasket">Sierpinski triangle · 2D</option>
           <option value="script">Custom script</option>
         </select>
         <label for="palette">Palette</label>
         <select id="palette"><option value="aurora">Aurora</option><option value="ember">Ember</option><option value="ocean">Ocean</option><option value="mono">Monochrome</option></select>
-        <div id="escape-controls">
-          <label class="range-label" for="iterations">Iterations <output id="iterations-value">384</output></label>
-          <input id="iterations" type="range" min="64" max="2048" step="32" value="384">
-        </div>
+        <p class="hint">Detail follows your view automatically as you zoom.</p>
         <div id="julia-controls" class="field-pair" hidden>
           <div><label for="julia-x">Julia real</label><input id="julia-x" type="number" min="-2" max="2" step="0.001" value="-0.8"></div>
           <div><label for="julia-y">Julia imaginary</label><input id="julia-y" type="number" min="-2" max="2" step="0.001" value="0.156"></div>
@@ -42,9 +42,6 @@
       </section>
 
       <section id="script-controls" class="control-section" hidden>
-        <label class="range-label" for="depth">Generations <output id="depth-value">16</output></label>
-        <input id="depth" type="range" min="0" max="32" step="1" value="16">
-        <p class="hint">Visible detail adapts as you zoom.</p>
         <label class="range-label" for="stroke">Line width <output id="stroke-value">1.1</output></label>
         <input id="stroke" type="range" min="0.5" max="4" step="0.1" value="1.1">
         <label for="example">Example</label>
@@ -52,8 +49,11 @@
         <label for="script">Algorithm</label>
         <textarea id="script" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="script-hint script-error">clone
 turn right</textarea>
-        <button id="run-script" class="small-button primary" type="button">Run script</button>
-        <p id="script-hint" class="hint">Ctrl+Enter runs your changes.</p>
+        <label for="run-count">Runs per click</label>
+        <input id="run-count" type="number" min="1" max="128" step="1" value="1" inputmode="numeric" required>
+        <div class="run-actions"><button id="run-script" class="small-button primary" type="button">Run once</button><button id="reset-script" class="small-button" type="button">Reset</button></div>
+        <p id="run-total" class="hint">0 runs applied</p>
+        <p id="script-hint" class="hint">Ctrl+Enter runs again. Editing the algorithm starts a new curve on Run. Reset returns to the seed.</p>
         <p id="script-error" class="error" role="alert" hidden></p>
         <details class="language-help">
           <summary>Language reference</summary>

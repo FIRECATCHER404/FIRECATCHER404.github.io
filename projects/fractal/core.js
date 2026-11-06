@@ -16,6 +16,28 @@ export class ScriptError extends Error {
   constructor(message, line = 0) { super(line ? `Line ${line}: ${message}` : message); this.line = line; }
 }
 
+export const MAX_RUNS = 128;
+export function automaticIterations(camera) {
+  return Math.min(8192, Math.round(512 + Math.max(0, Math.log2(3.4 / camera.span)) * 128));
+}
+export function advanceScript(previousSource, source, depth, count) {
+  if (!Number.isInteger(count) || count < 1 || count > MAX_RUNS) throw new ScriptError(`Runs must be a whole number from 1 to ${MAX_RUNS}.`);
+  const nextDepth = (source === previousSource ? depth : 0) + count;
+  if (nextDepth > MAX_RUNS) throw new ScriptError(`This curve has reached ${MAX_RUNS} runs. Reset to the seed to start again.`);
+  return buildModel(source, nextDepth);
+}
+export function gasketContains(x, y, levels) {
+  let c = y / (Math.sqrt(3) / 2), b = x - c / 2, a = 1 - b - c;
+  if (Math.min(a, b, c) < 0) return false;
+  for (let i = 0; i < levels; i++) {
+    if (Math.max(a, b, c) < 0.5) return false;
+    if (a >= b && a >= c) { a = a * 2 - 1; b *= 2; c *= 2; }
+    else if (b >= c) { b = b * 2 - 1; a *= 2; c *= 2; }
+    else { c = c * 2 - 1; a *= 2; b *= 2; }
+  }
+  return true;
+}
+
 const IDENTITY = [1, 0, 0, 1, 0, 0];
 const numeric = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
 function number(token, line, limit = 1e6) {
@@ -93,7 +115,7 @@ function clipLine(a, b, width, height) {
 }
 
 export function buildModel(source, depth) {
-  if (!Number.isInteger(depth) || depth < 0 || depth > 32) throw new ScriptError("Generations must be a whole number from 0 to 32.");
+  if (!Number.isInteger(depth) || depth < 0 || depth > MAX_RUNS) throw new ScriptError(`Runs must be a whole number from 0 to ${MAX_RUNS}.`);
   const parsed = typeof source === "string" ? parseScript(source) : source;
   const points = parsed.seed === "triangle" ? [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0.5, y: Math.sqrt(3) / 2 }, { x: 0, y: 0 }] : parsed.seed === "square" ? [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }, { x: 0, y: 0 }] : [{ x: 0, y: 0 }, { x: 1, y: 0 }];
   const levels = [{ points, start: points[0], end: points.at(-1), bounds: boundsOf(points), segments: BigInt(points.length - 1) }];
@@ -119,7 +141,12 @@ export function buildModel(source, depth) {
     const first = children[0], last = children.at(-1);
     const bounds = boundsOf(children.flatMap(child => corners(previous.bounds).map(p => transformPoint(child.matrix, p))));
     if (Object.values(bounds).some(n => !Number.isFinite(n) || Math.abs(n) > 1e12)) throw new ScriptError(`The drawing is too large at generation ${generation}. Reduce scale or generations.`);
-    levels.push({ children, bounds, start: transformPoint(first.matrix, previous[first.reverse ? "end" : "start"]), end: transformPoint(last.matrix, previous[last.reverse ? "start" : "end"]), segments: previous.segments * BigInt(children.length) });
+    const seen = new Set(), renderChildren = children.filter(child => {
+      const key = child.matrix.join(",");
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    levels.push({ children, renderChildren, bounds, start: transformPoint(first.matrix, previous[first.reverse ? "end" : "start"]), end: transformPoint(last.matrix, previous[last.reverse ? "start" : "end"]), segments: previous.segments * BigInt(children.length) });
   }
   return { levels, depth, bounds: levels.at(-1).bounds, segments: levels.at(-1).segments };
 }
@@ -147,12 +174,12 @@ export function* curveSegments(model, camera, width, height, stats = {}, limits 
   const emit = (a, b) => {
     const segment = clipLine(pixel(a), pixel(b), width, height);
     if (!segment) return null;
-    if (++stats.segments > maxSegments) throw new ScriptError("Too much detail is visible. Zoom in or lower generations.");
+    if (++stats.segments > maxSegments) throw new ScriptError("This script draws too many overlapping segments. Zoom in, simplify the script, or reset the curve.");
     return segment;
   };
   while (stack.length) {
     const node = stack.pop(), level = model.levels[node.level];
-    if (++stats.nodes > maxNodes) throw new ScriptError("This view is too complex. Zoom in or lower generations.");
+    if (++stats.nodes > maxNodes) throw new ScriptError("This script is too complex in this view. Zoom in, simplify the script, or reset the curve.");
     const bounds = boundsOf(corners(level.bounds).map(p => transformPoint(node.matrix, p)));
     if (bounds.maxX < visible.minX || bounds.minX > visible.maxX || bounds.maxY < visible.minY || bounds.minY > visible.maxY) continue;
     if (node.level > 0 && Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / units <= lod) {
@@ -165,7 +192,7 @@ export function* curveSegments(model, camera, width, height, stats = {}, limits 
         if (segment) yield segment;
       }
     } else {
-      for (let i = level.children.length - 1; i >= 0; i -= 1) stack.push({ level: node.level - 1, matrix: compose(node.matrix, level.children[i].matrix) });
+      for (let i = level.renderChildren.length - 1; i >= 0; i -= 1) stack.push({ level: node.level - 1, matrix: compose(node.matrix, level.renderChildren[i].matrix) });
     }
   }
 }
@@ -195,12 +222,14 @@ export function colorAt(value, palette = "aurora") {
 }
 
 export function validateState(value) {
-  if (!value || !["mandelbrot", "julia", "ship", "script"].includes(value.mode) || !Object.keys(PALETTES).includes(value.palette)) throw new Error("Invalid saved fractal.");
+  if (!value || !["mandelbrot", "julia", "ship", "gasket", "menger", "tetra", "script"].includes(value.mode) || !Object.keys(PALETTES).includes(value.palette)) throw new Error("Invalid saved fractal.");
   const camera = value.camera;
   if (!camera || ![camera.x, camera.y, camera.span].every(Number.isFinite) || Math.abs(camera.x) > 1e12 || Math.abs(camera.y) > 1e12 || camera.span < 1e-12 || camera.span > 1e12) throw new Error("Invalid saved location.");
-  if (!Number.isInteger(value.iterations) || value.iterations < 64 || value.iterations > 2048 || !Number.isInteger(value.depth) || value.depth < 0 || value.depth > 32) throw new Error("Invalid saved detail setting.");
+  if (!Number.isInteger(value.iterations) || value.iterations < 64 || value.iterations > 8192 || !Number.isInteger(value.depth) || value.depth < 0 || value.depth > MAX_RUNS) throw new Error("Invalid saved detail setting.");
   if (![value.juliaX, value.juliaY].every(n => Number.isFinite(n) && Math.abs(n) <= 2) || !Number.isFinite(value.stroke) || value.stroke < 0.5 || value.stroke > 4) throw new Error("Invalid saved settings.");
   if (typeof value.script !== "string" || value.script.length > 16000) throw new Error("Invalid saved script.");
   buildModel(value.script, value.depth);
-  return { mode: value.mode, palette: value.palette, camera: { ...camera }, iterations: value.iterations, depth: value.depth, juliaX: value.juliaX, juliaY: value.juliaY, stroke: value.stroke, script: value.script };
+  const orbit = value.orbit ?? { yaw: 0.65, pitch: 0.38 }, runBatch = value.runBatch ?? 1;
+  if (![orbit.yaw, orbit.pitch].every(Number.isFinite) || Math.abs(orbit.yaw) > 1e6 || Math.abs(orbit.pitch) > 1.5 || !Number.isInteger(runBatch) || runBatch < 1 || runBatch > MAX_RUNS) throw new Error("Invalid saved controls.");
+  return { mode: value.mode, palette: value.palette, camera: { ...camera }, iterations: value.iterations, depth: value.depth, juliaX: value.juliaX, juliaY: value.juliaY, stroke: value.stroke, script: value.script, orbit: { ...orbit }, runBatch };
 }

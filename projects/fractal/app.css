@@ -23,7 +23,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .hint { margin-top: 0.5rem; font-size: 0.7rem; line-height: 1.5; }
 textarea { display: block; min-height: 160px; resize: vertical; font-family: var(--mono); font-size: 0.78rem; line-height: 1.6; tab-size: 2; }
 textarea[aria-invalid="true"] { border-color: #db9292; }
-#run-script { width: 100%; margin-top: 0.65rem; }
+.run-actions { display: flex; gap: 0.5rem; margin-top: 0.65rem; }
+#run-script { flex: 1; }
 .error { margin-top: 0.65rem; color: #efb2aa; font-size: 0.75rem; overflow-wrap: anywhere; }
 .language-help { margin-top: 0.85rem; font-size: 0.72rem; color: var(--muted); }
 .language-help summary { color: var(--accent-text); cursor: pointer; }

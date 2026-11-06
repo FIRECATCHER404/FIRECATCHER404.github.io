@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../projects/fractal/core.js", import.meta.url));
-const { EXAMPLES, ScriptError, parseScript, buildModel, curveSegments, fitCamera, screenToWorld, zoomCamera, escapePoint, colorAt, validateState } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
+const { EXAMPLES, MAX_RUNS, ScriptError, advanceScript, automaticIterations, gasketContains, parseScript, buildModel, curveSegments, fitCamera, screenToWorld, zoomCamera, escapePoint, colorAt, validateState } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
+const solidSource = await readFile(new URL("../projects/fractal/solid.js", import.meta.url));
+const { solidDistance, solidDetail, solidBasis, traceSolid, rayBounds, TETRA_VERTICES } = await import(`data:text/javascript;base64,${solidSource.toString("base64")}`);
 let checks = 0;
 const test = (name, run) => { run(); checks++; console.log(`PASS ${name}`); };
 const close = (actual, expected, epsilon = 1e-8) => assert.ok(Math.abs(actual - expected) < epsilon, `${actual} != ${expected}`);
@@ -54,7 +56,7 @@ test("parser rejects malformed or executable input with useful line numbers", ()
   assert.throws(() => parseScript("# comment\nclone\nnope"), e => e.line === 3 && /Unknown command/.test(e.message));
   assert.equal(parseScript("# comment\nCLONE // copy\nTurn Right 45").instructions.length, 2);
   assert.throws(() => buildModel("clone\nscale 4", 32), /too large/);
-  assert.throws(() => buildModel(EXAMPLES.dragon.source, 33), /0 to 32/);
+  assert.throws(() => buildModel(EXAMPLES.dragon.source, MAX_RUNS + 1), /0 to 128/);
 });
 
 test("deep curves adapt, clip to the viewport, and explicitly reject excess work", () => {
@@ -66,7 +68,7 @@ test("deep curves adapt, clip to the viewport, and explicitly reject excess work
     assert.ok(segment[1] >= -4 && segment[1] <= 354 && segment[3] >= -4 && segment[3] <= 354);
   }
   assert.ok(stats.segments < 300000 && stats.approximated > 0);
-  assert.throws(() => [...curveSegments(model, camera, 500, 350, {}, { lod: 0, maxSegments: 20 })], /Too much detail/);
+  assert.throws(() => [...curveSegments(model, camera, 500, 350, {}, { lod: 0, maxSegments: 20 })], /too many overlapping/);
   const zoomed = { x: 0, y: 0, span: 0.000001 };
   assert.ok([...curveSegments(buildModel(EXAMPLES.dragon.source, 8), zoomed, 500, 350)].flat().every(Number.isFinite));
 });
@@ -98,8 +100,84 @@ test("escape-time equations match an independent complex recurrence", () => {
 });
 
 test("saved views round-trip full scripts and reject corrupt settings", () => {
-  const state = { mode: "script", palette: "aurora", camera: { x: 2, y: 3, span: 0.004 }, iterations: 384, depth: 18, juliaX: -0.8, juliaY: 0.156, stroke: 1.1, script: EXAMPLES.dragon.source };
+  const state = { mode: "script", palette: "aurora", camera: { x: 2, y: 3, span: 0.004 }, iterations: 384, depth: 18, juliaX: -0.8, juliaY: 0.156, stroke: 1.1, script: EXAMPLES.dragon.source, orbit: { yaw: 0.65, pitch: 0.38 }, runBatch: 1 };
   assert.deepEqual(validateState(JSON.parse(JSON.stringify(state))), state);
+  const { orbit, runBatch, ...legacy } = state;
+  assert.equal(validateState(legacy).depth, state.depth);
+  assert.deepEqual(validateState(legacy).camera, state.camera);
+  assert.deepEqual(validateState(legacy).orbit, orbit);
   for (const changed of [{ palette: "__proto__" }, { iterations: NaN }, { camera: { x: 0, y: 0, span: 0 } }, { mode: "unknown" }, { script: "nope", mode: "mandelbrot" }]) assert.throws(() => validateState({ ...state, ...changed }));
+});
+
+test("Run advances cumulatively, batching is equivalent, and edits start a new curve", () => {
+  const script = EXAMPLES.dragon.source;
+  let model = buildModel(script, 0);
+  for (let i = 0; i < 12; i++) model = advanceScript(script, script, model.depth, 1);
+  const batch = advanceScript(script, script, 0, 12);
+  assert.deepEqual(model, batch);
+  assert.equal(advanceScript(script, "clone\nturn left", 12, 2).depth, 2);
+  for (const count of [0, -1, NaN, 1.2, MAX_RUNS + 1]) assert.throws(() => advanceScript(script, script, 0, count), ScriptError);
+  assert.throws(() => advanceScript(script, script, MAX_RUNS, 1), /reached/);
+  const overlapping = buildModel("clone", MAX_RUNS);
+  const camera = fitCamera(overlapping.bounds, 500, 350);
+  assert.equal(overlapping.segments, 2n ** BigInt(MAX_RUNS));
+  assert.equal([...curveSegments(overlapping, camera, 500, 350)].length, 1);
+});
+
+test("detail increases with zoom while the target remains screen-pixel sized", () => {
+  for (const mode of ["menger", "tetra"]) {
+    const wide = solidDetail(mode, 4, 800), close = solidDetail(mode, 0.04, 800);
+    assert.ok(close.levels > wide.levels);
+    assert.equal(wide.epsilon / wide.pixel, close.epsilon / close.pixel);
+  }
+  assert.ok(automaticIterations({ span: 0.00001 }) > automaticIterations({ span: 3.4 }));
+  const basis = solidBasis({ yaw: 0.8, pitch: -0.4 });
+  for (const vector of Object.values(basis)) close(Math.hypot(...vector), 1);
+  close(basis.right.reduce((s,n,i)=>s+n*basis.up[i],0),0);
+});
+
+test("Menger distance field matches independently subdivided solid boxes", () => {
+  let cells = [{ center: [0, 0, 0], half: 1 }];
+  for (let level = 0; level < 2; level++) {
+    cells = cells.flatMap(cell => {
+      const result = [], half = cell.half / 3;
+      for (const x of [-1, 0, 1]) for (const y of [-1, 0, 1]) for (const z of [-1, 0, 1]) {
+        if ([x,y,z].filter(n=>n===0).length < 2) result.push({ center: cell.center.map((n,i)=>n+[x,y,z][i]*2*half), half });
+      }
+      return result;
+    });
+  }
+  assert.equal(cells.length, 400);
+  for (let i = 0; i < 800; i++) {
+    const p = [Math.sin(i*1.3)*1.2, Math.cos(i*0.7)*1.2, Math.sin(i*2.1)*1.2];
+    const inside = cells.some(cell=>p.every((n,axis)=>Math.abs(n-cell.center[axis])<cell.half));
+    const distance = solidDistance(...p,"menger",2);
+    if(Math.abs(distance)>1e-10)assert.equal(distance<0,inside,`Menger ${p}`);
+  }
+  assert.ok(solidDistance(0,0,0,"menger",5)>0);
+  assert.equal(traceSolid([0,0,6],[0,0,-1],"menger",solidDetail("menger",4,800)),null);
+  const hit=traceSolid([1,1,6],[0,0,-1],"menger",solidDetail("menger",4,800));
+  assert.ok(hit && Math.abs(hit.point[2]-1)<0.01);
+  assert.equal(rayBounds([2,0,6],[0,0,-1]),null);
+});
+
+test("tetrahedron field matches an independent union of corner tetrahedra", () => {
+  let cells=[{center:[0,0,0],scale:1}];
+  for(let level=0;level<2;level++)cells=cells.flatMap(cell=>TETRA_VERTICES.map(v=>({center:cell.center.map((n,i)=>n+v[i]*cell.scale/2),scale:cell.scale/2})));
+  assert.equal(cells.length,16);
+  for(let i=0;i<800;i++){
+    const p=[Math.sin(i*1.3)*1.2,Math.cos(i*0.7)*1.2,Math.sin(i*2.1)*1.2];
+    const inside=cells.some(cell=>TETRA_VERTICES.every(v=>p.reduce((s,n,axis)=>s+(n-cell.center[axis])/cell.scale*v[axis],0)>=-1));
+    const distance=solidDistance(...p,"tetra",2);
+    if(Math.abs(distance)>1e-10)assert.equal(distance<0,inside,`Tetra ${p}`);
+  }
+  assert.ok(solidDistance(0,0,0,"tetra",4)>0);
+});
+
+test("automatic 2D triangle removes its central opening and retains corner copies", () => {
+  assert.equal(gasketContains(0.5,Math.sqrt(3)/6,8),false);
+  assert.equal(gasketContains(0,0,8),true);
+  assert.equal(gasketContains(1,0,8),true);
+  assert.equal(gasketContains(-0.1,0,8),false);
 });
 console.log(`${checks} fractal test groups passed.`);

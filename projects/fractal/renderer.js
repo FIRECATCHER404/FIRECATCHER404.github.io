@@ -1,4 +1,5 @@
-import { PALETTES } from "./core.js";
+import { PALETTES } from "./core.js?v=2";
+import { isSolid, solidBasis, solidDetail, solidFragmentSource } from "./solid.js?v=2";
 
 const vertexSource = "attribute vec2 a_position; void main(){gl_Position=vec4(a_position,0.0,1.0);}";
 const fragmentSource = `precision highp float;
@@ -18,10 +19,22 @@ vec3 color(float value){
 }
 void main(){
   vec2 p=u_center+(gl_FragCoord.xy-u_resolution*0.5)*u_span/u_resolution.y;
+  if(u_mode==3){
+    float c=p.y/0.866025403784,b=p.x-c*0.5,a=1.0-b-c;
+    bool inside=min(a,min(b,c))>=0.0;
+    for(int i=0;i<48;i++){
+      if(i>=u_iterations||!inside)break;
+      if(max(a,max(b,c))<0.5){inside=false;break;}
+      if(a>=b&&a>=c){a=a*2.0-1.0;b*=2.0;c*=2.0;}
+      else if(b>=c){b=b*2.0-1.0;a*=2.0;c*=2.0;}
+      else{c=c*2.0-1.0;a*=2.0;b*=2.0;}
+    }
+    gl_FragColor=vec4(inside?mix(u_colors[2],u_colors[4],clamp(p.x,0.0,1.0)):vec3(16.0,21.0,23.0)/255.0,1.0);return;
+  }
   vec2 z=u_mode==1?p:vec2(0.0);
   vec2 c=u_mode==1?u_julia:p;
   float value=-1.0;
-  for(int i=0;i<2048;i++){
+  for(int i=0;i<8192;i++){
     if(i>=u_iterations)break;
     if(u_mode==2)z=abs(z);
     z=vec2(z.x*z.x-z.y*z.y,2.0*z.x*z.y)+c;
@@ -38,7 +51,7 @@ export class FractalRenderer {
     this.gpuCanvas = viewport.querySelector("#gpu-canvas");
     this.cpuCanvas = viewport.querySelector("#cpu-canvas");
     this.curveCanvas = viewport.querySelector("#curve-canvas");
-    this.worker = new Worker(new URL("./render-worker.js", import.meta.url), { type: "module" });
+    this.worker = new Worker(new URL("./render-worker.js?v=2", import.meta.url), { type: "module" });
     this.worker.onmessage = event => this.message(event.data);
     this.worker.onerror = () => this.onStatus({ busy: false, error: "The renderer could not start. Reload the page and try again." });
     this.id = 0;
@@ -59,21 +72,25 @@ export class FractalRenderer {
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
         return shader;
       };
-      const program = gl.createProgram();
-      gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource));
-      gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource)); gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
-      gl.useProgram(program);
+      const makeProgram = (source, names) => {
+        const program = gl.createProgram();
+        gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource));
+        gl.attachShader(program, compile(gl.FRAGMENT_SHADER, source)); gl.bindAttribLocation(program, 0, "a_position"); gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+        return { program, uniforms: Object.fromEntries(names.map(key => [key, gl.getUniformLocation(program, "u_" + key)])) };
+      };
+      const common = ["resolution", "center", "span", "mode", "colors[0]"];
+      this.flatProgram = makeProgram(fragmentSource, [...common, "iterations", "julia"]);
+      this.solidProgram = makeProgram(solidFragmentSource, [...common, "levels", "right", "up", "back"]);
       const buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-      const position = gl.getAttribLocation(program, "a_position"); gl.enableVertexAttribArray(position); gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-      this.gl = gl; this.program = program;
-      this.uniforms = Object.fromEntries(["resolution", "center", "span", "mode", "iterations", "julia", "colors[0]"].map(key => [key, gl.getUniformLocation(program, "u_" + key)]));
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      this.gl = gl;
     } catch (error) { console.warn("Using the CPU fractal renderer:", error.message); this.gl = null; }
   }
 
   preview(camera) {
-    if (!this.active || !this.lastCamera || this.lastMode !== this.request?.state.mode) return;
+    if (!this.active || !this.lastCamera || this.lastMode !== this.request?.state.mode || isSolid(this.lastMode)) return;
     const height = this.viewport.clientHeight;
     const scale = this.lastCamera.span / camera.span;
     const x = (this.lastCamera.x - camera.x) * height / camera.span;
@@ -94,26 +111,36 @@ export class FractalRenderer {
     const id = ++this.id;
     this.worker.postMessage({ type: "cancel", id });
     const width = Math.max(1, this.viewport.clientWidth), height = Math.max(1, this.viewport.clientHeight);
-    const request = { id, state: structuredClone(state), width, height };
+    const ratio = Math.min(devicePixelRatio || 1, 2);
+    const request = { id, state: structuredClone(state), width, height, pixelRatio: ratio };
     this.request = request;
     this.preview(state.camera);
     this.onStatus({ busy: true });
     if (state.mode !== "script" && this.gl && state.camera.span >= 0.002) {
-      const ratio = Math.min(devicePixelRatio || 1, 1.5);
-      const canvas = this.gpuCanvas, gl = this.gl, u = this.uniforms;
+      const canvas = this.gpuCanvas, gl = this.gl, bundle = isSolid(state.mode) ? this.solidProgram : this.flatProgram, u = bundle.uniforms;
       canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio);
-      gl.viewport(0, 0, canvas.width, canvas.height); gl.useProgram(this.program);
+      gl.viewport(0, 0, canvas.width, canvas.height); gl.useProgram(bundle.program);
       gl.uniform2f(u.resolution, canvas.width, canvas.height); gl.uniform2f(u.center, state.camera.x, state.camera.y); gl.uniform1f(u.span, state.camera.span);
-      gl.uniform1i(u.mode, state.mode === "julia" ? 1 : state.mode === "ship" ? 2 : 0); gl.uniform1i(u.iterations, state.iterations);
-      gl.uniform2f(u.julia, state.juliaX, state.juliaY);
+      let detail;
+      if (isSolid(state.mode)) {
+        detail = solidDetail(state.mode, state.camera.span, canvas.height);
+        const basis = solidBasis(state.orbit);
+        gl.uniform1i(u.mode, state.mode === "menger" ? 0 : 1); gl.uniform1i(u.levels, detail.levels);
+        gl.uniform3fv(u.right, basis.right); gl.uniform3fv(u.up, basis.up); gl.uniform3fv(u.back, basis.back);
+      } else {
+        const levels = Math.max(1, Math.min(48, Math.ceil(Math.log2(canvas.height / state.camera.span)) + 1));
+        gl.uniform1i(u.mode, state.mode === "julia" ? 1 : state.mode === "ship" ? 2 : state.mode === "gasket" ? 3 : 0);
+        gl.uniform1i(u.iterations, state.mode === "gasket" ? levels : state.iterations);
+        gl.uniform2f(u.julia, state.juliaX, state.juliaY);
+        detail = { ...(state.mode === "gasket" ? { levels } : { iterations: state.iterations }) };
+      }
       gl.uniform3fv(u["colors[0]"], new Float32Array(PALETTES[state.palette].colors.flat().map(value => value / 255)));
       gl.drawArrays(gl.TRIANGLES, 0, 3);
-      this.show(canvas, request, "webgl");
+      this.show(canvas, request, "webgl", { ...detail, width: canvas.width, height: canvas.height, pixelRatio: ratio });
       return;
     }
-    if (state.mode === "script") this.worker.postMessage({ ...request, type: "render" });
+    if (state.mode === "script") this.worker.postMessage({ ...request, width: Math.round(width * ratio), height: Math.round(height * ratio), type: "render" });
     else {
-      const ratio = Math.min(1, Math.sqrt(800000 / (width * height)));
       request.renderWidth = Math.max(1, Math.round(width * ratio)); request.renderHeight = Math.max(1, Math.round(height * ratio));
       this.buffer = document.createElement("canvas"); this.buffer.width = request.renderWidth; this.buffer.height = request.renderHeight;
       this.bufferContext = this.buffer.getContext("2d");
@@ -135,15 +162,18 @@ export class FractalRenderer {
       canvas.getContext("2d").drawImage(this.buffer, 0, 0);
       this.show(canvas, request, "cpu", message.stats); return;
     }
-    if (message.type === "curve") {
-      const canvas = this.curveCanvas, ratio = Math.min(devicePixelRatio || 1, 2);
-      canvas.width = Math.round(request.width * ratio); canvas.height = Math.round(request.height * ratio);
-      const context = canvas.getContext("2d"); context.scale(ratio, ratio);
-      context.fillStyle = "#101517"; context.fillRect(0, 0, request.width, request.height);
-      const gradient = context.createLinearGradient(0, request.height, request.width, 0);
+    if (message.type === "curve-start") {
+      this.buffer = document.createElement("canvas"); this.buffer.width = message.width; this.buffer.height = message.height;
+      const context = this.bufferContext = this.buffer.getContext("2d");
+      context.fillStyle = "#101517"; context.fillRect(0, 0, message.width, message.height);
+      const gradient = context.createLinearGradient(0, message.height, message.width, 0);
       const colors = PALETTES[request.state.palette].colors.slice(1);
       colors.forEach((color, i) => gradient.addColorStop(i / (colors.length - 1), `rgb(${color.join(",")})`));
-      context.strokeStyle = gradient; context.fillStyle = gradient; context.lineWidth = request.state.stroke; context.lineCap = "round";
+      context.strokeStyle = gradient; context.fillStyle = gradient; context.lineWidth = request.state.stroke * request.pixelRatio; context.lineCap = "round";
+      return;
+    }
+    if (message.type === "curve-chunk") {
+      const context = this.bufferContext;
       const segments = new Float32Array(message.buffer);
       context.beginPath();
       for (let i = 0; i < segments.length; i += 4) {
@@ -151,6 +181,11 @@ export class FractalRenderer {
         else { context.moveTo(segments[i], segments[i + 1]); context.lineTo(segments[i + 2], segments[i + 3]); }
       }
       context.stroke();
+      return;
+    }
+    if (message.type === "curve-complete") {
+      const canvas = this.curveCanvas; canvas.width = this.buffer.width; canvas.height = this.buffer.height;
+      canvas.getContext("2d").drawImage(this.buffer, 0, 0);
       this.show(canvas, request, "curve", message.stats);
     }
   }

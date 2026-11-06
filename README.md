@@ -16,7 +16,7 @@ To rebuild the audio collection from an installed copy of Minecraft, run `python
 
 ## Fractal Explorer
 
-Open [Fractal Explorer](https://firecatcher404.github.io/projects/fractal/) to explore Mandelbrot, Julia, and Burning Ship fractals or write recursive curve scripts. It includes cursor and pinch zoom, local saved locations, palettes, and PNG export. `clone` followed by `turn right` generates the endpoint-joined dragon curve.
+Open [Fractal Explorer](https://firecatcher404.github.io/projects/fractal/) to explore Mandelbrot, Julia, Burning Ship, the Sierpinski triangle, and 3D Menger sponge and Sierpinski tetrahedron fractals. Detail adapts to the view at a consistent pixel resolution. It includes orbit/pan/zoom, local saved locations, palettes, and PNG export. Custom scripts support cumulative single or batch runs; `clone` followed by `turn right` generates the endpoint-joined dragon curve.
 
 The app lives in `projects/fractal/`; its [language reference](projects/fractal/README.md) describes the scripting rules and rendering limits. Run `node scripts/test-fractal-explorer.mjs` for the math, parser, saved-state, and camera checks. Future selected ideas are recorded in [PROJECT_IDEAS.md](PROJECT_IDEAS.md).
 
