@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../projects/fractal/core.js", import.meta.url));
-const { EXAMPLES, MAX_RUNS, ScriptError, advanceScript, automaticIterations, gasketContains, parseScript, buildModel, curveSegments, fitCamera, screenToWorld, zoomCamera, escapePoint, colorAt, validateState } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
+const { EXAMPLES, MAX_RUNS, ScriptError, advanceScript, automaticIterations, carpetContains, gasketContains, planarDetail, parseScript, buildModel, curveSegments, fitCamera, screenToWorld, zoomCamera, escapePoint, colorAt, validateState } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
 const solidSource = await readFile(new URL("../projects/fractal/solid.js", import.meta.url));
 const { solidDistance, solidDetail, solidBasis, traceSolid, rayBounds, TETRA_VERTICES } = await import(`data:text/javascript;base64,${solidSource.toString("base64")}`);
 let checks = 0;
@@ -179,5 +179,27 @@ test("automatic 2D triangle removes its central opening and retains corner copie
   assert.equal(gasketContains(0,0,8),true);
   assert.equal(gasketContains(1,0,8),true);
   assert.equal(gasketContains(-0.1,0,8),false);
+});
+test("2D carpet matches independently subdivided squares and refines with zoom", () => {
+  let squares = [{ x: 0, y: 0, size: 1 }];
+  for (let level = 0; level < 3; level++) squares = squares.flatMap(square => {
+    const next = [], size = square.size / 3;
+    for (let column = 0; column < 3; column++) for (let row = 0; row < 3; row++) {
+      if (column !== 1 || row !== 1) next.push({ x: square.x + column * size, y: square.y + row * size, size });
+    }
+    return next;
+  });
+  assert.equal(squares.length, 512);
+  for (let i = 0; i < 1000; i++) {
+    const x = (Math.sin(i * 1.7) + 1) * 0.6 - 0.1, y = (Math.cos(i * 2.3) + 1) * 0.6 - 0.1;
+    assert.equal(carpetContains(x, y, 3), squares.some(s => x >= s.x && x <= s.x + s.size && y >= s.y && y <= s.y + s.size));
+  }
+  assert.equal(carpetContains(0.5, 0.5, 1), false);
+  assert.equal(carpetContains(1/6, 1/6, 1), true);
+  assert.equal(carpetContains(1/6, 1/6, 2), false);
+  for (const x of [0, 1]) for (const y of [0, 1]) assert.equal(carpetContains(x, y, 32), true);
+  assert.ok(planarDetail("carpet", 0.001, 800) > planarDetail("carpet", 1, 800));
+  const saved = { mode: "carpet", palette: "aurora", camera: { x: 0.1, y: 0.2, span: 0.001 }, iterations: 2048, depth: 0, juliaX: -0.8, juliaY: 0.156, stroke: 1.1, script: EXAMPLES.dragon.source, orbit: { yaw: 0.65, pitch: 0.38 }, runBatch: 1 };
+  assert.deepEqual(validateState(JSON.parse(JSON.stringify(saved))), saved);
 });
 console.log(`${checks} fractal test groups passed.`);

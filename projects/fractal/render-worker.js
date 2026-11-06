@@ -1,4 +1,4 @@
-import { PALETTES, buildModel, colorAt, curveSegments, escapePoint, gasketContains } from "./core.js?v=2";
+import { PALETTES, buildModel, carpetContains, colorAt, curveSegments, escapePoint, gasketContains, planarDetail } from "./core.js?v=3";
 import { isSolid, solidBasis, solidDetail, solidPixel } from "./solid.js?v=2";
 
 let current = 0;
@@ -37,7 +37,7 @@ async function render({ id, state, width, height, pixelRatio }) {
   const table = new Uint8Array(4096 * 3), colors = PALETTES[state.palette].colors;
   for (let i = 0; i < 4096; i += 1) table.set(colorAt(i / 4096 / 0.025, state.palette), i * 3);
   const units = state.camera.span / height, solid = isSolid(state.mode), basis = solidBasis(state.orbit), detail = solidDetail(state.mode, state.camera.span, height);
-  const triangleLevels = Math.max(1, Math.min(48, Math.ceil(Math.log2(height / state.camera.span)) + 1));
+  const planarLevels = planarDetail(state.mode, state.camera.span, height), planar = ["gasket", "carpet"].includes(state.mode);
   const tileHeight = solid ? 2 : 8;
   for (let top = 0; top < height; top += tileHeight) {
     if (id !== current) return;
@@ -49,8 +49,8 @@ async function render({ id, state, width, height, pixelRatio }) {
         if (solid) pixels.set(solidPixel(column, top + row, width, height, state, basis, detail, colors), pixel);
         else {
           const real = state.camera.x + (column + 0.5 - width / 2) * units;
-          if (state.mode === "gasket") {
-            const inside = gasketContains(real, imaginary, triangleLevels), mix = Math.max(0, Math.min(1, real));
+          if (planar) {
+            const inside = (state.mode === "carpet" ? carpetContains : gasketContains)(real, imaginary, planarLevels), mix = Math.max(0, Math.min(1, real));
             pixels.set(inside ? colors[2].map((n, i) => Math.round(n + (colors[4][i] - n) * mix)) : [16, 21, 23], pixel);
           } else {
             const value = escapePoint(real, imaginary, state.mode, state.iterations, state.juliaX, state.juliaY);
@@ -67,5 +67,5 @@ async function render({ id, state, width, height, pixelRatio }) {
     self.postMessage({ id, type: "tile", top, rows, width, buffer: pixels.buffer, progress: (top + rows) / height }, [pixels.buffer]);
     await breathe();
   }
-  if (id === current) self.postMessage({ id, type: "complete", stats: { milliseconds: performance.now() - started, precision: "double", width, height, pixelRatio, ...(solid ? detail : state.mode === "gasket" ? { levels: triangleLevels } : { iterations: state.iterations }) } });
+  if (id === current) self.postMessage({ id, type: "complete", stats: { milliseconds: performance.now() - started, precision: "double", width, height, pixelRatio, ...(solid ? detail : planar ? { levels: planarLevels } : { iterations: state.iterations }) } });
 }

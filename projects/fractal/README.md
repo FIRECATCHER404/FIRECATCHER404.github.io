@@ -19,9 +19,15 @@ the exposed canvas closes it. **Save PNG** exports the rendered canvas.
   squaring. All three use escape radius 2 and smooth escape coloring.
 - Menger sponge is a 3D cube subdivided into 20 retained corner/edge cubes
   at each level. A ray-marched distance bound reveals the visible holes.
+- Sierpinski carpet is its 2D counterpart: divide a square into nine smaller
+  squares and remove the center, repeating for each retained square.
 - Sierpinski tetrahedron uses four half-sized copies at its corners.
 - Sierpinski triangle is a separate automatic 2D preset with three corner copies.
 - Custom curves apply a script once per generation, beginning with a seed path.
+
+The picker groups each 3D fractal with its 2D counterpart. Both 2D presets
+support pan, cursor/pinch zoom, palettes, saved locations, and PNG export.
+Their recursive detail follows the current view automatically.
 
 Names, camera position and zoom, palette, iterations, Julia constant, generation
 count, line width, script, batch count, and 3D orientation are included in each saved location. Up to 50
@@ -98,7 +104,7 @@ move 0.25 0.4330127018922193
 There are no iteration, depth, distance, or quality controls. Preset detail
 is selected from the current viewport and zoom. Escape iteration budgets
 increase from roughly 512 up to 8192 as you zoom. Solid distance fields and
-the 2D triangle add recursive levels until their detail is subpixel sized
+the 2D carpet/triangle add recursive levels until their detail is subpixel sized
 (up to 48 levels in double precision). Only rays crossing the visible solid
 bounds are marched; no full recursive mesh is generated.
 
@@ -151,4 +157,5 @@ Mathematical references:
 [Mandelbrot set](https://mathworld.wolfram.com/MandelbrotSet.html),
 [Julia set](https://mathworld.wolfram.com/JuliaSet.html),
 [Menger sponge](https://mathworld.wolfram.com/MengerSponge.html),
+[Sierpinski carpet](https://mathworld.wolfram.com/SierpinskiCarpet.html),
 [Sierpinski tetrahedron](https://mathworld.wolfram.com/SierpinskiTetrahedron.html).

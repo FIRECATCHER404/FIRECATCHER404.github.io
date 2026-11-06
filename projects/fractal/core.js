@@ -37,6 +37,20 @@ export function gasketContains(x, y, levels) {
   }
   return true;
 }
+export function carpetContains(x, y, levels) {
+  if (x < 0 || x > 1 || y < 0 || y > 1) return false;
+  for (let i = 0; i < levels; i++) {
+    x *= 3; y *= 3;
+    const column = Math.floor(x), row = Math.floor(y);
+    if (column === 1 && row === 1) return false;
+    x -= column; y -= row;
+  }
+  return true;
+}
+export function planarDetail(mode, span, height) {
+  const base = mode === "carpet" ? 3 : 2;
+  return Math.max(1, Math.min(48, Math.ceil(Math.log(height / span) / Math.log(base)) + 1));
+}
 
 const IDENTITY = [1, 0, 0, 1, 0, 0];
 const numeric = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
@@ -222,7 +236,7 @@ export function colorAt(value, palette = "aurora") {
 }
 
 export function validateState(value) {
-  if (!value || !["mandelbrot", "julia", "ship", "gasket", "menger", "tetra", "script"].includes(value.mode) || !Object.keys(PALETTES).includes(value.palette)) throw new Error("Invalid saved fractal.");
+  if (!value || !["mandelbrot", "julia", "ship", "gasket", "carpet", "menger", "tetra", "script"].includes(value.mode) || !Object.keys(PALETTES).includes(value.palette)) throw new Error("Invalid saved fractal.");
   const camera = value.camera;
   if (!camera || ![camera.x, camera.y, camera.span].every(Number.isFinite) || Math.abs(camera.x) > 1e12 || Math.abs(camera.y) > 1e12 || camera.span < 1e-12 || camera.span > 1e12) throw new Error("Invalid saved location.");
   if (!Number.isInteger(value.iterations) || value.iterations < 64 || value.iterations > 8192 || !Number.isInteger(value.depth) || value.depth < 0 || value.depth > MAX_RUNS) throw new Error("Invalid saved detail setting.");

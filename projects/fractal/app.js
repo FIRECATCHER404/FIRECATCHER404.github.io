@@ -1,11 +1,11 @@
-import { EXAMPLES, advanceScript, automaticIterations, buildModel, fitCamera, screenToWorld, validateState, zoomCamera } from "./core.js?v=2";
-import { FractalRenderer } from "./renderer.js?v=2";
+import { EXAMPLES, advanceScript, automaticIterations, buildModel, fitCamera, screenToWorld, validateState, zoomCamera } from "./core.js?v=3";
+import { FractalRenderer } from "./renderer.js?v=3";
 import { DEFAULT_ORBIT, isSolid } from "./solid.js?v=2";
 
 const $ = id => document.getElementById(id);
 const viewport = $("viewport"), editor = $("script");
 const DRAFT_KEY = "neoj.fractal.draft.v1", VIEWS_KEY = "neoj.fractal.views.v1";
-const names = { mandelbrot: "Mandelbrot", julia: "Julia", ship: "Burning Ship", menger: "Menger sponge", tetra: "Sierpinski tetrahedron", gasket: "Sierpinski triangle", script: "Custom curve" };
+const names = { mandelbrot: "Mandelbrot", julia: "Julia", ship: "Burning Ship", menger: "Menger sponge", carpet: "Sierpinski carpet", tetra: "Sierpinski tetrahedron", gasket: "Sierpinski triangle", script: "Custom curve" };
 let state = { mode: "mandelbrot", palette: "aurora", camera: { x: -0.5, y: 0, span: 3.4 }, iterations: 512, juliaX: -0.8, juliaY: 0.156, depth: 0, stroke: 1.1, script: EXAMPLES.dragon.source, orbit: { ...DEFAULT_ORBIT }, runBatch: 1 };
 let restored = false, editorSource = state.script, views = [];
 try {
@@ -24,7 +24,7 @@ const renderer = new FractalRenderer(viewport, onRenderStatus);
 renderer.onInvalidate = () => requestRender();
 
 function homeCamera() {
-  const bounds = isSolid(state.mode) ? { minX: -1.65, maxX: 1.65, minY: -1.65, maxY: 1.65 } : state.mode === "gasket" ? { minX: 0, maxX: 1, minY: 0, maxY: Math.sqrt(3) / 2 } : state.mode === "script" ? model.bounds : state.mode === "julia" ? { minX: -1.8, maxX: 1.8, minY: -1.5, maxY: 1.5 } : state.mode === "ship" ? { minX: -2.2, maxX: 1.1, minY: -2, maxY: 1.1 } : { minX: -2.25, maxX: 0.9, minY: -1.35, maxY: 1.35 };
+  const bounds = isSolid(state.mode) ? { minX: -1.65, maxX: 1.65, minY: -1.65, maxY: 1.65 } : state.mode === "carpet" ? { minX: 0, maxX: 1, minY: 0, maxY: 1 } : state.mode === "gasket" ? { minX: 0, maxX: 1, minY: 0, maxY: Math.sqrt(3) / 2 } : state.mode === "script" ? model.bounds : state.mode === "julia" ? { minX: -1.8, maxX: 1.8, minY: -1.5, maxY: 1.5 } : state.mode === "ship" ? { minX: -2.2, maxX: 1.1, minY: -2, maxY: 1.1 } : { minX: -2.25, maxX: 0.9, minY: -1.35, maxY: 1.35 };
   return fitCamera(bounds, Math.max(1, viewport.clientWidth), Math.max(1, viewport.clientHeight));
 }
 function dirty() { return state.mode === "script" && editor.value !== state.script; }
@@ -69,7 +69,7 @@ function syncControls() {
   $("mode").value = state.mode; $("palette").value = state.palette;
   $("julia-controls").hidden = state.mode !== "julia";
   $("script-controls").hidden = state.mode !== "script";
-  $("coordinates").hidden = state.mode === "script" || state.mode === "gasket" || isSolid(state.mode);
+  $("coordinates").hidden = state.mode === "script" || ["gasket", "carpet"].includes(state.mode) || isSolid(state.mode);
   for (const [id, key] of [["julia-x", "juliaX"], ["julia-y", "juliaY"], ["stroke", "stroke"], ["run-count", "runBatch"]]) $(id).value = state[key];
   $("run-total").textContent = `${state.depth} ${state.depth === 1 ? "run" : "runs"} applied`;
   document.querySelector(".gesture-hint").textContent = isSolid(state.mode) ? "Drag to rotate · Shift-drag or two fingers to pan · Scroll or pinch to zoom" : "Drag to pan · Scroll or pinch to zoom";

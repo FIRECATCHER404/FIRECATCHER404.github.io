@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#242424">
-  <meta name="description" content="Explore Mandelbrot and Julia sets, a 3D Menger sponge and Sierpinski tetrahedron, or script your own recursive curves. Detail adapts automatically as you zoom.">
+  <meta name="description" content="Explore Mandelbrot and Julia sets, the Menger sponge and Sierpinski tetrahedron with their 2D carpet and triangle counterparts, or script your own recursive curves.">
   <title>Fractal Explorer</title>
   <link rel="preload" href="../../assets/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../../site.css">
   <link rel="stylesheet" href="app.css?v=2">
   <script src="/analytics.js" defer></script>
-  <script type="module" src="app.js?v=2"></script>
+  <script type="module" src="app.js?v=3"></script>
 </head>
 <body class="green-accent fractal-page">
   <header class="app-header">
@@ -27,9 +27,14 @@
           <option value="mandelbrot">Mandelbrot set</option>
           <option value="julia">Julia set</option>
           <option value="ship">Burning Ship</option>
-          <option value="menger">Menger sponge · 3D</option>
-          <option value="tetra">Sierpinski tetrahedron · 3D</option>
-          <option value="gasket">Sierpinski triangle · 2D</option>
+          <optgroup label="Menger sponge family">
+            <option value="menger">Menger sponge · 3D</option>
+            <option value="carpet">Sierpinski carpet · 2D</option>
+          </optgroup>
+          <optgroup label="Sierpinski tetrahedron family">
+            <option value="tetra">Sierpinski tetrahedron · 3D</option>
+            <option value="gasket">Sierpinski triangle · 2D</option>
+          </optgroup>
           <option value="script">Custom script</option>
         </select>
         <label for="palette">Palette</label>

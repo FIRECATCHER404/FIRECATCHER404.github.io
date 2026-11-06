@@ -1,4 +1,4 @@
-import { PALETTES } from "./core.js?v=2";
+import { PALETTES, planarDetail } from "./core.js?v=3";
 import { isSolid, solidBasis, solidDetail, solidFragmentSource } from "./solid.js?v=2";
 
 const vertexSource = "attribute vec2 a_position; void main(){gl_Position=vec4(a_position,0.0,1.0);}";
@@ -19,6 +19,17 @@ vec3 color(float value){
 }
 void main(){
   vec2 p=u_center+(gl_FragCoord.xy-u_resolution*0.5)*u_span/u_resolution.y;
+  if(u_mode==4){
+    vec2 point=p;
+    bool inside=min(point.x,point.y)>=0.0&&max(point.x,point.y)<=1.0;
+    for(int i=0;i<48;i++){
+      if(i>=u_iterations||!inside)break;
+      point*=3.0; vec2 cell=floor(point);
+      if(cell.x==1.0&&cell.y==1.0){inside=false;break;}
+      point-=cell;
+    }
+    gl_FragColor=vec4(inside?mix(u_colors[2],u_colors[4],clamp(p.x,0.0,1.0)):vec3(16.0,21.0,23.0)/255.0,1.0);return;
+  }
   if(u_mode==3){
     float c=p.y/0.866025403784,b=p.x-c*0.5,a=1.0-b-c;
     bool inside=min(a,min(b,c))>=0.0;
@@ -51,7 +62,7 @@ export class FractalRenderer {
     this.gpuCanvas = viewport.querySelector("#gpu-canvas");
     this.cpuCanvas = viewport.querySelector("#cpu-canvas");
     this.curveCanvas = viewport.querySelector("#curve-canvas");
-    this.worker = new Worker(new URL("./render-worker.js?v=2", import.meta.url), { type: "module" });
+    this.worker = new Worker(new URL("./render-worker.js?v=3", import.meta.url), { type: "module" });
     this.worker.onmessage = event => this.message(event.data);
     this.worker.onerror = () => this.onStatus({ busy: false, error: "The renderer could not start. Reload the page and try again." });
     this.id = 0;
@@ -128,11 +139,11 @@ export class FractalRenderer {
         gl.uniform1i(u.mode, state.mode === "menger" ? 0 : 1); gl.uniform1i(u.levels, detail.levels);
         gl.uniform3fv(u.right, basis.right); gl.uniform3fv(u.up, basis.up); gl.uniform3fv(u.back, basis.back);
       } else {
-        const levels = Math.max(1, Math.min(48, Math.ceil(Math.log2(canvas.height / state.camera.span)) + 1));
-        gl.uniform1i(u.mode, state.mode === "julia" ? 1 : state.mode === "ship" ? 2 : state.mode === "gasket" ? 3 : 0);
-        gl.uniform1i(u.iterations, state.mode === "gasket" ? levels : state.iterations);
+        const levels = planarDetail(state.mode, state.camera.span, canvas.height), planar = ["gasket", "carpet"].includes(state.mode);
+        gl.uniform1i(u.mode, state.mode === "julia" ? 1 : state.mode === "ship" ? 2 : state.mode === "gasket" ? 3 : state.mode === "carpet" ? 4 : 0);
+        gl.uniform1i(u.iterations, planar ? levels : state.iterations);
         gl.uniform2f(u.julia, state.juliaX, state.juliaY);
-        detail = { ...(state.mode === "gasket" ? { levels } : { iterations: state.iterations }) };
+        detail = { ...(planar ? { levels } : { iterations: state.iterations }) };
       }
       gl.uniform3fv(u["colors[0]"], new Float32Array(PALETTES[state.palette].colors.flat().map(value => value / 255)));
       gl.drawArrays(gl.TRIANGLES, 0, 3);
