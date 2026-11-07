@@ -28,9 +28,9 @@ The app lives in `projects/orbit/`. See its [controls and physics notes](project
 
 ## Void Lab
 
-Open [Void Lab](https://firecatcher404.github.io/projects/void-lab/) to place material shapes in unbounded 3D space with independent mass, size, velocity, and spin. It has mutual gravity, convex rigid-body collisions, impact and compression fracture, grab/throw, camera follow, undo/redo, device drafts, and portable `.void` files. Mass and size derive compact objects and their horizons automatically; mass also drives background light bending, with no lensing amount or black-hole switch.
+Open [Void Lab](https://firecatcher404.github.io/projects/void-lab/) to place material shapes in unbounded 3D space with independent mass, size, velocity, and spin. It has inverse-square mutual gravity, round-sphere and convex collisions, contact-local chipping and irregular fracture, grab/throw, camera follow, undo/redo, device drafts, and portable `.void` files. Mass and size derive compact objects and their horizons automatically; mass also drives background light bending, with no lensing amount or black-hole switch.
 
-The app lives in `projects/void-lab/`. Its [controls and physics model](projects/void-lab/README.md) explain the Newtonian motion, Schwarzschild background-light approximation, illustrative material strengths, and finite browser limits. Run `node scripts/test-void-lab.mjs` for the native Rapier, conservation, geodesic, and persistence checks.
+The app lives in `projects/void-lab/`. Its [controls and physics model](projects/void-lab/README.md) explain the Newtonian motion, Schwarzschild background-light approximation, illustrative material strengths, and finite browser limits. Run `node scripts/test-void-lab.mjs` for the native Rapier, conservation, contact-fracture, timestep, geodesic, and persistence checks.
 
 ## Sprite Rig
 
