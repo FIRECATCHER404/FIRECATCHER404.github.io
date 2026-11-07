@@ -26,6 +26,12 @@ Open [Orbital Sandbox](https://firecatcher404.github.io/projects/orbit/) to buil
 
 The app lives in `projects/orbit/`. See its [controls and physics notes](projects/orbit/README.md), and run `node scripts/test-orbital-sandbox.mjs` for orbit stability, force, collision, persistence, and camera checks.
 
+## Sprite Rig
+
+Open [Sprite Rig](https://firecatcher404.github.io/projects/sprite-rig/) to attach bones to a sprite, pose a hierarchy with IK, paint skin weights, and animate with keyframes. It includes a sample character, undo/redo, browser draft recovery, portable `.spriterig` projects, transparent frame PNGs, animated PNGs, and sprite-sheet ZIPs with frame data.
+
+The buildless app lives in `projects/sprite-rig/`. See its [controls, format, and limits](projects/sprite-rig/README.md). Run `node scripts/test-sprite-rig.mjs` for transforms, skinning, IK, timeline, validation, and independent PNG/ZIP decoding checks (Python with Pillow is needed for the last group).
+
 ## Expressionful Skin Studio
 
 Open [Skin Studio](https://firecatcher404.github.io/projects/skin-studio/) to create animated Minecraft skin packs. It runs entirely in your browser with a dark interface, 3D player preview, frame uploads, rule builder, ZIP import/export, and a draft stored on your device. No server setup or account is required.

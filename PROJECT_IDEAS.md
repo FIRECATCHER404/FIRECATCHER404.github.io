@@ -18,3 +18,5 @@ Useful files, with a timeline, pitch controls, playback, and song export.
 
 Attach bones to sprites, pose them, and create animations. Include joint
 controls, keyframes, playback, and animation export.
+
+Website project: [Sprite Rig](projects/sprite-rig/).
