@@ -26,6 +26,12 @@ Open [Orbital Sandbox](https://firecatcher404.github.io/projects/orbit/) to buil
 
 The app lives in `projects/orbit/`. See its [controls and physics notes](projects/orbit/README.md), and run `node scripts/test-orbital-sandbox.mjs` for orbit stability, force, collision, persistence, and camera checks.
 
+## Void Lab
+
+Open [Void Lab](https://firecatcher404.github.io/projects/void-lab/) to place material shapes in unbounded 3D space with independent mass, size, velocity, and spin. It has mutual gravity, convex rigid-body collisions, impact and compression fracture, grab/throw, camera follow, undo/redo, device drafts, and portable `.void` files. Mass and size derive compact objects and their horizons automatically; mass also drives background light bending, with no lensing amount or black-hole switch.
+
+The app lives in `projects/void-lab/`. Its [controls and physics model](projects/void-lab/README.md) explain the Newtonian motion, Schwarzschild background-light approximation, illustrative material strengths, and finite browser limits. Run `node scripts/test-void-lab.mjs` for the native Rapier, conservation, geodesic, and persistence checks.
+
 ## Sprite Rig
 
 Open [Sprite Rig](https://firecatcher404.github.io/projects/sprite-rig/) to turn 3D bone motion into 2D deformation on a fixed flat sprite plane. Move and rotate bones in XYZ, pose with 3D IK, orbit the camera, choose smooth mesh or per-pixel binding for pixel art, paint weights, and animate with quaternion keyframes. It includes a sample character, undo/redo, browser draft recovery, portable `.spriterig` projects with automatic 2D upgrades, and transparent PNG, animated PNG, and sprite-sheet exports from the fixed front view.
