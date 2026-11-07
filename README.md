@@ -22,7 +22,7 @@ The app lives in `projects/fractal/`; its [language reference](projects/fractal/
 
 ## Orbital Sandbox
 
-Open [Orbital Sandbox](https://firecatcher404.github.io/projects/orbit/) to build miniature solar systems. Drag to launch bodies, add circular starting orbits around a selected body, edit masses and velocities, and follow orbital trails. It includes solar-system, planet-and-moon, binary-star, and empty presets, pause/step/speed controls, undo, and local `.orbit` save files.
+Open [Orbital Sandbox](https://firecatcher404.github.io/projects/orbit/) to build 3D solar systems with mutual gravity between every pair of bodies. Rotate the perspective view, place bodies at different heights, add tilted orbits, edit XYZ positions/velocities, and follow trails through space. It includes solar-system, planet-and-moon, binary-star, and empty presets, pause/step/speed controls, undo, and local `.orbit` save files; old 2D files upgrade automatically.
 
 The app lives in `projects/orbit/`. See its [controls and physics notes](projects/orbit/README.md), and run `node scripts/test-orbital-sandbox.mjs` for orbit stability, force, collision, persistence, and camera checks.
 
