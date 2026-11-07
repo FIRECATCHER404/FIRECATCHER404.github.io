@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="en"><head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#242424">
-  <meta name="description" content="Rig a sprite with bones, paint its weights, pose it, and animate it with keyframes. Export transparent animations and sprite sheets, right in your browser.">
+  <meta name="description" content="Animate a camera-facing sprite with a 3D skeleton. Move joints in XYZ, pose with 3D IK, and export transparent animations and sprite sheets.">
   <title>Sprite Rig</title><link rel="canonical" href="https://firecatcher404.github.io/projects/sprite-rig/">
-  <link rel="preload" href="../../assets/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="../../site.css"><link rel="stylesheet" href="app.css">
-  <script src="/analytics.js" defer></script><script type="module" src="app.js"></script>
+  <link rel="preload" href="../../assets/fonts/atkinson-hyperlegible-next-latin.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="../../site.css"><link rel="stylesheet" href="app.css?v=2">
+  <script src="/analytics.js" defer></script><script type="module" src="app.js?v=2"></script>
 </head><body class="green-accent rig-page">
-  <header><a href="../" class="back">← <span>Projects</span></a><h1>Sprite Rig</h1><button id="controls-toggle" aria-controls="controls" aria-expanded="false">Controls</button><button id="play" class="primary">Play</button></header>
+  <header><a href="../" class="back">← <span>Projects</span></a><h1>Sprite Rig <span class="dimension-label">3D</span></h1><button id="controls-toggle" aria-controls="controls" aria-expanded="false">Controls</button><button id="play" class="primary">Play</button></header>
   <div class="app-shell">
     <aside id="controls" aria-label="Rig controls">
       <section><div class="section-heading"><h2>Sprite</h2><span id="image-size" class="mono"></span></div>
@@ -18,7 +18,8 @@
         <div class="modes" role="group" aria-label="Editor mode"><button data-mode="rig" aria-pressed="false">Rig</button><button data-mode="pose" aria-pressed="true">Pose</button><button data-mode="weights" aria-pressed="false">Weights</button></div>
         <p id="mode-help" class="hint"></p>
         <div id="rig-tools"><div class="joined" role="group" aria-label="Rig tool"><button data-tool="draw" aria-pressed="true">Draw bone</button><button data-tool="select" aria-pressed="false">Select joints</button></div><label class="check"><input id="attach" type="checkbox" checked> Attach to selected bone</label></div>
-        <div id="pose-tools"><label class="check"><input id="reach" type="checkbox" checked> Reach through parent joints</label><label class="check"><input id="auto-key" type="checkbox" checked> Auto key on edit</label><button id="reset-pose">Reset pose</button></div>
+        <div id="pose-tools"><label for="pose-tool">Pose tool</label><select id="pose-tool"><option value="reach">Reach joint (IK)</option><option value="move">Move bone</option><option value="rotate">Rotate bone</option></select><label class="check"><input id="reach" type="checkbox" checked> Reach through parent joints</label><label class="check"><input id="auto-key" type="checkbox" checked> Auto key on edit</label><button id="reset-pose">Reset pose</button></div>
+        <label for="axis">Drag axis</label><select id="axis"><option value="view">View plane / free rotation</option><option value="x">X · horizontal</option><option value="y">Y · vertical</option><option value="z">Z · depth</option></select><p class="hint">Drag the colored XYZ handles, or hold Shift to drag in depth. Positive Z goes away from the front camera.</p>
         <div id="weight-tools"><label for="brush-radius">Brush radius <output id="radius-value">30 px</output></label><input id="brush-radius" type="range" min="4" max="160" value="30"><label for="brush-strength">Strength</label><input id="brush-strength" type="range" min="0.05" max="1" step="0.05" value="0.3"><label class="check"><input id="erase" type="checkbox"> Erase weight</label><p class="hint">Bright green follows the selected bone. Paint in the rest pose; hold Shift to erase.</p></div>
         <div class="joined"><button id="bind">Bind weights</button><span id="weight-status" class="hint"></span></div>
       </section>
@@ -26,8 +27,9 @@
         <form id="bone-form" hidden>
           <label for="bone-name">Bone name</label><input id="bone-name" maxlength="48" required>
           <label for="bone-parent">Parent</label><select id="bone-parent"></select>
-          <div class="pair"><div><label for="bone-radius">Influence (px)</label><input id="bone-radius" type="number" min="1" max="2048" step="any" required></div><div><label for="bone-angle">Pose angle (°)</label><input id="bone-angle" type="number" min="-180" max="180" step="any" required></div></div>
-          <div id="root-offset" class="pair"><div><label for="offset-x">Pose offset X</label><input id="offset-x" type="number" min="-32768" max="32768" step="any" required></div><div><label for="offset-y">Pose offset Y</label><input id="offset-y" type="number" min="-32768" max="32768" step="any" required></div></div>
+          <label for="bone-radius">Influence (px)</label><input id="bone-radius" type="number" min="1" max="2048" step="any" required>
+          <p class="field-label">Rotation (degrees)</p><div class="triple"><div><label for="angle-x">X</label><input id="angle-x" type="number" min="-180" max="180" step="any" required></div><div><label for="angle-y">Y</label><input id="angle-y" type="number" min="-180" max="180" step="any" required></div><div><label for="angle-z">Z</label><input id="angle-z" type="number" min="-180" max="180" step="any" required></div></div>
+          <p id="offset-label" class="field-label">Pose offset (parent space)</p><div class="triple"><div><label for="offset-x">X</label><input id="offset-x" aria-label="Offset X" type="number" min="-32768" max="32768" step="any" required></div><div><label for="offset-y">Y</label><input id="offset-y" aria-label="Offset Y" type="number" min="-32768" max="32768" step="any" required></div><div><label for="offset-z">Z</label><input id="offset-z" aria-label="Offset Z" type="number" min="-32768" max="32768" step="any" required></div></div><p id="depth-info" class="hint mono"></p>
           <div class="joined"><button type="submit" class="primary">Apply</button><button type="button" id="delete-bone">Delete branch</button></div>
         </form>
       </section>
@@ -35,13 +37,14 @@
       <section><h2>Files &amp; export</h2><div class="joined"><button id="save">Save project</button><button id="open">Open project</button></div><input id="project-file" type="file" accept=".spriterig,.json,application/json" hidden>
         <label for="export-scale">Export scale</label><select id="export-scale"><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
         <div class="exports"><button id="export-png">Current frame PNG</button><button id="export-sheet">Sprite sheet + JSON</button><button id="export-animation">Animated PNG</button></div>
-        <p class="hint">Exports have a transparent background. Projects and drafts stay on this device.</p><p id="storage-status" class="hint" role="status"></p>
+        <p class="hint">Exports use the current 3D camera view with a transparent background. Projects and drafts stay on this device.</p><p id="storage-status" class="hint" role="status"></p>
       </section>
     </aside>
     <main class="workspace">
-      <div class="canvas-toolbar"><div class="joined"><button id="undo" disabled title="Undo (Ctrl+Z)">Undo</button><button id="redo" disabled title="Redo (Ctrl+Shift+Z)">Redo</button></div><div class="joined"><label class="check"><input id="show-bones" type="checkbox" checked> Bones</label><label class="check"><input id="pixelated" type="checkbox"> Crisp</label><button id="fit" title="Fit sprite (Home)">Fit</button></div></div>
-      <div id="viewport" tabindex="0" aria-label="Sprite canvas. Drag bone tips to pose. Scroll or pinch to zoom; right-drag or two fingers to pan."><canvas id="art" aria-hidden="true"></canvas><canvas id="overlay" aria-hidden="true"></canvas><div id="canvas-hint"></div><div id="zoom-label" class="mono"></div></div>
-      <div class="timeline"><div class="timeline-actions"><div class="joined"><button id="previous-key" aria-label="Previous keyframe">‹</button><button id="next-key" aria-label="Next keyframe">›</button><span class="mono" id="frame-label"></span></div><div class="joined"><button id="add-key" class="primary">Add key</button><button id="delete-key">Delete key</button></div></div><div id="timeline-track"><input id="playhead" type="range" min="0" max="47" value="0" step="1" aria-label="Animation frame"><div id="key-markers"></div></div><p class="hint">Space plays · arrows step · Home fits · right-drag pans · scroll zooms</p></div>
+      <div class="canvas-toolbar"><div class="joined"><button id="undo" disabled title="Undo (Ctrl+Z)">Undo</button><button id="redo" disabled title="Redo (Ctrl+Shift+Z)">Redo</button><button id="orbit-view" aria-pressed="false">Orbit view</button></div><div class="joined"><label class="check"><input id="show-bones" type="checkbox" checked> Bones</label><label class="check"><input id="show-grid" type="checkbox" checked> Grid</label><label class="check"><input id="pixelated" type="checkbox"> Crisp</label><button id="fit" title="Fit sprite (Home)">Fit</button></div></div>
+      <div class="view-presets" role="group" aria-label="Camera views"><button data-view="front">Front</button><button data-view="side">Side</button><button data-view="top">Top</button><button data-view="angle">Angle</button></div>
+      <div id="viewport" tabindex="0" aria-label="3D sprite canvas. Drag bone tips to pose; colored handles move on world X, Y, and Z. Right-drag or Orbit view rotates the camera. Shift-right-drag or two fingers pans. Scroll or pinch zooms."><canvas id="scene" aria-hidden="true"></canvas><canvas id="art" aria-hidden="true"></canvas><canvas id="overlay" aria-hidden="true"></canvas><div id="canvas-hint"></div><div id="zoom-label" class="mono"></div></div>
+      <div class="timeline"><div class="timeline-actions"><div class="joined"><button id="previous-key" aria-label="Previous keyframe">‹</button><button id="next-key" aria-label="Next keyframe">›</button><span class="mono" id="frame-label"></span></div><div class="joined"><button id="add-key" class="primary">Add key</button><button id="delete-key">Delete key</button></div></div><div id="timeline-track"><input id="playhead" type="range" min="0" max="47" value="0" step="1" aria-label="Animation frame"><div id="key-markers"></div></div><p class="hint">Space plays · arrows step · Home fits · right-drag orbits · Shift-right-drag pans</p></div>
       <p id="status" role="status" aria-live="polite">Loading editor…</p>
     </main>
   </div>

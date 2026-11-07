@@ -28,9 +28,9 @@ The app lives in `projects/orbit/`. See its [controls and physics notes](project
 
 ## Sprite Rig
 
-Open [Sprite Rig](https://firecatcher404.github.io/projects/sprite-rig/) to attach bones to a sprite, pose a hierarchy with IK, paint skin weights, and animate with keyframes. It includes a sample character, undo/redo, browser draft recovery, portable `.spriterig` projects, transparent frame PNGs, animated PNGs, and sprite-sheet ZIPs with frame data.
+Open [Sprite Rig](https://firecatcher404.github.io/projects/sprite-rig/) to animate a camera-facing sprite with a 3D skeleton. Move and rotate bones in XYZ, pose with 3D IK, orbit the camera, paint skin weights, and animate with quaternion keyframes. It includes a sample character, undo/redo, browser draft recovery, portable `.spriterig` projects with automatic 2D upgrades, and transparent PNG, animated PNG, and sprite-sheet exports from the chosen 3D view.
 
-The buildless app lives in `projects/sprite-rig/`. See its [controls, format, and limits](projects/sprite-rig/README.md). Run `node scripts/test-sprite-rig.mjs` for transforms, skinning, IK, timeline, validation, and independent PNG/ZIP decoding checks (Python with Pillow is needed for the last group).
+The buildless app lives in `projects/sprite-rig/`. See its [controls, format, and limits](projects/sprite-rig/README.md). Run `node scripts/test-sprite-rig.mjs` for 3D transforms, billboards, camera math, IK, timeline, migration/validation, and independent PNG/ZIP decoding checks (Python with Pillow is needed for the last group).
 
 ## Expressionful Skin Studio
 

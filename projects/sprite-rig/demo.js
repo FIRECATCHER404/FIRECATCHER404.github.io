@@ -1,4 +1,5 @@
-import {newProject,addBone,cleanPose,upsertKey,makeGrid} from './core.js';
+import {newProject,addBone,cleanPose,upsertKey,makeGrid} from './core.js?v=2';
+import {fromEuler} from './spatial.js?v=2';
 export async function exampleProject(){
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="256" height="320" viewBox="0 0 256 320"><g stroke="#21372b" stroke-width="5" stroke-linejoin="round"><g fill="none" stroke-linecap="round"><path d="M98 118L73 157L57 205M158 118L183 157L199 205" stroke-width="26"/><path d="M111 180L104 232L99 283M145 180L152 232L157 283" stroke-width="30"/><path d="M98 118L73 157L57 205M158 118L183 157L199 205" stroke="#8fae78" stroke-width="17"/><path d="M111 180L104 232L99 283M145 180L152 232L157 283" stroke="#71925f" stroke-width="21"/></g><g fill="#c1d5a4"><circle cx="73" cy="157" r="12"/><circle cx="183" cy="157" r="12"/><circle cx="104" cy="232" r="13"/><circle cx="152" cy="232" r="13"/><circle cx="57" cy="205" r="13"/><circle cx="199" cy="205" r="13"/></g><path fill="#88aa72" d="M109 95H147V124H109Z"/><rect x="94" y="106" width="68" height="82" rx="19" fill="#8fae78"/><rect x="106" y="123" width="44" height="36" rx="9" fill="#d6e3bf"/><path d="M115 142h8l5-10 5 18 5-8h5" fill="none" stroke="#447a41" stroke-width="3"/><rect x="91" y="32" width="74" height="67" rx="25" fill="#c1d5a4"/><path d="M128 32V20" fill="none"/><circle cx="128" cy="17" r="6" fill="#b5cb8f"/><rect x="100" y="49" width="56" height="27" rx="12" fill="#273c30"/><g fill="#d7f0b3" stroke="none"><rect x="111" y="57" width="7" height="11" rx="3"/><rect x="138" y="57" width="7" height="11" rx="3"/></g><path d="M119 86h18" fill="none" stroke-width="3" stroke-linecap="round"/><path d="M83 278Q97 270 108 280L109 294H80Z M148 280Q160 270 174 278L177 294H147Z" fill="#c1d5a4"/></g></svg>`;
   const source=new Image();source.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);await source.decode();const canvas=document.createElement('canvas');canvas.width=256;canvas.height=320;canvas.getContext('2d').drawImage(source,0,0);
@@ -13,6 +14,6 @@ export async function exampleProject(){
     if(y>188)return blend(x<128?7:9,x<128?8:10,(y-220)/24);
     return[{id:1,w:1}];
   });project.autoWeights=false;
-  for(const [frame,head,upper,lower]of [[0,-.05,-.85,-1.4],[12,.07,-1.2,-.7],[24,-.05,-.85,-1.4],[36,.07,-1.2,-.7]]){const pose=cleanPose(project.bones);pose[2].r=head;pose[5].r=upper;pose[6].r=lower;upsertKey(project,frame,pose);}
+  for(const [frame,head,upper,lower,depth]of [[0,-.05,-.85,-1.4,-.45],[12,.07,-1.2,-.7,.55],[24,-.05,-.85,-1.4,-.45],[36,.07,-1.2,-.7,.55]]){const pose=cleanPose(project.bones);pose[2].q=fromEuler(.05,depth*.25,head);pose[5].q=fromEuler(0,depth,upper);pose[6].q=fromEuler(0,-depth*.6,lower);upsertKey(project,frame,pose);}
   project.pose=structuredClone(project.animation.keys[0].pose);return project;
 }
