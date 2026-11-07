@@ -29,7 +29,8 @@ and open `/projects/orbit/`.
   advances one sixtieth of a simulation time unit. Time speed runs from ¼× to 16×.
   Canvas keyboard shortcuts do not capture typing in inputs.
 - The selected-body form edits name, mass, XYZ position, and XYZ velocity. Apply changes
-  commits all fields together. Delete removes the body. Follow centers the
+  commits only the edited fields together; unchanged positions and velocities
+  keep their current simulation values. Delete removes the body. Follow centers the
   camera on it. Trails can be hidden or cleared.
 - Undo restores the system to just before the last placement, body edit,
   deletion, preset load, or import, including that moment's simulation time.

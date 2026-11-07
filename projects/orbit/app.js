@@ -7,6 +7,7 @@ let simulation = new Simulation(preset("solar"));
 let settings = { camera:{...DEFAULT_CAMERA}, selectedId:1, tool:"select", bodyType:"planet", newMass:4, newColor:BODY_TYPES.planet.color, speed:1, paused:false, trails:true, follow:false, clockwise:false, preset:"solar", placementZ:0, launchVz:0, orbitTilt:0, grid:true };
 let restored = false, dirty = false, undo = [], accumulator = 0, previousFrame = 0, lastUI = 0, lastSave = 0, saveTimer = 0, noticeUntil = 0, preview = null, gesture = null, pinch = null, capacity = false;
 const pointers = new Map();
+const editedFields=new Set();
 const selected = () => simulation.bodies.find(body=>body.id===settings.selectedId);
 function pack() { return { format:"neoj-orbit", version:2, scene:simulation.toJSON(), settings:structuredClone(settings) }; }
 try { const value = localStorage.getItem(STORAGE); if (value) { const checked = validateProject(JSON.parse(value)); simulation = checked.simulation; settings = checked.settings; restored = true; } }
@@ -46,7 +47,7 @@ function syncInspector(force = false) {
   if (force || (!dirty && !form.contains(document.activeElement))) {
     $("body-name").value = body.name; $("body-mass").value = body.mass;
     for(const key of ["x","y","z","vx","vy","vz"])$("body-"+key).value=Number(body[key].toPrecision(8));
-    dirty = false; $("apply-body").textContent = "Apply changes";
+    dirty = false; editedFields.clear(); $("apply-body").textContent = "Apply changes";
   }
 }
 function updateUI() {
@@ -95,11 +96,12 @@ $("load-preset").addEventListener("click",()=>{
   settings.tool=settings.preset==="empty"?"place":"select";settings.placementZ=0;settings.launchVz=0;settings.orbitTilt=0; dirty=false; preview=null; accumulator=0; syncControls(); scheduleSave(); notify("Starting system loaded.");
 });
 $("undo").addEventListener("click",()=>{ if (undo.length) { restoreProject(undo.pop()); $("undo").disabled=!undo.length; notify("Last edit undone."); } });
-form.addEventListener("input",event=>{ if(event.target.type!=="checkbox")dirty=true; });
+form.addEventListener("input",event=>{if(event.target.type!=="checkbox"){dirty=true;editedFields.add(event.target.id.slice(5));}});
 form.addEventListener("submit",event=>{
-  event.preventDefault(); if (!selected() || !form.reportValidity()) return;
+  event.preventDefault(); if (!selected() || !form.reportValidity() || !editedFields.size) return;
   try {
-    const before=pack(), merged=simulation.edit(settings.selectedId,{name:$("body-name").value.trim(),mass:$("body-mass").valueAsNumber,...Object.fromEntries(["x","y","z","vx","vy","vz"].map(key=>[key,$("body-"+key).valueAsNumber]))});
+    const changes=Object.fromEntries([...editedFields].map(key=>[key,key==="name"?$("body-name").value.trim():$("body-"+key).valueAsNumber]));
+    const before=pack(), merged=simulation.edit(settings.selectedId,changes);
     undo.push(before); if (undo.length>30) undo.shift(); $("undo").disabled=false;
     followMerges(merged); dirty=false; syncControls(); scheduleSave(); notify("Body updated.");
   } catch (error) { notify(error.message); }
