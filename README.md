@@ -20,6 +20,12 @@ Open [Fractal Explorer](https://firecatcher404.github.io/projects/fractal/) to e
 
 The app lives in `projects/fractal/`; its [language reference](projects/fractal/README.md) describes the scripting rules and rendering limits. Run `node scripts/test-fractal-explorer.mjs` for the math, parser, saved-state, and camera checks. Future selected ideas are recorded in [PROJECT_IDEAS.md](PROJECT_IDEAS.md).
 
+## Isometric Map Maker
+
+Open [Isometric Map Maker](https://firecatcher404.github.io/projects/isometric/) to build small illustrated worlds with flat colors, softly beveled props, and an orthographic view. Paint terrain, raise hills, place and rotate buildings or decorations, and export clean PNGs with optional transparency. Includes example scenes, undo/redo, local drafts, portable `.isomap` files, and touch controls.
+
+The buildless app lives in `projects/isometric/`. See its [controls and file notes](projects/isometric/README.md); run `node scripts/test-isometric-map.mjs` for geometry, placement, validation, and camera checks.
+
 ## Orbital Sandbox
 
 Open [Orbital Sandbox](https://firecatcher404.github.io/projects/orbit/) to build 3D solar systems with mutual gravity between every pair of bodies. Rotate the perspective view, place bodies at different heights, add tilted orbits, edit XYZ positions/velocities, and follow trails through space. It includes solar-system, planet-and-moon, binary-star, and empty presets, pause/step/speed controls, undo, and local `.orbit` save files; old 2D files upgrade automatically.

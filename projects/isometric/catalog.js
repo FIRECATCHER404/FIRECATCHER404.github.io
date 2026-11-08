@@ -1,0 +1,10 @@
+export const TERRAIN={
+  grass:{name:'Meadow',color:'#91b778',side:'#b6ae94'},path:{name:'Path',color:'#dcca9d',side:'#b7a58a'},water:{name:'Water',color:'#74bfc7',side:'#a3b5ad'},sand:{name:'Sand',color:'#e7d6ac',side:'#c3b28f'},stone:{name:'Stone',color:'#b6c3bd',side:'#929f9c'},snow:{name:'Snow',color:'#e8eee5',side:'#bdcac5'},road:{name:'Road',color:'#697a7b',side:'#9ca8a0'},wood:{name:'Deck',color:'#c49c74',side:'#a68a6c'}
+};
+export const ASSETS={
+  oak:{name:'Oak tree',category:'nature',w:1,d:1,color:'#86a86c'},pine:{name:'Pine tree',category:'nature',w:1,d:1,color:'#648e79'},bush:{name:'Bush',category:'nature',w:1,d:1,color:'#91ae68'},flowers:{name:'Flowers',category:'nature',w:1,d:1,color:'#e7b66f'},rock:{name:'Boulder',category:'nature',w:1,d:1,color:'#a9b9b4',any:true},lily:{name:'Water lily',category:'nature',w:1,d:1,color:'#90b284',water:true},
+  house:{name:'Cottage',category:'build',w:2,d:2,color:'#c1856a'},cabin:{name:'Cabin',category:'build',w:2,d:2,color:'#7e9b88'},shop:{name:'Corner shop',category:'build',w:2,d:2,color:'#d9ae72'},wall:{name:'Wall',category:'build',w:1,d:1,color:'#c6bda9'},fence:{name:'Fence',category:'build',w:1,d:1,color:'#b3916a'},stairs:{name:'Stairs',category:'build',w:1,d:2,color:'#c8c8b5'},bridge:{name:'Bridge',category:'build',w:1,d:3,color:'#bd9570'},
+  bench:{name:'Bench',category:'props',w:2,d:1,color:'#b68c65'},lamp:{name:'Street lamp',category:'props',w:1,d:1,color:'#647c7a'},crate:{name:'Crate',category:'props',w:1,d:1,color:'#c7a075'},car:{name:'Little car',category:'props',w:1,d:2,color:'#d8b368'},sign:{name:'Signpost',category:'props',w:1,d:1,color:'#8ca19a'},duck:{name:'Duck',category:'props',w:1,d:1,color:'#f2dda0',any:true}
+};
+export const SWATCHES=['#91b778','#d6b572','#c98874','#80aaa9','#ad9dbb','#e5dcc5'];
+export const THEMES={day:{name:'Daylight',background:'#dce5d5',sun:'#fff0d0',light:3.2,ambient:2.7},dusk:{name:'Evening',background:'#d6cdd4',sun:'#ffcfac',light:2.6,ambient:2.3},night:{name:'Blue hour',background:'#344c59',sun:'#c1d9ed',light:1.5,ambient:1.8}};

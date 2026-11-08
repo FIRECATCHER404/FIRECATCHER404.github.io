@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#252925"><meta name="description" content="Build little isometric worlds. Paint terrain, place trees and buildings, and export your map as an image.">
+  <title>Isometric Map Maker</title><link rel="stylesheet" href="style.css"><script src="/analytics.js" defer></script><script type="module" src="app.js"></script>
+</head>
+<body>
+<header>
+  <a class="back" href="../index.html" aria-label="Back to projects">←</a>
+  <div class="identity"><h1>Isometric<span class="dot">.</span></h1><span id="map-title">A little world, your way.</span></div>
+  <div class="header-actions">
+    <button id="palette-toggle" aria-controls="palette" aria-expanded="true">＋ Pieces</button>
+    <details id="scene-menu" class="menu"><summary>Scene <span>⌄</span></summary><div class="dropdown scene-options">
+      <span class="eyebrow">START SOMEWHERE</span>
+      <button data-preset="village">Willow Bend <small>A village by the river</small></button>
+      <button data-preset="garden">Quiet Garden <small>Water, trees, a little space</small></button>
+      <button data-preset="street">Sunday Street <small>A sleepy neighborhood</small></button>
+      <button data-preset="terrace">Hilltop <small>A landscape in layers</small></button>
+      <button data-preset="empty">Blank island</button><hr>
+      <button id="save">Save map <kbd>Ctrl S</kbd></button><button id="open">Open map…</button><button id="settings-toggle">Map settings…</button>
+    </div></details>
+    <div class="history"><button id="undo" aria-label="Undo" title="Undo (Ctrl Z)">↶</button><button id="redo" aria-label="Redo" title="Redo (Ctrl Shift Z)">↷</button></div>
+    <div class="export-group"><button id="export" class="primary">Export PNG <span>↗</span></button><details class="menu" id="export-menu"><summary aria-label="Export options">⌄</summary><div class="dropdown export-options"><label for="resolution">Image size</label><select id="resolution"><option value="1024">1024 × 1024</option><option value="2048" selected>2048 × 2048</option><option value="3072">3072 × 3072</option></select><label class="check"><input type="checkbox" id="transparent"> Transparent background</label><p>Just your world. No controls or guides.</p></div></details></div>
+  </div>
+</header>
+<main id="workspace">
+  <canvas id="world" aria-label="Isometric map canvas. Choose a piece and click or drag to build. Use the Hand tool to move the view." tabindex="0"></canvas>
+  <div id="unavailable" hidden><h2>This world needs WebGL 2.</h2><p>Try a browser with hardware acceleration enabled.</p><a href="../index.html">Back to projects</a></div>
+  <aside id="palette" class="panel">
+    <div class="panel-heading"><span class="eyebrow">LITTLE WORLD, BIG IDEAS</span><button id="palette-close" aria-label="Close pieces">×</button></div>
+    <nav class="categories" aria-label="Piece categories"><button data-category="terrain" aria-pressed="true">Terrain</button><button data-category="nature" aria-pressed="false">Nature</button><button data-category="build" aria-pressed="false">Build</button><button data-category="props" aria-pressed="false">Props</button></nav>
+    <div id="pieces" class="pieces"></div>
+    <div id="brush-options" class="palette-options"><span class="muted">Brush</span><button data-brush="1" aria-pressed="true">1 × 1</button><button data-brush="3" aria-pressed="false">3 × 3</button><button id="fill" title="Fill connected terrain">Fill</button></div>
+    <div id="prop-options" class="palette-options" hidden><button id="rotate-piece">↻ Rotate <kbd>R</kbd></button><span id="footprint" class="muted"></span></div>
+    <div id="tint-options" hidden><span class="eyebrow">A LITTLE COLOR</span><div id="swatches" class="swatches"></div></div>
+    <p class="palette-help" id="palette-help">Paint a path. Raise a hill. Make it yours.</p>
+  </aside>
+  <section id="inspector" class="panel" hidden aria-label="Selected prop"><div class="panel-heading"><strong id="selected-name">Selected</strong><button id="deselect" aria-label="Deselect prop">×</button></div><div class="inspector-actions"><button id="rotate-selected">↻ Rotate</button><button id="duplicate">Duplicate</button><button id="delete-selected">Delete</button></div></section>
+  <form id="settings" class="panel" hidden><div class="panel-heading"><strong>Map settings</strong><button type="button" id="settings-close" aria-label="Close settings">×</button></div><label for="map-name">Name</label><input id="map-name" maxlength="64" required><div class="dimensions"><label>Width <input id="map-width" type="number" min="4" max="32" required></label><label>Depth <input id="map-depth" type="number" min="4" max="32" required></label></div><p>4–32 tiles per side. Resizing keeps the top-left corner and crops pieces outside the map. You can undo it.</p><label for="theme">Light</label><select id="theme"><option value="day">Daylight</option><option value="dusk">Evening</option><option value="night">Blue hour</option></select><button class="primary" type="submit">Apply changes</button></form>
+  <div class="bottom-controls"><nav class="tool-strip" aria-label="Map tools"><button data-tool="paint" aria-pressed="true" title="Paint (B)"><span>▧</span>Paint</button><button data-tool="raise" aria-pressed="false" title="Raise terrain"><span>↑</span>Raise</button><button data-tool="lower" aria-pressed="false" title="Lower terrain"><span>↓</span>Lower</button><button data-tool="erase" aria-pressed="false" title="Erase (E)"><span>⌫</span>Erase</button><button data-tool="select" aria-pressed="false" title="Select and move props (V)"><span>↖</span>Select</button><button data-tool="hand" aria-pressed="false" title="Pan (H or Space + drag)"><span>✥</span>Hand</button></nav><div class="view-strip"><button id="turn-left" aria-label="Turn view left">↶</button><button id="fit" title="Fit map (Home)">Fit</button><button id="turn-right" aria-label="Turn view right">↷</button><span></span><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-in" aria-label="Zoom in">＋</button></div></div>
+  <span id="hint">Drag to build · scroll to zoom · space to pan</span><div id="toast" role="status" aria-live="polite"></div>
+</main>
+<input type="file" id="file" accept=".isomap,.json,application/json" hidden>
+</body></html>
