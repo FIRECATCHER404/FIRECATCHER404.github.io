@@ -1,0 +1,44 @@
+import{WALLS,SHAPES,PROPS,clone,clamp,convex,fitPortal,wallSpan,polygon}from'./space.js';
+export const PALETTES={chalk:{wall:'#dfdfd0',floor:'#b5c3b1',accent:'#557767'},clay:{wall:'#e4baa4',floor:'#bd8e78',accent:'#924e43'},dusk:{wall:'#c3bed6',floor:'#9394af',accent:'#5e5a85'},pool:{wall:'#bad7d1',floor:'#83aaa7',accent:'#376c72'},night:{wall:'#70838e',floor:'#405867',accent:'#d4ba80'}};
+export const newId=(items)=>{for(let i=1;i<1000;i++)if(!items.some(o=>o.id===i))return i;throw Error('No free IDs.');};
+export function createProject(){return{format:'elsewhere',version:1,name:'The folded house',start:1,rooms:[]};}
+export function addRoom(p,values={}){if(p.rooms.length>=12)throw Error('This building holds up to 12 rooms.');const r={id:newId(p.rooms),name:'Untitled room',width:10,depth:12,height:5,palette:'chalk',pattern:'grid',portals:[],props:[],...values};p.rooms.push(r);return r;}
+export function addPortal(p,r,values={}){if(p.rooms.flatMap(x=>x.portals).length>=40||r.portals.length>=8)throw Error('Limit: 8 portals per room, 40 per building.');const item=fitPortal(r,{id:newId(p.rooms.flatMap(x=>x.portals)),name:'Unfolded doorway',wall:'north',u:0,base:0,width:3,height:3.6,shape:'arch',corners:[[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]],scale:true,color:'#c1d994',link:null,...values});r.portals.push(item);return item;}
+export function addProp(r,type='plinth',values={}){if(r.props.length>=36)throw Error('A room holds up to 36 objects.');const id=newId(r.props),o={type,x:0,z:0,y:0,angle:0,size:1,color:'#c9b27f',solid:true,...values,id};r.props.push(o);return o;}
+export function unlink(p,a){if(a.link){const r=p.rooms.find(r=>r.id===a.link.room),b=r?.portals.find(b=>b.id===a.link.portal);if(b?.link?.portal===a.id)b.link=null;a.link=null;}}
+export function pair(p,ra,a,rb,b){if(a===b)throw Error('Choose a different portal surface.');unlink(p,a);unlink(p,b);b.scale=a.scale;a.link={room:rb.id,portal:b.id};b.link={room:ra.id,portal:a.id};}
+export function removePortal(p,r,item){unlink(p,item);r.portals=r.portals.filter(a=>a!==item);}
+export function removeRoom(p,r){if(p.rooms.length===1)throw Error('Keep at least one room.');for(const a of [...r.portals])removePortal(p,r,a);p.rooms=p.rooms.filter(x=>x!==r);if(p.start===r.id)p.start=p.rooms[0].id;}
+export function resizeRoom(r){for(const p of r.portals)fitPortal(r,p);for(const o of r.props){o.x=clamp(o.x,-r.width/2+.5,r.width/2-.5);o.z=clamp(o.z,-r.depth/2+.5,r.depth/2-.5);o.y=clamp(o.y,0,r.height-.3);}}
+export function checkedProject(raw){
+ const fail=m=>{throw Error('Invalid building: '+m);},num=(n,a,b)=>Number.isFinite(n)&&n>=a&&n<=b,id=n=>Number.isInteger(n)&&n>0&&n<1000,text=(s,n)=>typeof s==='string'&&s.trim().length>0&&s.length<=n,color=s=>typeof s==='string'&&/^#[0-9a-f]{6}$/i.test(s);
+ if(!raw||raw.format!=='elsewhere'||raw.version!==1||!text(raw.name,80)||!Array.isArray(raw.rooms)||raw.rooms.length<1||raw.rooms.length>12)fail('file header or room count.');
+ const p=clone(raw),ids=new Set(),portalIds=new Set();let count=0;
+ for(const r of p.rooms){if(!r||!id(r.id)||ids.has(r.id)||!text(r.name,48)||!num(r.width,4,32)||!num(r.depth,4,32)||!num(r.height,3,16)||!Object.hasOwn(PALETTES,r.palette)||!['grid','bands','plain'].includes(r.pattern)||!Array.isArray(r.portals)||r.portals.length>8||!Array.isArray(r.props)||r.props.length>36)fail('room data.');ids.add(r.id);
+  for(const a of r.portals){count++;if(!a||!id(a.id)||portalIds.has(a.id)||!text(a.name,48)||!WALLS.includes(a.wall)||!SHAPES.includes(a.shape)||!num(a.width,.7,wallSpan(r,a)-.1)||!num(a.height,1,r.height)||!num(a.u,-wallSpan(r,a)/2+a.width/2-.01,wallSpan(r,a)/2-a.width/2+.01)||!num(a.base,0,r.height-a.height+.01)||typeof a.scale!=='boolean'||!color(a.color)||!Array.isArray(a.corners)||a.corners.length!==4||!a.corners.every(v=>Array.isArray(v)&&v.length===2&&v.every(x=>num(x,-.5,.5)))||!convex(a.corners))fail('portal surface.');portalIds.add(a.id);if(a.link!==null&&(!a.link||!id(a.link.room)||!id(a.link.portal)))fail('portal link.');}
+  const oi=new Set();for(const o of r.props){if(!o||!id(o.id)||oi.has(o.id)||!PROPS.includes(o.type)||!num(o.x,-r.width/2,r.width/2)||!num(o.z,-r.depth/2,r.depth/2)||!num(o.y,0,r.height)||!num(o.size,.3,5)||!num(o.angle,0,359)||!color(o.color)||typeof o.solid!=='boolean')fail('object data.');oi.add(o.id);}
+ }
+ if(count>40||!ids.has(p.start))fail('portal count or entrance.');
+ for(const r of p.rooms)for(const a of r.portals)if(a.link){const b=p.rooms.find(x=>x.id===a.link.room)?.portals.find(x=>x.id===a.link.portal);if(!b||b.id===a.id||b.link?.room!==r.id||b.link?.portal!==a.id||b.scale!==a.scale)fail('links and scale settings must be reciprocal.');}
+ return{format:'elsewhere',version:1,name:p.name.trim(),start:p.start,rooms:p.rooms.map(r=>({id:r.id,name:r.name,width:r.width,depth:r.depth,height:r.height,palette:r.palette,pattern:r.pattern,portals:r.portals.map(a=>({id:a.id,name:a.name,wall:a.wall,u:a.u,base:a.base,width:a.width,height:a.height,shape:a.shape,corners:a.corners,scale:a.scale,color:a.color,link:a.link})),props:r.props.map(o=>({id:o.id,type:o.type,x:o.x,z:o.z,y:o.y,angle:o.angle,size:o.size,color:o.color,solid:o.solid}))}))};
+}
+export function newRoomBehind(p,r,a,pocket=false){const scale=pocket?Math.min(2,15.8/a.height,31.6/a.width):1,b=addRoom(p,{name:pocket?'A bigger inside':'Beyond the fold',width:Math.max(pocket?22:10,a.width*scale+.3),depth:pocket?24:12,height:Math.max(pocket?10:5,a.height*scale+.12),palette:pocket?'pool':'clay'}),exit=addPortal(p,b,{wall:'south',name:'Back to '+r.name,width:a.width*scale,height:a.height*scale,shape:a.shape,corners:clone(a.corners),scale:a.scale,color:a.color});pair(p,r,a,b,exit);if(pocket){addProp(b,'column',{x:-7,z:-6,size:3,color:'#b6d9c5'});addProp(b,'ring',{x:3,z:-7,y:1,size:3,color:'#e4cc8c',solid:false});}return b;}
+export function preset(name='fold'){
+ const p=createProject(),a=addRoom(p,{name:'01 · The atrium'});
+ if(name==='empty'){p.name='Untitled building';a.name='First room';return p;}
+ if(name==='loop'){p.name='The corridor that returns';a.name='A quarter turn';a.width=7;a.depth=14;a.palette='dusk';const x=addPortal(p,a,{wall:'north',width:3.4,height:3.6,shape:'rectangle'}),y=addPortal(p,a,{wall:'east',u:3,width:3.4,height:3.6,shape:'rectangle'});pair(p,a,x,a,y);for(let i=0;i<5;i++)addProp(a,'column',{x:-2,z:-5+i*2.3,size:.7,color:'#d4bf8e'});return p;}
+ if(name==='pocket'){p.name='The pocket museum';a.name='The little room';a.width=6;a.depth=7;const x=addPortal(p,a,{width:2.2,height:3.4,shape:'tarp'});newRoomBehind(p,a,x,true);addProp(a,'bench',{x:-1.8,z:1,size:1,color:'#997f67'});return p;}
+ const b=addRoom(p,{name:'02 · The long gallery',width:8,depth:18,height:5,palette:'clay',pattern:'bands'}),c=addRoom(p,{name:'03 · The pocket garden',width:22,depth:24,height:10,palette:'pool'}),d=addRoom(p,{name:'04 · A returning passage',width:6,depth:16,height:4.5,palette:'dusk',pattern:'bands'}),e=addRoom(p,{name:'05 · The blue room',width:12,depth:12,height:7,palette:'night',pattern:'plain'});
+ const connect=(ra,va,rb,vb)=>{const x=addPortal(p,ra,va),y=addPortal(p,rb,{color:x.color,...vb});pair(p,ra,x,rb,y);};
+ connect(a,{name:'The long way',wall:'north',shape:'arch',width:3.2,height:3.8},b,{name:'The atrium',wall:'south',shape:'arch',width:3.2,height:3.8});
+ connect(a,{name:'Bigger on the inside',wall:'east',u:-1,shape:'tarp',width:2.5,height:3.6,color:'#8fcad1'},c,{name:'The little doorway',wall:'west',shape:'tarp',width:5,height:7.2});
+ connect(a,{name:'A returning passage',wall:'west',u:0,shape:'rectangle',width:2.8,height:3.6,color:'#c0afdb'},d,{name:'Return?',wall:'south',shape:'rectangle',width:2.8,height:3.6});
+ connect(d,{name:'You have been here',wall:'north',shape:'rectangle',width:2.8,height:3.6,color:'#d9bb82'},a,{name:'The other side of here',wall:'south',u:0,shape:'rectangle',width:2.8,height:3.6});
+ connect(b,{name:'The blue room',wall:'north',shape:'oval',width:4,height:4.5,color:'#e0be7c'},e,{name:'The gallery',wall:'south',shape:'oval',width:4,height:4.5});
+ connect(b,{name:'A side of the same room',wall:'east',u:-3,shape:'tarp',width:2.4,height:3.6,color:'#e6b6a4'},b,{name:'An impossible shortcut',wall:'west',u:4,shape:'tarp',width:2.4,height:3.6});
+ addProp(a,'ring',{x:-3.4,z:-3.5,y:.2,size:1.6,color:'#bc915b'});addProp(a,'bench',{x:3,z:3,size:1.8,color:'#a78b6a'});addProp(a,'plant',{x:3.5,z:-4.5,size:1.3,color:'#527966'});
+ for(let i=0;i<4;i++){addProp(b,i%2?'orb':'plinth',{x:-2.5,z:-5+i*3.2,size:1.2,color:i%2?'#b67156':'#e8ceaa'});}
+ for(const x of [-7,7])for(const z of [-7,7])addProp(c,'column',{x,z,size:3,color:'#c0d4b5'});addProp(c,'plant',{x:3,z:-2,size:3,color:'#5c8f7f'});addProp(c,'stairs',{x:-1,z:-7,size:2.5,color:'#bad7c7'});
+ for(let i=0;i<5;i++)addProp(d,'column',{x:-2,z:-5+i*2.5,size:.6,color:'#d3c4a8'});
+ addProp(e,'orb',{x:0,z:-2,y:1.8,size:2.4,color:'#e3bf77'});addProp(e,'plinth',{x:0,z:-2,size:1.6,color:'#798c8e'});return p;
+}

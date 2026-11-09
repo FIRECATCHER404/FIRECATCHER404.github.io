@@ -20,6 +20,12 @@ Open [Fractal Explorer](https://firecatcher404.github.io/projects/fractal/) to e
 
 The app lives in `projects/fractal/`; its [language reference](projects/fractal/README.md) describes the scripting rules and rendering limits. Run `node scripts/test-fractal-explorer.mjs` for the math, parser, saved-state, and camera checks. Future selected ideas are recorded in [PROJECT_IDEAS.md](PROJECT_IDEAS.md).
 
+## Elsewhere
+
+Open [Elsewhere](https://firecatcher404.github.io/projects/elsewhere/) to build and explore impossible spaces. Fit live portal surfaces to walls, drag a tarp's four corners, link rooms back into themselves, and walk into a bigger inside. Includes four starting buildings, room customization, seven scenery pieces, a connection diagram, scale-changing doorways, touch controls, portable buildings, and PNG exports.
+
+The buildless WebGL app lives in `projects/elsewhere/`. See its [controls and practical limits](projects/elsewhere/README.md); run `node scripts/test-elsewhere.mjs` for geometry, travel, topology, and file checks.
+
 ## Music Canvas
 
 Open [Music Canvas](https://firecatcher404.github.io/projects/music-canvas/) to arrange moving shapes that play notes when they intersect. Give each shape a pitch and voice, reveal its short ID by selecting it and holding Ctrl, and use a tiny `select` / `move yes` / `move no` script with optional beat waits. Includes live synthesis, quantized notes, local drafts, portable canvas files, and stereo WAV export.
