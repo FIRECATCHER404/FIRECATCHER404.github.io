@@ -1,0 +1,12 @@
+import {clone,STEP,createRuntime} from './model.js';
+import {compile,install} from './script.js';
+import {step} from './simulation.js';
+import {makeMaster,playTone} from './synth.js';
+export function encodeWav(channels,sampleRate){const frames=channels[0]?.length??0;if(!frames||channels.length!==2||channels[1].length!==frames||!Number.isInteger(sampleRate)||sampleRate<8000||sampleRate>192000)throw Error('Invalid audio buffer.');const buffer=new ArrayBuffer(44+frames*4),view=new DataView(buffer),text=(offset,value)=>{for(let i=0;i<value.length;i++)view.setUint8(offset+i,value.charCodeAt(i));};text(0,'RIFF');view.setUint32(4,36+frames*4,true);text(8,'WAVE');text(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,2,true);view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*4,true);view.setUint16(32,4,true);view.setUint16(34,16,true);text(36,'data');view.setUint32(40,frames*4,true);let offset=44;for(let i=0;i<frames;i++)for(let c=0;c<2;c++){const value=Number.isFinite(channels[c][i])?Math.max(-1,Math.min(1,channels[c][i])):0;view.setInt16(offset,Math.round(value*(value<0?32768:32767)),true);offset+=2;}return new Uint8Array(buffer);}
+export async function renderWav(source,beats=16,withScript=true){
+  if(![8,16,32].includes(beats))throw Error('Choose 8, 16, or 32 beats.');const Offline=globalThis.OfflineAudioContext??globalThis.webkitOfflineAudioContext;if(!Offline)throw Error('This browser cannot render audio files.');const project=clone(source),state=createRuntime(),duration=beats*60/project.tempo,events=[];if(withScript)install(project,state,compile(project.script,project.shapes));
+  for(let i=0;i<Math.ceil(duration/STEP);i++){step(project,state,Math.min(STEP,duration-state.time),e=>{events.push(e);});if(events.length>8000)throw Error('This render has too many notes. Try fewer shapes or a shorter export.');if(i%240===0)await new Promise(resolve=>setTimeout(resolve,0));}
+  const rate=44100,context=new Offline(2,Math.ceil((duration+1.5)*rate),rate),master=makeMaster(context,context.destination,project.volume),seen=new Set();
+  for(const event of events){const delay=project.quantize?(Math.ceil(event.beat*4-1e-8)/4-event.beat)*60/project.tempo:0,time=event.time+Math.max(0,delay),key=event.id+':'+Math.round(time*100);if(seen.has(key))continue;seen.add(key);playTone(context,master.gain,event,time);}
+  const rendered=await context.startRendering();return{bytes:encodeWav([rendered.getChannelData(0),rendered.getChannelData(1)],rate),notes:seen.size,duration:rendered.duration};
+}
