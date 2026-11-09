@@ -22,7 +22,7 @@ The app lives in `projects/fractal/`; its [language reference](projects/fractal/
 
 ## Isometric Map Maker
 
-Open [Isometric Map Maker](https://firecatcher404.github.io/projects/isometric/) to build small illustrated worlds in a warm, minimal studio. Customize 17 ground materials, sculpt and soften hills, place 43 buildings and decorations, resize bridges and long pieces, and choose sunlight with a live sun wheel. Includes optional shadows beneath the world, clean PNG exports, example scenes, undo/redo, local drafts, portable `.isomap` files, and touch controls.
+Open [Isometric Map Maker](https://firecatcher404.github.io/projects/isometric/) to build small illustrated worlds in a warm, minimal studio. Generate seeded landscapes in four biomes, customize 22 ground materials, and place 75 buildings and decorations. Includes group editing and copy/paste, searchable objects with names/hide/lock, palette favorites, line/rectangle brushes, resizable long pieces, a live sun wheel, PNG exports, undo/redo, local drafts, portable `.isomap` files, and touch controls.
 
 The buildless app lives in `projects/isometric/`. See its [controls and file notes](projects/isometric/README.md); run `node scripts/test-isometric-map.mjs` for geometry, placement, validation, and camera checks.
 
