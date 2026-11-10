@@ -1,6 +1,6 @@
 import{createProject,checkedProject,clone,buildPairs,frameAt,phaseProgress,animatedSVG,exportPlan,rgba}from'./core.js?v=2';
 import{GifWriter,quantize}from'./gif.js?v=2';
-import{readSVG}from'../svg-shared/import.js?v=1';
+import{readSVG}from'../svg-shared/import.js?v=2';
 import{installTouchButtons}from'../svg-shared/touch.js?v=1';
 const $=id=>document.getElementById(id),canvases={a:$('a'),b:$('b'),preview:$('preview')};
 let project=createProject(),pairs=[],playing=false,phase=0,startPhase=0,started=0,dirty=true,job=null;

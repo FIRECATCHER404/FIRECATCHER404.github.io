@@ -18,7 +18,7 @@ export function readSVG(text,{square=true,samples=128}={}){
  const vb=(source.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number),validVB=vb.length===4&&vb.every(Number.isFinite)&&vb[2]>0&&vb[3]>0;
  const dimension=(name,fallback)=>{const v=source.getAttribute(name)||'';return /^\d*\.?\d+(px)?$/.test(v)&&parseFloat(v)>0?parseFloat(v):fallback;};
  const ow=validVB?vb[2]:dimension('width',512),oh=validVB?vb[3]:dimension('height',512),width=square?512:Math.min(4096,ow),height=square?512:Math.min(4096,oh);
- const root=document.createElementNS(NS,'svg');root.setAttribute('width',width);root.setAttribute('height',height);root.setAttribute('viewBox',validVB?vb.join(' '):`0 0 ${ow} ${oh}`);root.setAttribute('preserveAspectRatio','xMidYMid meet');
+ const root=document.createElementNS(NS,'svg');root.setAttribute('color','#000');root.setAttribute('width',width);root.setAttribute('height',height);root.setAttribute('viewBox',validVB?vb.join(' '):`0 0 ${ow} ${oh}`);root.setAttribute('preserveAspectRatio','xMidYMid meet');
  const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-20000px;top:0;opacity:0;pointer-events:none;contain:layout style;';holder.append(root);
  const attrs=new Set('transform fill stroke stroke-width fill-rule fill-opacity stroke-opacity opacity stroke-linejoin stroke-linecap color display visibility d x y width height rx ry cx cy r x1 y1 x2 y2 points'.split(' '));
  const styles=new Set('fill stroke stroke-width fill-rule fill-opacity stroke-opacity opacity stroke-linejoin stroke-linecap color display visibility'.split(' ')),geometries=new Set(['path','rect','circle','ellipse','polygon','polyline','line']);let elements=0;

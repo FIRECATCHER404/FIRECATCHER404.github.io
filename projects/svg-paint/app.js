@@ -1,5 +1,5 @@
 import{createDocument,checkedDocument,clone,clamp,bounds,roundedPath,makeShape,resize,rotate,simplify,exportSVG}from'./core.js?v=1';
-import{readSVG}from'../svg-shared/import.js?v=1';
+import{readSVG}from'../svg-shared/import.js?v=2';
 import{installTouchButtons}from'../svg-shared/touch.js?v=1';
 const $=id=>document.getElementById(id),NS='http://www.w3.org/2000/svg',svg=$('canvas'),stage=$('stage');
 let doc=createDocument(),selected=null,pointSelection=null,tool='select',gesture=null,polygon=[],undo=[],redo=[],zoom=1;
