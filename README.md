@@ -20,6 +20,12 @@ Open [Fractal Explorer](https://firecatcher404.github.io/projects/fractal/) to e
 
 The app lives in `projects/fractal/`; its [language reference](projects/fractal/README.md) describes the scripting rules and rendering limits. Run `node scripts/test-fractal-explorer.mjs` for the math, parser, saved-state, and camera checks. Future selected ideas are recorded in [PROJECT_IDEAS.md](PROJECT_IDEAS.md).
 
+## Pixel Level Maker
+
+Open [Pixel Level Maker](https://firecatcher404.github.io/projects/pixel-level-maker/) to paint multi-room, top-down dungeons. Draw artwork and physical meaning on separate layers, use finer artwork resolution, configure triggers in a popup, connect rooms, and instantly play. Includes doors, messages, trigger chains, flags, checkpoints, local drafts, project files, PNG artwork, and a single-file offline game export.
+
+The buildless app lives in `projects/pixel-level-maker/`. See its [controls and limits](projects/pixel-level-maker/README.md); run `node scripts/test-pixel-level-maker.mjs` for layer, drawing, collision, trigger, file, and export checks.
+
 ## Elsewhere
 
 Open [Elsewhere](https://firecatcher404.github.io/projects/elsewhere/) to build and explore impossible spaces. Fit live portal surfaces to walls, drag a tarp's four corners, link rooms back into themselves, and walk into a bigger inside. Includes four starting buildings, room customization, seven scenery pieces, a connection diagram, scale-changing doorways, touch controls, portable buildings, and PNG exports.

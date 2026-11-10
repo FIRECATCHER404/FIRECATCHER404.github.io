@@ -20,3 +20,10 @@ Attach bones to sprites, pose them, and create animations. Include joint
 controls, keyframes, playback, and animation export.
 
 Website project: [Sprite Rig](projects/sprite-rig/).
+
+## 16. Shape-morph animator
+
+Saved from the 2026-11-09 project idea list.
+
+Draw two silhouettes, match their points, and create a smooth transformation
+between them.
