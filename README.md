@@ -2,6 +2,8 @@
 
 Static site published through GitHub Pages. The Firebase-backed messenger lives at `message.html`.
 
+Publishing uses [.github/workflows/pages.yml](.github/workflows/pages.yml): the existing Jekyll build, followed by a Pages deployment with a 30-minute timeout for slow file syncing. Push to `main` or run **Publish website** from GitHub Actions to publish or retry without an empty commit. Deployments run one at a time and finish before newer queued versions publish.
+
 ## Interactive backgrounds
 
 The homepage uses the local Box2D-based Planck.js engine. Clicking outside links creates a grey shape with a 45% circle, 45% square, and 10% triangle distribution; holding grows it, and dragging sets its launch velocity. Buttons, visible text glyphs, and the footer divider are separate static collision bodies. The floor follows the viewport bottom while scrolling. The same constraint solver handles collision normals, friction, rebound, and rotation, with continuous collision detection for fast small shapes and solver torque constraints for rolling resistance. Physics steps at 120 Hz. Circle collision geometry is analytic, and collision skins sit outside the painted outlines. Spawn previews and resized objects must fit in free space. The bio runs a shared Langton's ant grid, adding an invisible ant on each non-interactive click and drawing only changed cells. Both backgrounds use `#474747` and pause in hidden tabs.
