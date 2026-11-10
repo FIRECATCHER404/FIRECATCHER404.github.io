@@ -22,7 +22,7 @@ The app lives in `projects/fractal/`; its [language reference](projects/fractal/
 
 ## SVG Paint and Shape Morph
 
-[SVG Paint](https://firecatcher404.github.io/projects/svg-paint/) is a vector drawing editor with a Paint-style ribbon, light/dark themes, point editing, corner rounding, layers, transforms, and SVG export. [Shape Morph](https://firecatcher404.github.io/projects/shape-morph/) takes two SVG files and automatically animates their geometry and colors in a plain white-on-black interface. It exports animated SVG, color GIF, and PNG frames. Both keep drafts locally and support portable project files.
+[SVG Paint](https://firecatcher404.github.io/projects/svg-paint/) is a vector drawing editor with a Paint-style ribbon, 21 shapes, light/dark themes, point editing, corner rounding, separate fill/outline styling, alignment, layers, transforms, and SVG export. [Shape Morph](https://firecatcher404.github.io/projects/shape-morph/) takes two SVG files and automatically animates their geometry and colors in a plain white-on-black interface. It exports animated SVG, color GIF, and PNG frames. Both keep drafts locally and support portable project files.
 
 See [SVG Paint controls and limits](projects/svg-paint/README.md) and [Shape Morph import/export notes](projects/shape-morph/README.md). Run `node scripts/test-svg-paint.mjs` and `node scripts/test-shape-morph.mjs` (the latter independently decodes GIFs with Python/Pillow). `scripts/package-shape-morph.py --app svg-paint --output path.html` packages an offline editor; omit `--app` for Shape Morph.
 
