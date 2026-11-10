@@ -20,6 +20,12 @@ Open [Fractal Explorer](https://firecatcher404.github.io/projects/fractal/) to e
 
 The app lives in `projects/fractal/`; its [language reference](projects/fractal/README.md) describes the scripting rules and rendering limits. Run `node scripts/test-fractal-explorer.mjs` for the math, parser, saved-state, and camera checks. Future selected ideas are recorded in [PROJECT_IDEAS.md](PROJECT_IDEAS.md).
 
+## SVG Paint and Shape Morph
+
+[SVG Paint](https://firecatcher404.github.io/projects/svg-paint/) is a vector drawing editor with a Paint-style ribbon, light/dark themes, point editing, corner rounding, layers, transforms, and SVG export. [Shape Morph](https://firecatcher404.github.io/projects/shape-morph/) takes two SVG files and automatically animates their geometry and colors in a plain white-on-black interface. It exports animated SVG, color GIF, and PNG frames. Both keep drafts locally and support portable project files.
+
+See [SVG Paint controls and limits](projects/svg-paint/README.md) and [Shape Morph import/export notes](projects/shape-morph/README.md). Run `node scripts/test-svg-paint.mjs` and `node scripts/test-shape-morph.mjs` (the latter independently decodes GIFs with Python/Pillow). `scripts/package-shape-morph.py --app svg-paint --output path.html` packages an offline editor; omit `--app` for Shape Morph.
+
 ## Pixel Level Maker
 
 Open [Pixel Level Maker](https://firecatcher404.github.io/projects/pixel-level-maker/) to draw multi-room levels with separate artwork and physical layers. Every visible pixel is yours: paint the player region's artwork, configure invisible triggers, connect rooms, and play or export a single offline HTML file. New levels are empty and there are no supplied graphics.

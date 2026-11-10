@@ -1,0 +1,35 @@
+// Reconstruct only geometry and paint attributes. Never mount source markup.
+const NS='http://www.w3.org/2000/svg';
+export function splitPath(d){
+ const pattern=/[MmLlHhVvCcSsQqTtAaZz]|[-+]?(?:\d*\.?\d+)(?:[eE][-+]?\d+)?/g,tokens=d.match(pattern)||[];
+ if(d.replace(pattern,'').replace(/[\s,]/g,''))throw Error('Invalid SVG path.');
+ const arity={M:2,L:2,H:1,V:1,C:6,S:4,Q:4,T:2,A:7},out=[];let i=0,cmd='',x=0,y=0,sx=0,sy=0,part=null;
+ while(i<tokens.length){if(/^[a-z]$/i.test(tokens[i]))cmd=tokens[i++];const upper=cmd.toUpperCase(),rel=cmd!==upper;if(upper==='Z'){if(!part)throw Error('Invalid SVG path.');part.d+=' Z';part.closed=true;out.push(part);part=null;x=sx;y=sy;cmd='';continue;}const n=arity[upper];if(!n||i+n>tokens.length)throw Error('Invalid SVG path.');const v=tokens.slice(i,i+n).map(Number);if(v.some(v=>!Number.isFinite(v)))throw Error('Invalid SVG coordinates.');i+=n;
+  if(upper==='H'){if(rel)v[0]+=x;x=v[0];}else if(upper==='V'){if(rel)v[0]+=y;y=v[0];}else{for(let j=upper==='A'?5:0;j<n;j+=2){if(rel){v[j]+=x;v[j+1]+=y;}}x=v[n-2];y=v[n-1];}
+  if(upper==='M'){if(part)out.push(part);part={d:'M'+v.join(' '),closed:false};sx=x;sy=y;cmd=rel?'l':'L';}else{if(!part)part={d:`M${sx} ${sy}`,closed:false};part.d+=' '+upper+v.join(' ');}
+ }if(part)out.push(part);return out;
+}
+export function readSVG(text,{square=true,samples=128}={}){
+ if(typeof text!=='string'||text.length>1000000)throw Error('Use an SVG smaller than 1 MB.');
+ if(/<!DOCTYPE|<!ENTITY/i.test(text))throw Error('SVG document declarations are not supported.');
+ const parsed=new DOMParser().parseFromString(text,'image/svg+xml'),source=parsed.documentElement;
+ if(source.localName!=='svg'||parsed.querySelector('parsererror'))throw Error('This is not a valid SVG file.');
+ if(source.querySelectorAll('*').length>2048)throw Error('SVG has too many elements.');
+ const vb=(source.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number),validVB=vb.length===4&&vb.every(Number.isFinite)&&vb[2]>0&&vb[3]>0;
+ const dimension=(name,fallback)=>{const v=source.getAttribute(name)||'';return /^\d*\.?\d+(px)?$/.test(v)&&parseFloat(v)>0?parseFloat(v):fallback;};
+ const ow=validVB?vb[2]:dimension('width',512),oh=validVB?vb[3]:dimension('height',512),width=square?512:Math.min(4096,ow),height=square?512:Math.min(4096,oh);
+ const root=document.createElementNS(NS,'svg');root.setAttribute('width',width);root.setAttribute('height',height);root.setAttribute('viewBox',validVB?vb.join(' '):`0 0 ${ow} ${oh}`);root.setAttribute('preserveAspectRatio','xMidYMid meet');
+ const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-20000px;top:0;opacity:0;pointer-events:none;contain:layout style;';holder.append(root);
+ const attrs=new Set('transform fill stroke stroke-width fill-rule fill-opacity stroke-opacity opacity stroke-linejoin stroke-linecap color display visibility d x y width height rx ry cx cy r x1 y1 x2 y2 points'.split(' '));
+ const styles=new Set('fill stroke stroke-width fill-rule fill-opacity stroke-opacity opacity stroke-linejoin stroke-linecap color display visibility'.split(' ')),geometries=new Set(['path','rect','circle','ellipse','polygon','polyline','line']);let elements=0;
+ function copy(src,el){for(const a of src.attributes){if(['clip-path','mask','filter'].includes(a.name)&&a.value!=='none')throw Error('Clips, masks, and filters must be flattened first.');if(attrs.has(a.name))el.setAttribute(a.name,a.value);}for(const declaration of(src.getAttribute('style')||'').split(';')){const at=declaration.indexOf(':');if(at<0)continue;const key=declaration.slice(0,at).trim().toLowerCase(),value=declaration.slice(at+1).trim();if(['clip-path','mask','filter'].includes(key)&&value!=='none')throw Error('Clips, masks, and filters must be flattened first.');if(styles.has(key))el.setAttribute(key,value);}}
+ function build(src,parent){for(const child of src.children){const tag=child.localName;if(['title','desc','metadata','defs','script'].includes(tag))continue;if(!geometries.has(tag)&&tag!=='g')throw Error('Use plain paths and shapes. Text, images, CSS, filters, and references must be converted to outlines first.');const el=document.createElementNS(NS,tag);copy(child,el);parent.append(el);if(tag==='g')build(child,el);else if(++elements>64)throw Error('Use at most 64 painted shapes.');}}
+ copy(source,root);root.setAttribute('width',width);root.setAttribute('height',height);build(source,root);document.body.append(holder);
+ const pixel=document.createElement('canvas');pixel.width=pixel.height=1;const ctx=pixel.getContext('2d',{willReadFrequently:true});
+ function color(value,alpha){if(value==='none')return null;if(/url\(/i.test(value)||!CSS.supports('color',value))throw Error('Use solid fill and stroke colors. Gradients and patterns must be flattened first.');ctx.clearRect(0,0,1,1);ctx.fillStyle=value;ctx.fillRect(0,0,1,1);const a=ctx.getImageData(0,0,1,1).data;return[a[0],a[1],a[2],a[3]/255*alpha];}
+ try{const shapes=[];let contours=0;for(const el of root.querySelectorAll('path,rect,circle,ellipse,polygon,polyline,line')){const style=getComputedStyle(el);let alpha=1,visible=true;for(let parent=el;parent&&parent!==root.parentElement;parent=parent.parentElement){const s=getComputedStyle(parent);alpha*=Number(s.opacity);if(s.display==='none'||s.visibility==='hidden')visible=false;}if(!visible||alpha===0)continue;const fill=el.localName==='line'?null:color(style.fill,alpha*Number(style.fillOpacity)),stroke=color(style.stroke,alpha*Number(style.strokeOpacity));if(!fill&&!stroke)continue;
+  const matrix=el.getCTM();if(!matrix)continue;const base=el.localName==='path'?splitPath(el.getAttribute('d')||''):[{d:null,closed:!['line','polyline'].includes(el.localName)}],parts=[];
+  for(const part of base){let geometry=el;if(part.d!==null){geometry=document.createElementNS(NS,'path');geometry.setAttribute('d',part.d);root.append(geometry);}let length;try{length=geometry.getTotalLength();}catch{throw Error('SVG has invalid geometry.');}if(!Number.isFinite(length)||length<=.00001){if(geometry!==el)geometry.remove();continue;}const points=[];for(let i=0;i<samples;i++){const v=geometry.getPointAtLength(length*i/(part.closed?samples:samples-1)).matrixTransform(matrix);if(!Number.isFinite(v.x)||!Number.isFinite(v.y)||Math.abs(v.x/width)>20||Math.abs(v.y/height)>20)throw Error('SVG coordinates are outside the supported range.');points.push({x:v.x/width,y:v.y/height});}if(geometry!==el)geometry.remove();parts.push({points,closed:part.closed});if(++contours>128)throw Error('Use at most 128 outlines.');}
+  if(parts.length)shapes.push({contours:parts,fill,stroke,strokeWidth:(parseFloat(style.strokeWidth)||0)*Math.sqrt(Math.abs(matrix.a*matrix.d-matrix.b*matrix.c))/width,fillRule:style.fillRule==='evenodd'?'evenodd':'nonzero',lineJoin:['round','bevel'].includes(style.strokeLinejoin)?style.strokeLinejoin:'miter',lineCap:['round','square'].includes(style.strokeLinecap)?style.strokeLinecap:'butt'});
+ }if(!shapes.length)throw Error('SVG has no visible paths or shapes.');return{width,height,shapes};}finally{holder.remove();}
+}
