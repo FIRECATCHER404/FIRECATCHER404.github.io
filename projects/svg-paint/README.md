@@ -22,4 +22,6 @@ Keyboard: Ctrl+A selects visible shapes, Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y), Ctrl
 
 Limits: 1–4096 px artboards, 64 shapes, 32,768 total points, 4,096 points per outline, 60 undo snapshots with a 4 MB history budget. Add a canvas background only when the combined exported shape count will stay within Shape Morph's 64-shape limit. Imports sample each outline to 128 points and flatten group opacity; imported curves are approximations, not editable Bezier handles. There are no text, image, gradient, subtraction/intersection, or persistent nested-group tools yet.
 
-Run `node scripts/test-svg-paint.mjs`. To package a standalone editor: `python scripts/package-shape-morph.py --app svg-paint --output C:/path/SVG-Paint.html`. Keep it beside `Shape-Morph.html` for their cross-links to work offline.
+Corner rounding treats redundant straight-edge samples and small baked corner arcs as logical edges/corners, so imported or combined paths can use a useful rounding amount. Explicitly setting rounding to zero sharpens those recovered corners; untouched imported curves retain their original geometry. The number field and slider both cover 0–512 px. Rounding remains limited by neighboring edge lengths.
+
+Run `node scripts/test-svg-paint.mjs` and follow the complete browser, touch, offline, and deployment checks in [QA.md](QA.md) before finishing an update. To package a standalone editor: `python scripts/package-shape-morph.py --app svg-paint --output C:/path/SVG-Paint.html`. Keep it beside `Shape-Morph.html` for their cross-links to work offline.

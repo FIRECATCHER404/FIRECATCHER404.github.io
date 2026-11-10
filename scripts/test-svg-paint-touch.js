@@ -1,0 +1,27 @@
+(async (page, options={}) => {
+ const baseURL=options.baseURL||'http://127.0.0.1:8973/projects/svg-paint/',results=[];
+ for(const width of[320,390,768]){
+  const c=await page.context().browser().newContext({viewport:{width,height:900},hasTouch:true,isMobile:true,deviceScaleFactor:1}),p=await c.newPage();p.setDefaultTimeout(6000);
+  const errors=[],trace=[];p.on('pageerror',e=>errors.push(e.message));
+  const assert=(v,msg)=>{if(!v)throw Error(msg);},snap=()=>p.evaluate(()=>window.svgPaint.snapshot());
+  const tap=async selector=>{await p.locator(selector).scrollIntoViewIfNeeded();await p.locator(selector).tap();};
+  const input=async(id,v)=>{await p.locator('#'+id).fill(String(v));await p.locator('#'+id).press('Tab');};
+  try{
+   const cdp=await c.newCDPSession(p);
+   const finger=async(a,b)=>{await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[a]});for(let i=1;i<=8;i++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:a.x+(b.x-a.x)*i/8,y:a.y+(b.y-a.y)*i/8}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});};
+   const move=async(a,b)=>{await p.locator('#canvas').scrollIntoViewIfNeeded();const points=await p.evaluate(([a,b])=>[window.svgPaint.point(...a),window.svgPaint.point(...b)],[a,b]);await finger(...points);};
+   await p.goto(baseURL);await p.waitForFunction(()=>!!window.svgPaint);await tap('#fit');await tap('[data-tool=rectangle]');await move([100,100],[400,300]);assert((await snap()).document.items.length===1,'touch draws');
+   await input('radius',60);assert(await p.evaluate(()=>!document.querySelector('#artwork path').isPointInFill(new DOMPoint(101,101))),'touch selected numeric rounding');
+   await p.locator('#round-slider').scrollIntoViewIfNeeded();let b=await p.locator('#round-slider').boundingBox(),before=await snap();await finger({x:b.x+b.width*60/512,y:b.y+b.height/2},{x:b.x+b.width*.5,y:b.y+b.height/2});let s=await snap();assert(s.document.items[0].radius>180&&s.document.items[0].radius<330,'touch rounding slider');assert(s.undo===before.undo+1,'touch slider history');
+   await tap('#undo');assert((await snap()).document.items[0].radius===60,'touch undo');await tap('#redo');assert((await snap()).document.items[0].radius>180,'touch redo');
+   await tap('[data-tool=rectangle]');await move([550,350],[800,550]);assert((await snap()).document.items.length===2,'touch second shape');await tap('#select-all');assert((await snap()).selection.length===2,'touch multi-select');await input('fill-hex','#abc');assert((await snap()).document.items.every(i=>i.fill==='#aabbcc'),'touch batch style');
+   await tap('#canvas');await tap('#add-select');await move([40,40],[450,330]);assert((await snap()).selection.length===1,'touch marquee selection');await move([500,320],[850,580]);assert((await snap()).selection.length===2,'touch additive marquee');await tap('#add-select');
+   await tap('#duplicate');assert((await snap()).document.items.length===4,'touch duplicate');await tap('#undo');assert((await snap()).document.items.length===2,'touch undo duplicate');await tap('#combine');assert((await snap()).document.items.length===1,'touch combine');await input('radius',40);assert(await p.evaluate(()=>!document.querySelector('#artwork path').isPointInFill(new DOMPoint(101,101))),'touch combined rounding');
+   await tap('#hide-selected');assert(!(await snap()).selection.length,'touch hide');assert((await snap()).document.items[0].radius===40,'layout-shifting button must not change exposed slider');await tap('#undo');assert((await snap()).document.items[0].radius===40,'undo hide keeps rounding');
+   await p.locator('#canvas').scrollIntoViewIfNeeded();const old=(await snap()).selectionBounds;let h=await p.locator('[data-handle=br]').boundingBox();if(await p.evaluate(([x,y])=>!document.elementFromPoint(x,y)?.hasAttribute('data-handle'),[h.x+h.width/2,h.y+h.height/2])){await p.locator('footer p').hover();await p.mouse.wheel(0,180);await p.waitForFunction(()=>{const el=document.querySelector('[data-handle=br]'),b=el.getBoundingClientRect();return document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)?.hasAttribute('data-handle');});h=await p.locator('[data-handle=br]').boundingBox();}trace.push({old,handle:h,hit:await p.evaluate(([x,y])=>document.elementFromPoint(x,y)?.outerHTML,[h.x+h.width/2,h.y+h.height/2])});await finger({x:h.x+h.width/2,y:h.y+h.height/2},{x:h.x+h.width/2+12,y:h.y+h.height/2+12});trace.push({after:(await snap()).selectionBounds,selected:(await snap()).selection});assert((await snap()).selectionBounds.w>old.w,'touch resize');
+   await tap('#theme');assert(await p.locator('html').getAttribute('data-theme')==='dark','touch theme');await p.reload();await p.waitForFunction(()=>!!window.svgPaint);assert(await p.locator('html').getAttribute('data-theme')==='dark'&&(await snap()).document.items.length===1,'theme/draft persists');assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no horizontal page overflow');assert(!errors.length,'no browser exceptions');
+   if(options.screenshotDirectory)await p.screenshot({path:options.screenshotDirectory+'/touch-'+width+'.png',fullPage:true});results.push({width,pass:true});
+  }catch(e){results.push({width,pass:false,error:e.message,trace});}finally{await c.close();}
+ }
+ await page.bringToFront();return{passed:results.filter(x=>x.pass).length,failed:results.filter(x=>!x.pass).length,results};
+})

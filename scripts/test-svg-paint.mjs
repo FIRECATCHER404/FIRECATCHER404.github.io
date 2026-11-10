@@ -30,4 +30,37 @@ test('merge retains disjoint outlines and preserves holes in even-odd shapes',()
 test('nonzero holes cancel opposite windings while equally wound nested contours stay filled',()=>{const outer=rect(1,0,0,100,100),inner=rect(2,25,25,50,50).contours[0];outer.contours.push(inner);const other=rect(2,200,0,10,10);near(filledArea(mergedShape([outer,other],3,clip)),10100);inner.points.reverse();const m=mergedShape([outer,other],3,clip);near(filledArea(m),7600);assert(!inside(m,50,50));});
 test('opposite overlapping contours cancel just their intersection',()=>{const a=rect(1,0,0,100,100),b=rect(2,50,0,100,100).contours[0];b.points.reverse();a.contours.push(b);const m=mergedShape([a,rect(2,300,0,1,1)],3,clip);near(filledArea(m),10001);assert(!inside(m,75,50));assert(inside(m,25,50));assert(inside(m,125,50));});
 test('rounding is baked into vector segments for merge and combine',()=>{const a=rect(1,0,0,100,100);a.radius=20;const flat=flattenedContours(a);assert(flat[0].points.length>4);assert(flat[0].points.length<4096);const m=mergedShape([a,rect(2,200,0,10,10)],3,clip);assert.equal(m.radius,0);assert(filledArea(m)<10100&&filledArea(m)>9500);const open=makeShape(2,'line',{x:0,y:150},{x:100,y:150},style);assert.throws(()=>mergedShape([a,open],3,clip));const combined=combinedShape([a,open],3);assert.equal(combined.contours.length,2);assert(!combined.contours[1].closed);assert.equal(combined.radius,0);checkedDocument({...createDocument(),nextId:4,items:[combined]});});
+test('densely sampled imported edges round at the requested size, including missed corners',()=>{
+ const s=rect(1,100,100,400,300),original=clone(s.contours[0].points),perimeter=1400;
+ s.contours[0].points=Array.from({length:128},(_,i)=>{let d=i/128*perimeter;for(let j=0;j<4;j++){const a=original[j],b=original[(j+1)%4],len=Math.hypot(b.x-a.x,b.y-a.y);if(d<=len)return{x:a.x+(b.x-a.x)*d/len,y:a.y+(b.y-a.y)*d/len};d-=len;}});
+ const before=JSON.stringify(s.contours);s.radius=60;s.roundingOverride=true;
+ const flat={...s,contours:flattenedContours(s)},area=filledArea(flat);
+ assert(Math.abs(area-(120000-4*60*60/6))<10,'rounding must remove four visible corner regions');
+ assert.equal((roundedPath(s.contours,60,true).match(/Q/g)||[]).length,4);
+ assert.equal(JSON.stringify(s.contours),before,'rounding must retain editable source points');
+ s.radius=0;const sharp={...s,contours:flattenedContours(s)};near(filledArea(sharp),120000);assert.equal(sharp.contours[0].points.length,4);
+});
+test('baked rounded corners can be increased, removed, exported, and saved',()=>{
+ const a=rect(1,0,0,400,300);a.radius=20;const b=rect(2,600,0,400,300);b.radius=20;
+ for(const s of[combinedShape([a,b],3),mergedShape([a,b],3,clip)]){
+  const baked=filledArea(s);assert(baked<240000);s.radius=60;s.roundingOverride=true;
+  const area=filledArea({...s,contours:flattenedContours(s)});assert(Math.abs(area-(240000-8*60*60/6))<20);
+  const d={...createDocument(),nextId:4,items:[s]},copy=checkedDocument(JSON.parse(JSON.stringify(d)));assert(copy.items[0].roundingOverride);assert.equal((exportSVG(copy).match(/ Q/g)||[]).length,8);
+  s.radius=0;near(filledArea({...s,contours:flattenedContours(s)}),240000);
+ }
+});
+test('rounding cache invalidates after point edits, transforms, and closed-state changes',()=>{
+ const s=rect(1,0,0,400,300),first=roundedPath(s.contours,60,true);s.contours[0].points[0].x=25;assert.notEqual(roundedPath(s.contours,60,true),first);
+ s.contours[0].closed=false;assert(!roundedPath(s.contours,60,true).endsWith('Z'));resize(s,{x:10,y:20,w:200,h:150});const flat=flattenedContours({...s,radius:60,roundingOverride:true});assert.deepEqual(flat[0].points[0],s.contours[0].points[0]);
+});
+test('all gallery shapes retain finite, bounded geometry across rounding and narrow aspect ratios',()=>{
+ for(const[kind]of SHAPES)for(const[w,h]of[[400,300],[1000,10],[10,1000]])for(const radius of[0,1,60,512]){
+  const s=makeShape(1,kind,{x:0,y:0},{x:w,y:h},style);s.radius=radius;s.roundingOverride=true;const flat=flattenedContours(s),p=flat.flatMap(c=>c.points);
+  assert(p.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>=-1e-6&&p.y>=-1e-6&&p.x<=w+1e-6&&p.y<=h+1e-6),kind+' radius '+radius);assert(!/NaN|Infinity/.test(roundedPath(s.contours,radius,true)));
+ }
+ for(const kind of['ellipse','ring','arc','heart']){const s=shape(kind),before=clone(s.contours);assert.deepEqual(flattenedContours({...s,radius:0,roundingOverride:true}),before,kind+' must preserve its smooth sampled outline');}
+});
+test('rounding override is optional for old projects and rejects malformed flags',()=>{
+ const d=document();delete d.items[0].roundingOverride;checkedDocument(d);d.items[0].roundingOverride='true';assert.throws(()=>checkedDocument(d));
+});
 console.log(`${count} SVG Paint test groups passed.`);
