@@ -1,4 +1,4 @@
-import{clamp}from'./model.js';
+import{clamp}from'./model.js?v=2';
 export function line(x0,y0,x1,y1,visit){let dx=Math.abs(x1-x0),sx=x0<x1?1:-1,dy=-Math.abs(y1-y0),sy=y0<y1?1:-1,error=dx+dy;for(;;){visit(x0,y0);if(x0===x1&&y0===y1)break;const e=2*error;if(e>=dy){error+=dy;x0+=sx;}if(e<=dx){error+=dx;y0+=sy;}}}
 export function brush(data,w,h,x,y,size,value){const a=Math.floor((size-1)/2);for(let j=y-a;j<y-a+size;j++)for(let i=x-a;i<x-a+size;i++)if(i>=0&&j>=0&&i<w&&j<h)data[j*w+i]=value;}
 export function flood(data,w,h,x,y,value){if(x<0||y<0||x>=w||y>=h)return;const old=data[y*w+x];if(old===value)return;const stack=[y*w+x];data[y*w+x]=value;while(stack.length){const n=stack.pop(),cx=n%w,cy=Math.floor(n/w);for(const v of[cx>0?n-1:-1,cx<w-1?n+1:-1,cy>0?n-w:-1,cy<h-1?n+w:-1])if(v>=0&&data[v]===old){data[v]=value;stack.push(v);}}}

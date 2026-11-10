@@ -22,7 +22,7 @@ The app lives in `projects/fractal/`; its [language reference](projects/fractal/
 
 ## Pixel Level Maker
 
-Open [Pixel Level Maker](https://firecatcher404.github.io/projects/pixel-level-maker/) to paint multi-room, top-down dungeons. Draw artwork and physical meaning on separate layers, use finer artwork resolution, configure triggers in a popup, connect rooms, and instantly play. Includes doors, messages, trigger chains, flags, checkpoints, local drafts, project files, PNG artwork, and a single-file offline game export.
+Open [Pixel Level Maker](https://firecatcher404.github.io/projects/pixel-level-maker/) to draw multi-room levels with separate artwork and physical layers. Every visible pixel is yours: paint the player region's artwork, configure invisible triggers, connect rooms, and play or export a single offline HTML file. New levels are empty and there are no supplied graphics.
 
 The buildless app lives in `projects/pixel-level-maker/`. See its [controls and limits](projects/pixel-level-maker/README.md); run `node scripts/test-pixel-level-maker.mjs` for layer, drawing, collision, trigger, file, and export checks.
 
