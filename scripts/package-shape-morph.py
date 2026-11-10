@@ -11,7 +11,20 @@ def inline(match):
 app=re.sub(r"from'([^']+)'",inline,app)
 html=(root/'index.html').read_text(encoding='utf-8')
 html=re.sub(r'<link rel="stylesheet" href="style.css[^\"]*">',lambda _: '<style>'+(root/'style.css').read_text(encoding='utf-8')+'</style>',html)
-html=re.sub(r'<script[^>]+src="[^"]+"[^>]*></script>','',html)
+def script_tag(match):
+    tag=match.group(0)
+    if 'data-inline-offline' not in tag:return ''
+    src=re.search(r'src="([^"]+)"',tag).group(1).split('?')[0]
+    script_path=(root/src).resolve()
+    source=script_path.read_text(encoding='utf-8')
+    licenses=sorted(script_path.parent.glob('*LICENSE*'))
+    apache=script_path.parent/'Apache-2.0.txt'
+    if apache.exists():licenses.append(apache)
+    if licenses:
+        notice='\n\n'.join(p.name+'\n'+p.read_text(encoding='utf-8') for p in licenses)
+        source='/* Third-party licenses\n'+notice.replace('*/','* /')+'\n*/\n'+source
+    return '<script>'+source.replace('</script','<\\/script')+'</script>'
+html=re.sub(r'<script[^>]+src="[^"]+"[^>]*></script>',script_tag,html)
 html=html.replace('href="../"','href="https://firecatcher404.github.io/projects/"').replace('href="../svg-paint/"','href="SVG-Paint.html"').replace('href="../shape-morph/"','href="Shape-Morph.html"')
 html=html.replace('</body>','<script type="module">'+app.replace('</script','<\\/script')+'</script></body>')
 args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(html,encoding='utf-8')
