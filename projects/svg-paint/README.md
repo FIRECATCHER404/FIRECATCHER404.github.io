@@ -14,6 +14,6 @@ Export SVG creates plain vector paths that can be imported into Shape Morph. Sav
 
 Keyboard: Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y), Ctrl+D to duplicate, Ctrl+S to save a project, Delete to remove, arrows to nudge (Shift for 10 px), Escape to cancel. Ctrl+wheel zooms; Fit restores a useful canvas view. Mouse and touch gestures are supported; point insertion by double-click is easiest with a mouse.
 
-Limits: 32–4096 px artboards, 64 shapes, 32,768 total points, 4,096 points per outline, 60 undo snapshots with a 4 MB history budget. Add a canvas background only when the combined exported shape count will stay within Shape Morph's 64-shape limit. Imports sample each outline to 128 points and flatten group opacity; imported curves are approximations, not editable Bezier handles. There are no text, image, gradient, Boolean-path, or multi-selection tools yet.
+Limits: 1–4096 px artboards, 64 shapes, 32,768 total points, 4,096 points per outline, 60 undo snapshots with a 4 MB history budget. Add a canvas background only when the combined exported shape count will stay within Shape Morph's 64-shape limit. Imports sample each outline to 128 points and flatten group opacity; imported curves are approximations, not editable Bezier handles. There are no text, image, gradient, Boolean-path, or multi-selection tools yet.
 
 Run `node scripts/test-svg-paint.mjs`. To package a standalone editor: `python scripts/package-shape-morph.py --app svg-paint --output C:/path/SVG-Paint.html`. Keep it beside `Shape-Morph.html` for their cross-links to work offline.
