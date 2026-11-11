@@ -1,4 +1,4 @@
-import{CameraRig,CAMERA_FOV,LOOK_SPEED,PITCH_LIMIT}from'../projects/gear-lab/camera.js';
+import{CameraRig,CAMERA_FOV,PITCH_LIMIT,screenRay}from'../projects/gear-lab/camera.js';
 import assert from'node:assert/strict';
 import{ready,GearSimulation,DT}from'../projects/gear-lab/physics.js';
 import{blankScene,defaultGear,dimensions,meshPhase,gearParts,polygonProperties,checkedScene,MATERIALS,toothStress}from'../projects/gear-lab/geometry.js';
@@ -94,13 +94,16 @@ test('camera wheel moves forward and backward along its viewing direction with f
 test('camera pan stays in its current view plane and preserves direction, distance and rotation',()=>{
  const c=new CameraRig(),before=c.snapshot();c.pan(80,-35,900);const delta=sub(c.position,before.position);near(dot(delta,before.forward),0);assert(dot(delta,c.right)<0&&dot(delta,c.up)<0);assert.deepEqual(c.rotation,before.rotation);near(c.distance,before.distance);const translated=sub(c.center,before.center);for(const k of['x','y','z'])near(delta[k],translated[k]);
 });
-test('mouse-look turns in place with independent yaw/pitch and no roll at any drag position',()=>{
- const a=new CameraRig(),b=new CameraRig();a.orient(0,0);b.orient(0,0);const eye=a.position;a.look({x:400,y:400},{x:480,y:430});b.look({x:20,y:20},{x:100,y:50});near(a.yaw,80*LOOK_SPEED);near(a.pitch,-30*LOOK_SPEED);assert(a.forward.x<0&&a.forward.y>0,'right/down drag must look left/up');near(a.right.y,0);assert(a.up.y>0);assert.deepEqual(a.rotation,b.rotation);for(const k of['x','y','z'])near(a.position[k],eye[k]);
+test('grab rotation follows perspective rays with restored yaw/pitch directions and a level horizon',()=>{
+ const c=new CameraRig(),rect={left:0,top:0,width:800,height:800};c.orient(0,0);const anchor={...c.center},radius=length(sub(anchor,c.position));c.look({x:400,y:400},{x:480,y:430},rect,anchor);assert(c.yaw<0&&c.pitch>0,'right/down drag must turn right/down');assert(c.forward.x>0&&c.forward.y<0);near(c.right.y,0);assert(c.up.y>0);near(length(sub(anchor,c.position)),radius);near(Math.hypot(...Object.values(c.rotation)),1);
 });
-test('mouse-look pitch stops before flipping and repeated mixed drags never tilt the horizon',()=>{
- const c=new CameraRig(),eye=c.position;for(let i=0;i<100;i++){c.look({x:0,y:0},{x:110,y:i%2?10000:-10000});assert(Math.abs(c.pitch)<=PITCH_LIMIT);near(c.right.y,0);assert(c.up.y>0);near(Math.hypot(...Object.values(c.rotation)),1);for(const k of['x','y','z'])near(c.position[k],eye[k]);}c.orient(0,0);assert(c.isFront());
+test('grabbed world points project exactly to the moving cursor at every step and viewport edge',()=>{
+ for(const rect of[{left:10,top:50,width:1400,height:900},{left:0,top:120,width:320,height:260}])for(const offset of[[.5,.5],[.05,.07],[.94,.88]]){const c=new CameraRig(),initial=c.snapshot(),start={x:rect.left+rect.width*offset[0],y:rect.top+rect.height*offset[1]},anchor=add(c.position,rotate(c.rotation,screenRay(start,rect))),radius=length(sub(anchor,c.position));for(const delta of[[10,5],[50,-30],[-70,40],[160,120],[-250,-300]]){const end={x:start.x+delta[0],y:start.y+delta[1]};c.look(start,end,rect,anchor,initial);const d=sub(anchor,c.position),z=dot(d,c.forward),tan=Math.tan(CAMERA_FOV*Math.PI/360),x=rect.left+(dot(d,c.right)/(z*tan*(rect.width/rect.height))+1)*rect.width/2,y=rect.top+(1-dot(d,c.up)/(z*tan))*rect.height/2;near(x,end.x,1e-6);near(y,end.y,1e-6);near(length(d),radius);near(c.right.y,0);}}
+});
+test('grab rotation pitch stops before flipping while keeping its world anchor under the cursor',()=>{
+ const c=new CameraRig(),rect={left:0,top:0,width:800,height:800},anchor={...c.center};for(let i=0;i<100;i++){c.look({x:400,y:400},{x:510,y:i%2?10000:-10000},rect,anchor);assert(Math.abs(c.pitch)<=PITCH_LIMIT);near(c.right.y,0);assert(c.up.y>0);near(Math.hypot(...Object.values(c.rotation)),1);for(const v of Object.values(c.position))assert(Number.isFinite(v));}c.orient(0,0);assert(c.isFront());
 });
 test('perspective Fit contains long and tall bounds at narrow aspect ratios after arbitrary camera rotation',()=>{
- const rect={left:0,top:0,width:800,height:800},points=[];for(const x of[-1.94,1.94])for(const y of[-.5,.75])for(const z of[-.14,.14])points.push(V(x,y,z));for(const aspect of[.55,1,1.8]){const c=new CameraRig();c.look({x:790,y:400},{x:400,y:315});c.fit(points,aspect);for(const p of points){const delta=sub(p,c.position),depth=dot(delta,c.forward),tan=Math.tan(CAMERA_FOV*Math.PI/360);assert(depth>.005);assert(Math.abs(dot(delta,c.right))<depth*tan*aspect);assert(Math.abs(dot(delta,c.up))<depth*tan);}}
+ const rect={left:0,top:0,width:800,height:800},points=[];for(const x of[-1.94,1.94])for(const y of[-.5,.75])for(const z of[-.14,.14])points.push(V(x,y,z));for(const aspect of[.55,1,1.8]){const c=new CameraRig();c.look({x:790,y:400},{x:400,y:315},rect);c.fit(points,aspect);for(const p of points){const delta=sub(p,c.position),depth=dot(delta,c.forward),tan=Math.tan(CAMERA_FOV*Math.PI/360);assert(depth>.005);assert(Math.abs(dot(delta,c.right))<depth*tan*aspect);assert(Math.abs(dot(delta,c.up))<depth*tan);}}
 });
 console.log(`${count} Gear Lab test groups passed.`);

@@ -1,4 +1,4 @@
-import{CameraRig,CAMERA_FOV}from'./camera.js?v=7';
+import{CameraRig,CAMERA_FOV}from'./camera.js?v=8';
 import*as T from'../isometric/vendor/three.module.js';
 import{MATERIALS,dimensions}from'./geometry.js?v=6';
 import{SCALE}from'./physics.js?v=6';
@@ -26,7 +26,7 @@ export class GearView{
  cameraState(){return this.rig.snapshot();}
  updateCamera(){this.camera.position.copy(this.rig.position);this.camera.quaternion.copy(this.rig.rotation);this.camera.up.copy(this.rig.up);this.camera.updateMatrixWorld();}
  orient(yaw,pitch){this.rig.orient(yaw,pitch);this.updateCamera();}
- look(start,end,initial){this.rig.look(start,end,initial);this.updateCamera();}
+ look(start,end,rect,anchor,initial){this.rig.look(start,end,rect,anchor,initial);this.updateCamera();}
  pan(dx,dy,height,initial){this.rig.pan(dx,dy,height,initial);this.updateCamera();}
  wheel(delta,mode,height){this.rig.wheel(delta,mode,height);this.updateCamera();}
  dolly(factor){this.rig.dolly(factor);this.updateCamera();}
@@ -64,6 +64,7 @@ export class GearView{
  hits(event){return this.ray(event).intersectObjects([...this.environment.children,...this.mounts.children,...this.rotors.children],true).map(hit=>{let o=hit.object;while(o&&!o.userData.type)o=o.parent;if(!o)return null;return{type:o.userData.type,id:o.userData.id,point:{x:hit.point.x,y:hit.point.y,z:hit.point.z},normal:hit.face?new T.Vector3().copy(hit.face.normal).transformDirection(hit.object.matrixWorld):null,distance:hit.distance};}).filter(Boolean);}
  surface(event){return this.hits(event).find(h=>h.type==='floor'||h.type==='wall')||null;}
  pick(event){return this.hits(event).find(h=>h.type!=='floor')||null;}
+ rotationAnchor(event){const hit=this.ray(event).intersectObjects([...this.environment.children,...this.mounts.children,...this.rotors.children,...this.fragments.children],true)[0],p=hit?.point||this.planePoint(event,this.rig.center,this.rig.forward);return p?V(p.x,p.y,p.z):{...this.rig.center};}
  planePoint(event,point,normal){return this.ray(event).ray.intersectPlane(new T.Plane().setFromNormalAndCoplanarPoint(new T.Vector3(normal.x,normal.y,normal.z),new T.Vector3(point.x,point.y,point.z)),new T.Vector3());}
  dragPlane(event,point,normal){const ray=this.ray(event).ray,n=new T.Vector3(normal.x,normal.y,normal.z),forward=this.camera.getWorldDirection(new T.Vector3()),chosen=Math.abs(forward.dot(n))<.15||Math.abs(ray.direction.dot(n))<.05?forward:n;return{point:this.planePoint(event,point,chosen),normal:{x:chosen.x,y:chosen.y,z:chosen.z}};}
  revealCrank(axis){if(Math.abs(this.rig.forward.x*axis.x+this.rig.forward.y*axis.y+this.rig.forward.z*axis.z)>=.15)return false;if(Math.abs(axis.y)>.9)this.orient(-.55,axis.y*.95);else this.orient(Math.atan2(axis.x,axis.z),.35);return true;}
