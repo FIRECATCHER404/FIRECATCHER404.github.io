@@ -1,8 +1,8 @@
-import{CameraRig,CAMERA_FOV}from'./camera.js?v=5';
+import{CameraRig,CAMERA_FOV}from'./camera.js?v=6';
 import*as T from'../isometric/vendor/three.module.js';
-import{MATERIALS,dimensions}from'./geometry.js?v=5';
-import{SCALE}from'./physics.js?v=5';
-import{V,Q,multiply,rotate,mountRotation,gearPoint,pegLength,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=5';
+import{MATERIALS,dimensions}from'./geometry.js?v=6';
+import{SCALE}from'./physics.js?v=6';
+import{V,Q,multiply,rotate,mountRotation,gearPoint,pegLength,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=6';
 
 function dispose(group){for(const child of[...group.children]){group.remove(child);child.traverse(o=>{o.geometry?.dispose();for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[])m.dispose();});}}
 const material=(color,metalness=.15)=>new T.MeshStandardMaterial({color,metalness,roughness:.55});
@@ -26,7 +26,7 @@ export class GearView{
  cameraState(){return this.rig.snapshot();}
  updateCamera(){this.camera.position.copy(this.rig.position);this.camera.quaternion.copy(this.rig.rotation);this.camera.up.copy(this.rig.up);this.camera.updateMatrixWorld();}
  orient(yaw,pitch){this.rig.orient(yaw,pitch);this.updateCamera();}
- orbit(start,end,rect,initial){this.rig.orbit(start,end,rect,initial);this.updateCamera();}
+ look(start,end,initial){this.rig.look(start,end,initial);this.updateCamera();}
  pan(dx,dy,height,initial){this.rig.pan(dx,dy,height,initial);this.updateCamera();}
  wheel(delta,mode,height){this.rig.wheel(delta,mode,height);this.updateCamera();}
  dolly(factor){this.rig.dolly(factor);this.updateCamera();}

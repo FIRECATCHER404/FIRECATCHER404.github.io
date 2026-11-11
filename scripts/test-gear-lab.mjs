@@ -1,4 +1,4 @@
-import{CameraRig,CAMERA_FOV}from'../projects/gear-lab/camera.js';
+import{CameraRig,CAMERA_FOV,LOOK_SPEED,PITCH_LIMIT}from'../projects/gear-lab/camera.js';
 import assert from'node:assert/strict';
 import{ready,GearSimulation,DT}from'../projects/gear-lab/physics.js';
 import{blankScene,defaultGear,dimensions,meshPhase,gearParts,polygonProperties,checkedScene,MATERIALS,toothStress}from'../projects/gear-lab/geometry.js';
@@ -89,15 +89,18 @@ test('larger designs retain bounded part/stack limits and shaft lengths cover up
  const d=stepperExample();assert(d.gears.length<MAX_GEARS);for(const g of d.gears)assert(pegLength(d,g.peg)>=.06+g.layer*.05+g.thickness/2+.039);const bad=structuredClone(d);bad.gears[0].layer=MAX_LAYER+1;assert.throws(()=>checkedScene(bad));const tooMany=structuredClone(d);tooMany.gears=Array(MAX_GEARS+1).fill(d.gears[0]);assert.throws(()=>checkedScene(tooMany));
 });
 test('camera wheel moves forward and backward along its viewing direction with fixed orientation and field of view',()=>{
- const c=new CameraRig(),before=c.snapshot();c.wheel(-100);const after=c.snapshot(),delta=sub(after.position,before.position);assert(dot(delta,before.forward)>0);near(length(delta),dot(delta,before.forward));assert.deepEqual(after.rotation,before.rotation);assert.deepEqual(after.center,before.center);assert.equal(after.fov,CAMERA_FOV);c.wheel(100);for(const k of['x','y','z'])near(c.position[k],before.position[k]);const a=new CameraRig(),b=new CameraRig();a.wheel(1,1);b.wheel(16,0);near(a.distance,b.distance);for(let i=0;i<100;i++)c.wheel(-1e6);assert(c.distance>=.035&&Number.isFinite(c.distance));
+ const c=new CameraRig(),before=c.snapshot();c.wheel(-100);const after=c.snapshot(),delta=sub(after.position,before.position);assert(dot(delta,before.forward)>0);near(length(delta),dot(delta,before.forward));assert.deepEqual(after.rotation,before.rotation);for(const k of['x','y','z'])near(after.center[k]-before.center[k],delta[k]);assert.equal(after.fov,CAMERA_FOV);c.wheel(100);for(const k of['x','y','z'])near(c.position[k],before.position[k]);const a=new CameraRig(),b=new CameraRig();a.wheel(1,1);b.wheel(16,0);for(const k of['x','y','z'])near(a.position[k],b.position[k]);for(let i=0;i<100;i++)c.wheel(-100);assert(length(sub(c.position,before.position))>before.distance*5,'scroll must continue past the old orbit target');assert(Number.isFinite(c.position.x));
 });
 test('camera pan stays in its current view plane and preserves direction, distance and rotation',()=>{
  const c=new CameraRig(),before=c.snapshot();c.pan(80,-35,900);const delta=sub(c.position,before.position);near(dot(delta,before.forward),0);assert(dot(delta,c.right)<0&&dot(delta,c.up)<0);assert.deepEqual(c.rotation,before.rotation);near(c.distance,before.distance);const translated=sub(c.center,before.center);for(const k of['x','y','z'])near(delta[k],translated[k]);
 });
-test('trackball supports roll and movement through poles without clamping or invalid rotations',()=>{
- const c=new CameraRig(),rect={left:0,top:0,width:800,height:800};c.orient(0,0);c.orbit({x:790,y:400},{x:400,y:10},rect);assert(Math.abs(c.rotation.z)>.2,'edge drag must roll');near(Math.hypot(...Object.values(c.rotation)),1);c.orient(0,0);for(let i=0;i<2;i++)c.orbit({x:400,y:400},{x:400,y:1600},rect);assert(c.up.y<-.8,'camera must pass the pole');for(let i=0;i<200;i++)c.orbit({x:400,y:400},{x:510,y:440},rect);near(Math.hypot(...Object.values(c.rotation)),1);for(const v of Object.values(c.position))assert(Number.isFinite(v));c.orient(0,0);assert(c.isFront());
+test('mouse-look turns in place with independent yaw/pitch and no roll at any drag position',()=>{
+ const a=new CameraRig(),b=new CameraRig();a.orient(0,0);b.orient(0,0);const eye=a.position;a.look({x:400,y:400},{x:480,y:430});b.look({x:20,y:20},{x:100,y:50});near(a.yaw,-80*LOOK_SPEED);near(a.pitch,30*LOOK_SPEED);assert(a.forward.x>0&&a.forward.y<0);near(a.right.y,0);assert(a.up.y>0);assert.deepEqual(a.rotation,b.rotation);for(const k of['x','y','z'])near(a.position[k],eye[k]);
+});
+test('mouse-look pitch stops before flipping and repeated mixed drags never tilt the horizon',()=>{
+ const c=new CameraRig(),eye=c.position;for(let i=0;i<100;i++){c.look({x:0,y:0},{x:110,y:i%2?10000:-10000});assert(Math.abs(c.pitch)<=PITCH_LIMIT);near(c.right.y,0);assert(c.up.y>0);near(Math.hypot(...Object.values(c.rotation)),1);for(const k of['x','y','z'])near(c.position[k],eye[k]);}c.orient(0,0);assert(c.isFront());
 });
 test('perspective Fit contains long and tall bounds at narrow aspect ratios after arbitrary camera rotation',()=>{
- const rect={left:0,top:0,width:800,height:800},points=[];for(const x of[-1.94,1.94])for(const y of[-.5,.75])for(const z of[-.14,.14])points.push(V(x,y,z));for(const aspect of[.55,1,1.8]){const c=new CameraRig();c.orbit({x:790,y:400},{x:400,y:15},rect);c.fit(points,aspect);for(const p of points){const delta=sub(p,c.position),depth=dot(delta,c.forward),tan=Math.tan(CAMERA_FOV*Math.PI/360);assert(depth>.005);assert(Math.abs(dot(delta,c.right))<depth*tan*aspect);assert(Math.abs(dot(delta,c.up))<depth*tan);}}
+ const rect={left:0,top:0,width:800,height:800},points=[];for(const x of[-1.94,1.94])for(const y of[-.5,.75])for(const z of[-.14,.14])points.push(V(x,y,z));for(const aspect of[.55,1,1.8]){const c=new CameraRig();c.look({x:790,y:400},{x:400,y:315});c.fit(points,aspect);for(const p of points){const delta=sub(p,c.position),depth=dot(delta,c.forward),tan=Math.tan(CAMERA_FOV*Math.PI/360);assert(depth>.005);assert(Math.abs(dot(delta,c.right))<depth*tan*aspect);assert(Math.abs(dot(delta,c.up))<depth*tan);}}
 });
 console.log(`${count} Gear Lab test groups passed.`);

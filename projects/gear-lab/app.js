@@ -1,8 +1,8 @@
-import{stepperExample,stepperInfo}from'./stepper.js?v=5';
-import{GearSimulation,ready}from'./physics.js?v=5';
-import{GearView}from'./view.js?v=5';
-import{MATERIALS,dimensions,defaultGear,blankScene,checkedScene,meshPhase,nextStackLayer,connectParts,disconnectParts,connections}from'./geometry.js?v=5';
-import{V,add,sub,mul,dot,length,rotate,inverse,normal,mountRotation,mountPoint,gearPoint,wallSize,wallOnFloor,sameMountPlane,moveMount,wrap,FLOOR_Y}from'./space.js?v=5';
+import{stepperExample,stepperInfo}from'./stepper.js?v=6';
+import{GearSimulation,ready}from'./physics.js?v=6';
+import{GearView}from'./view.js?v=6';
+import{MATERIALS,dimensions,defaultGear,blankScene,checkedScene,meshPhase,nextStackLayer,connectParts,disconnectParts,connections}from'./geometry.js?v=6';
+import{V,add,sub,mul,dot,length,rotate,inverse,normal,mountRotation,mountPoint,gearPoint,wallSize,wallOnFloor,sameMountPlane,moveMount,wrap,FLOOR_Y}from'./space.js?v=6';
 import{installTouchButtons}from'../svg-shared/touch.js?v=2';
 const $=id=>document.getElementById(id),canvas=$('world'),view=new GearView(canvas);
 let design=blankScene(),sim,selected=null,selection=new Set(),additive=false,tool='select',running=false,undo=[],redo=[],pointer=null,last=0,latched=null,stepper=null,previewTime=0;
@@ -114,27 +114,27 @@ function touchPair(){const[a,b]=[...touches.values()];return a&&b?{x:(a.x+b.x)/2
 canvas.addEventListener('pointerdown',e=>{
  if(e.button>2)return;e.preventDefault();canvas.focus();canvas.setPointerCapture(e.pointerId);
  if(e.pointerType==='touch'){touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size>=2){if(latched)release();touchNavigation=true;touchGesture=touchPair();pointer=null;return;}if(touchNavigation)return;}
- const hit=view.pick(e),extend=tool==='select'&&(e.shiftKey||additive),state=view.cameraState();pointer={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false,hit,rotation:state.rotation,center:state.center,rect:canvas.getBoundingClientRect()};
+ const hit=view.pick(e),extend=tool==='select'&&(e.shiftKey||additive),state=view.cameraState();pointer={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false,hit,camera:state,center:state.center,rect:canvas.getBoundingClientRect()};
  if(e.button===2||e.button===1){if(latched)release();pointer.pan=true;return;}
  if(extend&&hit){if(latched)release();choose(hit.id,true);pointer.selectionOnly=true;sync();return;}
  if(latched){pointer.crank=true;pointer.wasLatched=true;moveCrank(e);return;}
  if(tool==='select'&&hit?.type==='crank'){latch(hit.id,e);pointer.crank=true;pointer.wasLatched=false;return;}
- if(!hit){pointer.orbit=true;pointer.keepSelection=extend;return;}
+ if(!hit){pointer.look=true;pointer.keepSelection=extend;return;}
  if(tool==='select'){if(!selection.has(hit.id))choose(hit.id);else selected=hit.id;const wall=currentWall(),peg=pegCurrent();if(wall){pointer.mount=wall.id;pointer.plane=V(0,1,0);pointer.origin=V(wall.x,wall.y,wall.z);}else if(peg){pointer.mount=peg.id;pointer.plane=normal(peg);pointer.origin={...peg};}if(pointer.mount){const drag=view.dragPlane(e,pointer.origin,pointer.plane);pointer.at=drag.point;pointer.dragPlane=drag.normal;}sync();}
 });
 canvas.addEventListener('pointermove',e=>{
  if(e.pointerType==='touch'&&touches.has(e.pointerId)){touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touchNavigation){const next=touchPair();if(next&&touchGesture){view.pan(next.x-touchGesture.x,next.y-touchGesture.y,canvas.getBoundingClientRect().height);view.dolly(touchGesture.span/next.span);touchGesture=next;cameraLabel();}return;}}
- if(pointer&&pointer.id===e.pointerId){const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;if(Math.hypot(dx,dy)>4)pointer.moved=true;if(pointer.pan){view.pan(dx,dy,pointer.rect.height,pointer.center);cameraLabel();return;}if(pointer.orbit&&pointer.moved){view.orbit({x:pointer.x,y:pointer.y},{x:e.clientX,y:e.clientY},pointer.rect,pointer.rotation);cameraLabel();return;}}
+ if(pointer&&pointer.id===e.pointerId){const dx=e.clientX-pointer.x,dy=e.clientY-pointer.y;if(Math.hypot(dx,dy)>4)pointer.moved=true;if(pointer.pan){view.pan(dx,dy,pointer.rect.height,pointer.center);cameraLabel();return;}if(pointer.look&&pointer.moved){view.look({x:pointer.x,y:pointer.y},{x:e.clientX,y:e.clientY},pointer.camera);cameraLabel();return;}}
  if(latched)moveCrank(e);
 });
 canvas.addEventListener('pointerup',e=>{
  if(e.pointerType==='touch'){touches.delete(e.pointerId);if(touchNavigation){touchGesture=touchPair();if(!touches.size){touchNavigation=false;touchGesture=null;}pointer=null;return;}}
  if(!pointer||pointer.id!==e.pointerId)return;const p=pointer;pointer=null;if(p.pan||p.selectionOnly)return;if(p.crank){if(p.wasLatched&&!p.moved)release();return;}
- if(p.orbit){if(!p.moved){if(tool==='select'){if(!p.keepSelection){choose(null);sync();}}else place(e);}return;}
+ if(p.look){if(!p.moved){if(tool==='select'){if(!p.keepSelection){choose(null);sync();}}else place(e);}return;}
  if(tool==='select'&&p.moved&&p.mount&&p.at){const at=view.planePoint(e,p.origin,p.dragPlane);if(at)edit(()=>{const delta=sub(at,p.at),roots=mountRoots();let tangent=sub(delta,mul(p.plane,dot(delta,p.plane)));for(const id of roots){const peg=pegFor(id),n=peg?normal(peg):V(0,1,0);tangent=sub(tangent,mul(n,dot(tangent,n)));}for(const id of roots)moveMount(design,id,tangent);for(const g of design.gears)gearFits(g);});}else if(!p.moved&&tool!=='select')place(e);
 });
 canvas.addEventListener('pointercancel',()=>{resetPointers();release();});canvas.addEventListener('lostpointercapture',e=>{if(pointer?.id===e.pointerId)pointer=null;});canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('wheel',e=>{e.preventDefault();if(latched)release();view.wheel(e.deltaY,e.deltaMode,canvas.getBoundingClientRect().height);},{passive:false});
+canvas.addEventListener('wheel',e=>{e.preventDefault();if(latched)release();view.wheel(e.deltaY,e.deltaMode,canvas.getBoundingClientRect().height);if(pointer?.look||pointer?.pan){pointer.x=e.clientX;pointer.y=e.clientY;pointer.camera=view.cameraState();pointer.center=pointer.camera.center;}},{passive:false});
 
 document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{release();tool=b.dataset.tool;choose(null);sync();status(tool==='gear'?'Click a peg or a gear on it to add the next gear to its stack.':tool==='peg'?'Click a floor or wall face to place a peg.':tool==='motor'?'Click a surface or peg to mount a motor.':tool==='crank'?'Click the outermost ordinary gear to attach a hand crank.':tool==='wall'?'Choose XY, YZ or XZ; click the floor to place.':'Click to select. Shift-click adds parts. Left-drag empty space to rotate; right-drag to pan; scroll to move forward or back.');});
 $('apply').onclick=()=>{const gears=selectedGears();if(!gears.length||gears.length!==selection.size)return;const v=values();edit(()=>{for(const g of gears){const editMotor=gears.every(o=>o.kind==='motor'),drive=editMotor?v.drive:g.drive,props={teeth:v.teeth,module:v.module,thickness:v.thickness,material:v.material,brake:g.kind==='motor'&&drive==='ideal'?0:v.brake};if(gears.length===1)props.handTorque=v.handTorque;if(editMotor)Object.assign(props,{drive:v.drive,rpm:v.rpm,torque:v.torque});Object.assign(g,props);gearFits(g);}});};
