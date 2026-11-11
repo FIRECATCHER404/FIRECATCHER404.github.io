@@ -1,8 +1,9 @@
 import assert from'node:assert/strict';
 import{ready,GearSimulation,DT}from'../projects/gear-lab/physics.js';
 import{blankScene,defaultGear,dimensions,meshPhase,gearParts,polygonProperties,checkedScene,MATERIALS,toothStress}from'../projects/gear-lab/geometry.js';
-import{V,add,rotate,mountRotation,normal,mountedOnSurface,wallSize,wallOnFloor,moveMount,FLOOR_Y}from'../projects/gear-lab/space.js';
-import{axialEnvelope,nextStackLayer,connectParts,disconnectParts,connections}from'../projects/gear-lab/geometry.js';
+import{V,add,rotate,mountRotation,normal,mountedOnSurface,wallSize,wallOnFloor,moveMount,pegLength,FLOOR_Y}from'../projects/gear-lab/space.js';
+import{stepperExample,stepperInfo}from'../projects/gear-lab/stepper.js';
+import{axialEnvelope,MAX_LAYER,MAX_GEARS,nextStackLayer,connectParts,disconnectParts,connections}from'../projects/gear-lab/geometry.js';
 await ready;let count=0;const test=(name,fn)=>{fn();console.log('PASS '+name);count++;},near=(a,b,e=1e-5)=>assert(Math.abs(a-b)<e,`${a} differs from ${b}`);
 function pair(n=20,m=30,module=.012){const d={...blankScene(),version:1},a={...defaultGear(),id:3,peg:1,teeth:n,module,motor:true},b={...defaultGear(),id:4,peg:2,teeth:m,module};b.angle=meshPhase(a,m,0);d.pegs=[{id:1,x:0,y:0},{id:2,x:(n+m)*module/2,y:0}];d.gears=[a,b];d.nextId=5;return d;}
 function run(d,fn,seconds=2){const s=new GearSimulation(d);s.gravity=false;try{for(let i=0;i<seconds/DT;i++)s.step();fn(s);}finally{s.dispose();}}
@@ -54,7 +55,7 @@ test('legacy mechanisms below the new floor are lifted together while preserving
  const old=pair();old.pegs[0].y=-5;old.pegs[1].y=5;const d=checkedScene(old);near(d.pegs[1].y-d.pegs[0].y,10);assert(d.pegs[0].y-dimensions(20,.012).outer>FLOOR_Y);assert(d.pegs.every(p=>mountedOnSurface(p,d.walls)));
 });
 test('placing on an occupied peg automatically chooses the next clear outer slot',()=>{
- const d=mountedPair(),peg=d.pegs[0].id,part=defaultGear();near(nextStackLayer(d,peg,part),1);for(let layer=1;layer<=6;layer++){d.gears.push({...part,id:d.nextId++,peg,layer});}assert.throws(()=>nextStackLayer(d,peg,part),/full/);
+ const d=mountedPair(),peg=d.pegs[0].id,part=defaultGear();near(nextStackLayer(d,peg,part),1);for(let layer=1;layer<=MAX_LAYER;layer++){d.gears.push({...part,id:d.nextId++,peg,layer});}assert.throws(()=>nextStackLayer(d,peg,part),/full/);
  const c=mountedPair();Object.assign(c.gears[0],{kind:'gear',motor:false,thickness:.04});near(nextStackLayer(c,c.pegs[0].id,{...part,kind:'motor',thickness:.04}),2);c.gears[0].crank=true;assert.throws(()=>nextStackLayer(c,c.pegs[0].id,part),/crank/);
 });
 test('multi-part fuse joins an entire stack while preserving angular offsets and file data',()=>{
@@ -74,4 +75,16 @@ test('reconnecting and deleting parts cleans legacy fuse links and saved sync re
  const d=mountedPair();d.gears.push({...defaultGear(),id:d.nextId++,peg:d.gears[0].peg,layer:1,link:d.gears[0].id});connectParts(d,[d.gears[0].id,d.gears[1].id],'sync');assert(d.gears.every(g=>g.link===null));assert.equal(connections(d).length,1);disconnectParts(d,[d.gears[0].id]);assert.equal(connections(d).length,0);checkedScene(d);
 });
 test('reciprocal legacy shaft links load once while added duplicate and cycle constraints are rejected',()=>{const d=mountedPair();d.gears[1].peg=d.gears[0].peg;d.gears[1].layer=1;d.gears[0].link=d.gears[1].id;d.gears[1].link=d.gears[0].id;checkedScene(d);assert.equal(connections(d).length,1);d.couplings.push({a:d.gears[0].id,b:d.gears[1].id,kind:'fuse'});assert.throws(()=>checkedScene(d),/Duplicate/);d.couplings=[];d.gears[0].link=null;d.gears[1].link=null;const g={...defaultGear(),id:d.nextId++,peg:d.gears[0].peg,layer:2};d.gears.push(g);connectParts(d,d.gears.map(g=>g.id),'fuse');d.couplings.push({a:d.gears[1].id,b:g.id,kind:'fuse'});assert.throws(()=>checkedScene(d),/loop/);});
+test('twenty 10/20 stepper pairs rise above one another and mesh with each previous driver',()=>{
+ const d=stepperExample(),info=stepperInfo(d);assert.equal(d.pegs.length,21);assert.equal(d.gears.length,41);assert.equal(d.couplings.length,20);assert.equal(d.gears[0].teeth,20);assert.equal(d.gears[0].kind,'motor');assert.equal(info.ratio,1048576);let previous=d.gears[0];for(let i=0;i<20;i++){const item=d.stepper.stages[i],small=d.gears.find(g=>g.id===item.small),big=d.gears.find(g=>g.id===item.big);assert.equal(small.teeth,10);assert.equal(big.teeth,20);assert.equal(small.layer,i);assert.equal(big.layer,i+1);assert.equal(small.peg,big.peg);assert.equal(previous.layer,small.layer);const a=d.pegs.find(p=>p.id===previous.peg),b=d.pegs.find(p=>p.id===small.peg);near(b.x-a.x,.18);near(Math.sin(small.angle),Math.sin(meshPhase(previous,10,0)));assert(d.couplings.some(c=>c.kind==='fuse'&&c.a===small.id&&c.b===big.id));previous=big;}assert.deepEqual(checkedScene(JSON.parse(JSON.stringify(d))),d);assert.deepEqual(stepperInfo(JSON.parse(JSON.stringify(d))),info);for(const n of[0,21,1.5,NaN])assert.throws(()=>stepperExample(n));
+});
+test('one and three physical stepper stages double speed at each contact and fused stack',()=>{
+ for(const n of[1,3]){const d=stepperExample(n),s=new GearSimulation(d);try{for(let i=0;i<480;i++)s.step();const info=stepperInfo(d);for(let i=0;i<n;i++){const big=s.gears.get(info.stages[i].id),small=s.gears.get(d.stepper.stages[i].small);near(s.speed(big)*30/Math.PI,6*(-2)**(i+1),1);near(s.speed(big),s.speed(small),.02);}assert(!s.fragments.length);}finally{s.dispose();}}
+});
+test('full stepper runs finite measured physics without copying its ideal millionfold ratio',()=>{
+ const d=stepperExample(),s=new GearSimulation(d);try{for(let i=0;i<480;i++)s.step();assert.equal(s.gears.size,41);for(const g of s.snapshot().gears){assert(Number.isFinite(g.rpm)&&Number.isFinite(g.angle));for(const n of Object.values(g.position))assert(Number.isFinite(n));}assert(Math.abs(s.snapshot().gears.at(-1).rpm)<1000,'ideal ratio must not be silently imposed on physics');near(s.time,2);}finally{s.dispose();}disconnectParts(d,[d.stepper.stages[1].small]);assert.equal(stepperInfo(d),null);assert.equal(stepperInfo({...d,stepper:{stages:[null]}}),null);
+});
+test('larger designs retain bounded part/stack limits and shaft lengths cover upper layers',()=>{
+ const d=stepperExample();assert(d.gears.length<MAX_GEARS);for(const g of d.gears)assert(pegLength(d,g.peg)>=.06+g.layer*.05+g.thickness/2+.039);const bad=structuredClone(d);bad.gears[0].layer=MAX_LAYER+1;assert.throws(()=>checkedScene(bad));const tooMany=structuredClone(d);tooMany.gears=Array(MAX_GEARS+1).fill(d.gears[0]);assert.throws(()=>checkedScene(tooMany));
+});
 console.log(`${count} Gear Lab test groups passed.`);

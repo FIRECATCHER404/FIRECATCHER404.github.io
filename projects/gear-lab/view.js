@@ -1,7 +1,7 @@
 import*as T from'../isometric/vendor/three.module.js';
-import{MATERIALS,dimensions}from'./geometry.js?v=3';
-import{SCALE}from'./physics.js?v=3';
-import{V,rotate,mountRotation,gearPoint,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=3';
+import{MATERIALS,dimensions}from'./geometry.js?v=4';
+import{SCALE}from'./physics.js?v=4';
+import{V,Q,multiply,rotate,mountRotation,gearPoint,pegLength,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=4';
 
 function dispose(group){for(const child of[...group.children]){group.remove(child);child.traverse(o=>{o.geometry?.dispose();for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[])m.dispose();});}}
 const material=(color,metalness=.15)=>new T.MeshStandardMaterial({color,metalness,roughness:.55});
@@ -26,7 +26,7 @@ export class GearView{
   this.design=design;this.sim=sim;for(const g of[this.environment,this.mounts,this.rotors,this.fragments])dispose(g);this.gearMeshes.clear();this.fragmentMeshes.clear();
   const floor=box(FLOOR_SIZE,.08,FLOOR_SIZE,'#2c333a');floor.position.y=FLOOR_Y-.04;floor.castShadow=false;floor.userData={type:'floor',id:'floor'};this.environment.add(floor);
   for(const w of design.walls){const size=wallSize(w),m=box(size.x,size.y,size.z,'#525e68');m.position.set(w.x,w.y,w.z);m.userData={type:'wall',id:w.id};this.environment.add(m);}
-  for(const p of design.pegs){const group=new T.Group(),pole=cylinder(.008,.43,'#a7b2b8');pole.position.z=.215;group.add(pole);const base=cylinder(.024,.012,'#687784');base.position.z=.006;group.add(base);group.position.set(p.x,p.y,p.z);group.quaternion.copy(mountRotation(p));group.userData={type:'peg',id:p.id};this.mounts.add(group);}
+  for(const p of design.pegs){const group=new T.Group(),size=pegLength(design,p.id),pole=cylinder(.008,size,'#a7b2b8');pole.position.z=size/2;group.add(pole);const base=cylinder(.024,.012,'#687784');base.position.z=.006;group.add(base);group.position.set(p.x,p.y,p.z);group.quaternion.copy(mountRotation(p));group.userData={type:'peg',id:p.id};this.mounts.add(group);}
   for(const g of sim.gears.values()){
    if(g.config.kind==='motor'){const peg=design.pegs.find(p=>p.id===g.config.peg),housing=new T.Group(),r=dimensions(g.config.teeth,g.config.module).pitch*.92,z=.06+g.config.layer*.05;const base=box(r*2,r*2,.034,'#b39a61');base.position.z=z-g.config.thickness/2-.02;housing.add(base);const cap=cylinder(r*.7,.006,'#655b43');cap.position.z=z-g.config.thickness/2-.004;housing.add(cap);housing.position.set(peg.x,peg.y,peg.z);housing.quaternion.copy(mountRotation(peg));housing.userData={type:'motor',id:g.config.id};this.mounts.add(housing);}
    const group=this.rotor(g);this.gearMeshes.set(g.config.id,group);this.rotors.add(group);
@@ -39,11 +39,11 @@ export class GearView{
   if(g.config.crank){const radius=dimensions(g.config.teeth,g.config.module).outer*.72,z=g.config.thickness/2,arm=box(radius,.012,.012,'#aab9bd');arm.position.set(radius/2,0,z+.014);group.add(arm);const handle=cylinder(.012,.04,'#b79958');handle.position.set(radius,0,z+.04);handle.userData={type:'crank',id:g.config.id};group.add(handle);}
   group.userData={type:'gear',id:g.config.id,revision:g.revision};return group;
  }
- draw(selected=null,stress=false,latched=null){
+ draw(selected=null,stress=false,latched=null,preview=null){
   if(!this.sim)return;const has=id=>selected instanceof Set?selected.has(id):selected===id;
   for(const g of this.sim.gears.values()){
    let mesh=this.gearMeshes.get(g.config.id);if(mesh.userData.revision!==g.revision){this.rotors.remove(mesh);dispose(mesh);mesh=this.rotor(g);this.gearMeshes.set(g.config.id,mesh);this.rotors.add(mesh);}
-   const p=g.rb.translation();mesh.position.set(p.x/SCALE,p.y/SCALE,p.z/SCALE);mesh.quaternion.copy(g.rb.rotation());
+   const p=g.rb.translation();mesh.position.set(p.x/SCALE,p.y/SCALE,p.z/SCALE);mesh.quaternion.copy(preview?.has(g.config.id)?multiply(g.frame,Q(preview.get(g.config.id))):g.rb.rotation());
    const body=mesh.children[0];body.material.color.set(MATERIALS[g.config.material].color);if(stress){const ratio=Math.min(1,g.stress/MATERIALS[g.config.material].strength);body.material.color.setHSL(.33*(1-ratio),.65,.5);}body.material.emissive.set(has(g.config.id)?'#76531a':'#000000');
    const handle=mesh.children.find(m=>m.userData.type==='crank');if(handle)handle.material.color.set(latched===g.config.id?'#80c89b':'#b79958');
   }
@@ -61,9 +61,9 @@ export class GearView{
  point(p){const v=new T.Vector3(p.x,p.y,p.z).project(this.camera),r=this.canvas.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}
  fit(){
   const points=[];for(const w of this.design.walls){const s=wallSize(w);points.push(new T.Vector3(w.x-s.x/2,w.y-s.y/2,w.z-s.z/2),new T.Vector3(w.x+s.x/2,w.y+s.y/2,w.z+s.z/2));}
-  for(const p of this.design.pegs){const tip=rotate(mountRotation(p),V(0,0,.43));points.push(new T.Vector3(p.x,p.y,p.z),new T.Vector3(p.x+tip.x,p.y+tip.y,p.z+tip.z));}
+  for(const p of this.design.pegs){const tip=rotate(mountRotation(p),V(0,0,pegLength(this.design,p.id)));points.push(new T.Vector3(p.x,p.y,p.z),new T.Vector3(p.x+tip.x,p.y+tip.y,p.z+tip.z));}
   for(const g of this.design.gears){const p=gearPoint(this.design.pegs.find(p=>p.id===g.peg),g),r=dimensions(g.teeth,g.module).outer;points.push(new T.Vector3(p.x-r,p.y-r,p.z-r),new T.Vector3(p.x+r,p.y+r,p.z+r));}
-  if(!points.length){this.center.set(0,-.15,0);this.zoom=1;}else{const b=new T.Box3().setFromPoints(points),size=b.getSize(new T.Vector3());b.getCenter(this.center);const extent=Math.max(.6,size.length()+.18);this.zoom=Math.max(.15,Math.min(5,2.24/extent));}this.resize();
+  if(!points.length){this.center.set(0,-.15,0);this.zoom=1;}else{const b=new T.Box3().setFromPoints(points);b.getCenter(this.center);this.resize();const right=new T.Vector3(1,0,0).applyQuaternion(this.camera.quaternion),up=new T.Vector3(0,1,0).applyQuaternion(this.camera.quaternion),extent=points.map(p=>p.clone().sub(this.center)),width=Math.max(.6,2*Math.max(...extent.map(p=>Math.abs(p.dot(right))))+.12),height=Math.max(.6,2*Math.max(...extent.map(p=>Math.abs(p.dot(up))))+.12),rect=this.canvas.getBoundingClientRect(),aspect=Math.max(.1,rect.width/rect.height);this.zoom=Math.max(.15,Math.min(5,2.24/height,2.24*aspect/width));}this.resize();
  }
- stats(){return{gears:this.gearMeshes.size,fragments:this.fragmentMeshes.size,walls:this.design.walls.length,floor:true,highlighted:this.highlighted||[]};}
+ stats(){return{gears:this.gearMeshes.size,fragments:this.fragmentMeshes.size,walls:this.design.walls.length,floor:true,poses:[...this.gearMeshes].map(([id,m])=>({id,rotation:{x:m.quaternion.x,y:m.quaternion.y,z:m.quaternion.z,w:m.quaternion.w}})),pegLengths:this.design.pegs.map(p=>({id:p.id,length:pegLength(this.design,p.id)})),highlighted:this.highlighted||[]};}
 }

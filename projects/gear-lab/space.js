@@ -19,3 +19,5 @@ export function mountedOnSurface(peg,walls,tolerance=.0001){
 }
 export function sameMountPlane(a,b){return a.axis===b.axis&&a.sign===b.sign&&Math.abs(dot(sub(a,b),normal(a)))<.0001;}
 export function moveMount(scene,id,delta){const wall=scene.walls.find(w=>w.id===id);if(wall){for(const k of['x','y','z'])wall[k]+=delta[k];for(const p of scene.pegs.filter(p=>p.surface===id))for(const k of['x','y','z'])p[k]+=delta[k];return;}const peg=scene.pegs.find(p=>p.id===id);if(peg)for(const k of['x','y','z'])peg[k]+=delta[k];}
+
+export const pegLength=(scene,id)=>Math.max(.43,...scene.gears.filter(g=>g.peg===id).map(g=>.06+g.layer*.05+g.thickness/2+(g.crank?.09:.04)));

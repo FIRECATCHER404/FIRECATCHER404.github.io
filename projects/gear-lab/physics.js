@@ -1,6 +1,6 @@
 import R from'../void-lab/vendor/rapier.js';
-import{MATERIALS,dimensions,gearParts,hullVertices,polygonProperties,toothStress,checkedScene,connections}from'./geometry.js?v=3';
-import{V,Q,rotate,inverse,multiply,add,sub,mul,cross,dot,wrap,normal,mountRotation,gearPoint,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=3';
+import{MATERIALS,dimensions,gearParts,hullVertices,polygonProperties,toothStress,checkedScene,connections}from'./geometry.js?v=4';
+import{V,Q,rotate,inverse,multiply,add,sub,mul,cross,dot,wrap,normal,mountRotation,gearPoint,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=4';
 export const ready=R.init(),DT=1/240,SCALE=100;
 
 export class GearSimulation{

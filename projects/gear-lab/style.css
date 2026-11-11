@@ -3,3 +3,5 @@ nav{flex-wrap:wrap}#wall-controls,#motor-controls,#hand-controls{border-bottom:1
 #delete{width:100%;margin:10px 0}
 
 #selection-actions{border-top:1px solid #3c424a}#disconnect{width:100%;margin-top:9px}#parts{display:flex;flex-direction:column;gap:4px;max-height:230px;overflow:auto;margin:12px 0}#parts button{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;min-height:34px}#parts small{font:10px monospace;opacity:.7}#parts-panel summary{margin-top:12px}#multi-select{font-size:11px}#multi-select[aria-pressed=true]{background:#5d795f;color:#fff;border-color:#8aa08c}
+
+#stepper-readout{border-top:1px solid #3c424a;font-size:11px}#stepper-rpm{display:block;font-family:monospace;color:#d4b57b}#stepper-readout table{width:100%;border-collapse:collapse;font:10px/1.8 monospace;margin:12px 0}#stepper-readout th,#stepper-readout td{text-align:right;padding:3px;border-bottom:1px solid #383e45}#stepper-readout th{font-size:9px;color:#a9b2bd}
