@@ -1,6 +1,8 @@
-import{MATERIALS,colorHex}from './model.js?v=2';
+import{invalidateTerrain}from'./terrain.js?v=3';
+import{invalidateSpace}from'./space.js?v=3';
+import{MATERIALS,colorHex}from './model.js?v=3';
 const artCache=new WeakMap(),gameArtCache=new WeakMap();
-export function invalidateArt(r){artCache.delete(r);gameArtCache.delete(r);}
+export function invalidateArt(r){invalidateTerrain(r);invalidateSpace(r);artCache.delete(r);gameArtCache.delete(r);}
 export function artwork(r){let c=artCache.get(r);if(c)return c;c=document.createElement('canvas');c.width=r.width*r.artScale;c.height=r.height*r.artScale;const ctx=c.getContext('2d'),data=ctx.createImageData(c.width,c.height);for(let i=0;i<r.art.length;i++){const n=r.art[i];if(!n)continue;const rgb=n-1;data.data[i*4]=rgb>>16&255;data.data[i*4+1]=rgb>>8&255;data.data[i*4+2]=rgb&255;data.data[i*4+3]=255;}ctx.putImageData(data,0,0);artCache.set(r,c);return c;}
 function gameArtwork(r,g){const key=r.doors.map(d=>d.id+':'+g.doors[d.id]).join(','),cached=gameArtCache.get(r);if(cached?.key===key)return cached.canvas;const source=artwork(r),c=document.createElement('canvas');c.width=source.width;c.height=source.height;const ctx=c.getContext('2d');ctx.drawImage(source,0,0);const s=r.artScale,clear=o=>ctx.clearRect(o.x*s,o.y*s,o.w*s,o.h*s);if(r.spawn)clear(r.spawn);for(const d of r.doors)if(g.doors[d.id])clear(d);gameArtCache.set(r,{key,canvas:c});return c;}
 function rect(ctx,o,color,alpha=1){ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=color;ctx.fillRect(o.x,o.y,o.w,o.h);ctx.restore();}

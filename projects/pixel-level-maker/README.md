@@ -2,7 +2,15 @@
 
 Draw every visible pixel yourself. A separate physical layer gives those pixels meaning, and Play runs the behavior underneath the drawing. New projects and rooms start empty. There are no supplied characters, textures, object graphics, animated markers, tile sets, or generated artwork.
 
-Buildless Canvas 2D/JavaScript. Serve `index.html` over HTTP. Exported games run directly from a single HTML file with no server, libraries, accounts, fonts, or network assets.
+Buildless Canvas 2D/JavaScript artwork with hidden 3D collision and movement. **Paint the 3D perspective yourself:** the application does not rotate, extrude, relight, or replace your artwork. Serve `index.html` over HTTP. Exported games run directly from a single HTML file with no server, libraries, accounts, fonts, or network assets.
+
+## 3D physics under your pixel art
+
+Wall rows represent upright wall faces. Scanning each column from bottom to top, a wall pixel adds its configured height; floors above it are higher and offset forward in ground depth. The relationship is `ground depth = drawing Y + elevation / wall-pixel height`, so your original painted perspective remains in place. A floor above a two-pixel wall occupies a different physical elevation from the floor below it.
+
+**Paint floor heights** overrides automatic elevation with the normal drawing tools. Erase or **Restore automatic heights** clears an override, and Reset clears them all. Overrides never change artwork or floor/wall meanings. The height brush shows numbers only in the editor's physical layer. Height overrides, wall-pixel height, and player body height are saved with each room; older files receive compatible defaults.
+
+The player has a rectangular ground footprint plus a vertical body height. The runtime checks vertical walls, closed door volumes, floors, ceilings, and clearance between stacked floors. J / Jump adds upward velocity; gravity brings the player down onto a supporting floor. Walking off a raised edge onto lower ground falls rather than teleporting down. Small steps up to 0.26 units can be walked; taller ledges need a jump or a drawn stair route. Trigger interaction checks elevation so it cannot activate through a different floor. The room remains a surface map, not a freeform voxel sculptor: walls and floors must be authored through this pixel-to-space mapping.
 
 ## Two layers
 
@@ -35,7 +43,7 @@ Removing objects or rooms removes dangling target actions. Room duplication rema
 
 ## Play, files, and limits
 
-WASD/arrows move; E/Space/Enter interact or acknowledge messages; Escape returns to editing. Touch has held movement buttons and Interact. Restart resets runtime state. Play uses an independent copy and never changes editor pixels or settings. The optional physics preview is diagnostic only.
+WASD/arrows move; J jumps; E/Space/Enter interact or acknowledge messages; Escape returns to editing. Touch has held movement buttons, Jump, and Interact. Restart resets runtime state. Play uses an independent copy and never changes editor pixels or settings. The optional physics preview is diagnostic only.
 
 Movement is normalized diagonally and substepped against the full rectangular player region. A one-pixel-tall player can travel along a one-pixel floor stripe without entering adjacent walls. Water slows movement; hazards cost a health point and return to a checkpoint. Destination entry triggers containing the arrival point are latched to avoid immediate return loops.
 
@@ -47,6 +55,6 @@ Limits: 20 rooms, 8-128 physical pixels wide and 8-96 high, one million artwork 
 
 ## Verification
 
-`node scripts/test-pixel-level-maker.mjs` covers independent layers, RGB/transparency, RLE validation, resampling, drawing tools, collision, interaction, trigger chains and cycles, flags, transitions, checkpoints, endings, reference cleanup, strict files, offline packaging, empty defaults, exact player-pixel extraction, invisible unpainted regions, rectangular body clearance, and version migration.
+`node scripts/test-pixel-level-maker.mjs` covers independent layers, RGB/transparency, RLE validation, resampling, drawing tools, collision, interaction, trigger chains and cycles, flags, transitions, checkpoints, endings, reference cleanup, strict files, offline packaging, empty defaults, exact player-pixel extraction, invisible unpainted regions, rectangular body clearance, version migration, folded wall geometry, floor depth/elevation, jumping/landing, ceilings, overlapping floors, ledge falls, height persistence/validation, and trigger elevation.
 
-Browser QA draws a level from an empty project, paints a four-pixel player, samples the rendered colors, verifies those exact pixels move and their old position clears, tests an authored door's pixels disappearing on activation, changes rooms while retaining the player pixels, and checks drafts and offline exports. Physical phones and non-Chromium browsers remain untested.
+Run `scripts/test-pixel-level-maker-browser.js` through the Playwright browser tool after serving the checkout on port 8974. It exercises painting tools, height editing, exact authored raster colors during Play, 3D movement/jumping, objects/action dialogs, room operations, settings, files/PNG, drafts, a network-disabled exported game, and emulated touch/responsive controls. Its optional second argument supplies `baseURL` and an `offlinePath` for QA exports. Combine this with all core tests before finishing an update. Physical phones and non-Chromium browsers need separate checks.
