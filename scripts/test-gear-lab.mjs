@@ -1,9 +1,11 @@
 import assert from'node:assert/strict';
 import{ready,GearSimulation,DT}from'../projects/gear-lab/physics.js';
 import{blankScene,defaultGear,dimensions,meshPhase,gearParts,polygonProperties,checkedScene,MATERIALS,toothStress}from'../projects/gear-lab/geometry.js';
+import{V,add,rotate,mountRotation,normal,mountedOnSurface,wallSize,wallOnFloor,moveMount,FLOOR_Y}from'../projects/gear-lab/space.js';
+import{axialEnvelope}from'../projects/gear-lab/geometry.js';
 await ready;let count=0;const test=(name,fn)=>{fn();console.log('PASS '+name);count++;},near=(a,b,e=1e-5)=>assert(Math.abs(a-b)<e,`${a} differs from ${b}`);
-function pair(n=20,m=30,module=.012){const d=blankScene(),a={...defaultGear(),id:3,peg:1,teeth:n,module,motor:true},b={...defaultGear(),id:4,peg:2,teeth:m,module};b.angle=meshPhase(a,m,0);d.pegs=[{id:1,x:0,y:0},{id:2,x:(n+m)*module/2,y:0}];d.gears=[a,b];d.nextId=5;return d;}
-function run(d,fn,seconds=2){const s=new GearSimulation(d);try{for(let i=0;i<seconds/DT;i++)s.step();fn(s);}finally{s.dispose();}}
+function pair(n=20,m=30,module=.012){const d={...blankScene(),version:1},a={...defaultGear(),id:3,peg:1,teeth:n,module,motor:true},b={...defaultGear(),id:4,peg:2,teeth:m,module};b.angle=meshPhase(a,m,0);d.pegs=[{id:1,x:0,y:0},{id:2,x:(n+m)*module/2,y:0}];d.gears=[a,b];d.nextId=5;return d;}
+function run(d,fn,seconds=2){const s=new GearSimulation(d);s.gravity=false;try{for(let i=0;i<seconds/DT;i++)s.step();fn(s);}finally{s.dispose();}}
 test('strict scenes reject invalid limits, IDs, peg references, duplicate stack slots, and links',()=>{checkedScene(blankScene());for(const change of[d=>d.gears[0].teeth=0,d=>d.gears[0].module=Infinity,d=>d.gears[0].material='__proto__',d=>d.gears[0].id=1,d=>d.gears[0].peg=999,d=>d.gears[0].link=4,d=>d.gears[0].torque=-1,d=>d.pegs[0].x=6]){const d=pair();change(d);assert.throws(()=>checkedScene(d));}const d=pair();d.gears[1].peg=1;assert.throws(()=>checkedScene(d));});
 test('involute profiles have positive finite area at every supported tooth count and module limit',()=>{for(let n=8;n<=48;n++)for(const m of[.005,.012,.03]){const parts=gearParts(n,m),d=dimensions(n,m);assert.equal(parts.length,n*2+1);for(const p of parts){assert(polygonProperties(p.polygon).area>0);assert(p.polygon.every(v=>Number.isFinite(v.x)&&Number.isFinite(v.y)&&Math.hypot(v.x,v.y)<=d.outer+1e-8));}}});
 test('torque-limited motors accelerate actual rigid bodies and reverse',()=>{for(const rpm of[-30,30]){const d=pair();d.gears.pop();d.gears[0].rpm=rpm;run(d,s=>{const g=s.snapshot().gears[0];near(g.rpm,rpm,.1);assert(Math.abs(g.torque)<=1);assert(g.mass>0);});}});
@@ -19,4 +21,36 @@ test('RPM alone never breaks an unloaded gear',()=>{const d=overload('glass');d.
 test('fracture conserves mass and rigid-body velocity at detached piece centers',()=>{const s=new GearSimulation(pair());try{const g=s.gears.get(3);g.rb.setAngvel({x:0,y:0,z:3},true);const mass=g.rb.mass(),v={...g.rb.linvel()},omega={...g.rb.angvel()},com={...g.rb.worldCom()},part=g.parts.find(p=>p.type==='tooth');const f=s.detach(g,[part],'test');near(g.rb.mass()+f.rb.mass(),mass,1e-5);const c=f.rb.worldCom(),expected={x:v.x-omega.z*(c.y-com.y),y:v.y+omega.z*(c.x-com.x)};near(f.rb.linvel().x,expected.x,.001);near(f.rb.linvel().y,expected.y,.001);assert(!g.parts.includes(part));assert(!s.colliders.has(part.collider.handle));assert.equal(g.revision,1);}finally{s.dispose();}});
 test('simulation time retains frame remainders and reset designs remain intact',()=>{const d=pair(),before=JSON.stringify(d),s=new GearSimulation(d);try{for(let i=0;i<60;i++)s.advance(1/60);near(s.time,1);assert(s.remainder<1e-8);assert.equal(JSON.stringify(d),before);}finally{s.dispose();}});
 test('strength and tooth-section relationships are material and geometry dependent',()=>{assert(MATERIALS.steel.strength>MATERIALS.wood.strength);near(toothStress(10,20,.012,.012)*2,toothStress(20,20,.012,.012));near(toothStress(10,20,.012,.012)/2,toothStress(10,20,.012,.024));});
+function mountedPair(axis='y',sign=1){
+ const d=blankScene();let p;
+ if(axis==='y'&&sign===1)p={id:d.nextId++,x:0,y:FLOOR_Y,z:0,axis,sign,surface:'floor'};
+ else{const plane=axis==='x'?'yz':axis==='y'?'xz':'xy',w=wallOnFloor(d.nextId++,plane,V(0,FLOOR_Y,0),2,1.4,axis==='y'?.8:0);d.walls.push(w);const size=wallSize(w);p={id:d.nextId++,x:w.x,y:w.y,z:w.z,axis,sign,surface:w.id};p[axis]+=sign*size[axis]/2;}
+ d.pegs.push(p);const delta=rotate(mountRotation(p),V(.3,0,0)),pb={...p,...add(p,delta),id:d.nextId++};d.pegs.push(pb);
+ const a={...defaultGear(),id:d.nextId++,peg:p.id,kind:'motor',motor:true},b={...defaultGear(),id:d.nextId++,peg:pb.id,teeth:30};b.angle=meshPhase(a,30,0);d.gears.push(a,b);return checkedScene(d);
+}
+test('new scenes have a persistent physical floor and no implicit pegs',()=>{const d=blankScene(),s=new GearSimulation(d);try{assert.equal(d.version,2);assert.equal(d.pegs.length,0);assert.equal(d.gears.length,0);assert(s.floor.isValid());near(s.floor.translation().y/100,FLOOR_Y-.04,.0001);}finally{s.dispose();}});
+test('wall planes sit flush on the floor and all six face normals accept surface-mounted pegs',()=>{
+ for(const axis of['xy','yz','xz']){const w=wallOnFloor(1,axis,V(0,FLOOR_Y,0));near(w.y-wallSize(w).y/2,FLOOR_Y);}
+ for(const axis of['x','y','z'])for(const sign of[-1,1]){const d=mountedPair(axis,sign);assert(d.pegs.every(p=>mountedOnSurface(p,d.walls)));const bad=structuredClone(d);bad.pegs[0][axis]+=.01;assert.throws(()=>checkedScene(bad));}
+});
+test('constant-RPM motors maintain speed and drive meshing gears on every world axis',()=>{
+ for(const axis of['x','y','z'])for(const sign of[-1,1]){const d=mountedPair(axis,sign),s=new GearSimulation(d);try{s.breaking=false;for(let i=0;i<480;i++)s.step();const[a,b]=s.snapshot().gears;near(a.rpm,30,.05);near(b.rpm,-20,.5);assert(Math.abs(a.axis[axis]-sign)<1e-8);assert(a.peak>0);}finally{s.dispose();}}
+});
+test('shaft locks preserve compound motion on a floor-mounted motor',()=>{
+ const d=mountedPair();d.gears[1].peg=d.pegs[0].id;d.gears[1].layer=1;d.gears[1].link=d.gears[0].id;const s=new GearSimulation(d);try{for(let i=0;i<240;i++)s.step();const[a,b]=s.snapshot().gears;near(a.rpm,b.rpm,.1);}finally{s.dispose();}
+});
+test('a latched crank physically drives a gear train and releases its hand torque',()=>{
+ for(const axis of['x','y','z']){const d=mountedPair(axis);Object.assign(d.gears[0],{kind:'gear',motor:false,crank:true});const s=new GearSimulation(d);try{s.gravity=false;s.latchCrank(d.gears[0].id);for(let i=0;i<480;i++){s.setCrankTarget((i+1)/480*Math.PI*2);s.step();}const[a,b]=s.snapshot().gears;assert(a.angle>5.5&&a.rpm>20,axis+' crank did not rotate');assert(b.angle<d.gears[1].angle-3,axis+' crank did not drive neighbor');assert(Math.abs(a.torque)<=d.gears[0].handTorque);s.releaseCrank();s.step();assert.equal(s.crank,null);near(s.gears.get(a.id).torque,0);}finally{s.dispose();}}
+});
+test('crank constraints prevent motor handles and crank collisions with upper stack layers',()=>{const d=mountedPair();d.gears[0].crank=true;assert.throws(()=>checkedScene(d));d.gears[0].crank=false;const g={...defaultGear(),id:d.nextId++,peg:d.pegs[1].id,layer:1};d.gears.push(g);d.gears[1].crank=true;assert.throws(()=>checkedScene(d));});
+test('moving a support preserves attached peg positions and file round trips',()=>{const d=mountedPair('z'),w=d.walls[0],old={...d.pegs[0]};moveMount(d,w.id,V(.2,0,.1));near(d.pegs[0].x,old.x+.2);near(d.pegs[0].z,old.z+.1);assert.deepEqual(checkedScene(JSON.parse(JSON.stringify(d))),d);});
+test('detached pieces land on the physical floor instead of falling through it',()=>{const d=mountedPair(),s=new GearSimulation(d);try{const g=s.gears.get(d.gears[1].id),part=g.parts.find(p=>p.type==='tooth'),f=s.detach(g,[part],'test');for(let i=0;i<720;i++)s.step();const y=f.rb.translation().y/100;assert(y>FLOOR_Y-.001&&y<FLOOR_Y+.04,`fragment y ${y}`);}finally{s.dispose();}});
+test('version 1 files acquire a flush support wall without losing gears or shaft links',()=>{const old=pair(),d=checkedScene(old);assert.equal(d.version,2);assert.equal(d.gears.length,2);assert.equal(d.walls.length,1);assert(d.pegs.every(p=>p.axis==='z'&&p.surface===d.walls[0].id));assert.equal(d.gears[0].drive,'torque');assert.equal(d.gears[0].kind,'motor');near(d.pegs[0].x,old.pegs[0].x);});
+test('motor housings clear their rotors at all thicknesses and reject overlapping stack space',()=>{
+ for(const thickness of[.006,.012,.04]){const d=mountedPair();d.gears[0].thickness=thickness;const s=new GearSimulation(d);try{const g=s.gears.get(d.gears[0].id),housing=s.pegs.get(g.config.peg).collider(0);s.world.propagateModifiedBodyPositionsToColliders();for(const part of g.parts){const c=part.collider.contactCollider(housing,0);assert(!c||c.distance>=-.00001,'housing overlaps rotor');}const ground=housing.contactCollider(s.floor,0);assert(!ground||ground.distance>=-.00001,'housing overlaps floor');}finally{s.dispose();}}
+ const d=mountedPair();d.gears[1].peg=d.pegs[0].id;d.gears[0].kind='gear';d.gears[0].motor=false;Object.assign(d.gears[1],{kind:'motor',motor:true,layer:1,thickness:.04});assert.throws(()=>checkedScene(d),/overlap/);d.gears[1].layer=2;checkedScene(d);
+});
+test('legacy mechanisms below the new floor are lifted together while preserving their layout',()=>{
+ const old=pair();old.pegs[0].y=-5;old.pegs[1].y=5;const d=checkedScene(old);near(d.pegs[1].y-d.pegs[0].y,10);assert(d.pegs[0].y-dimensions(20,.012).outer>FLOOR_Y);assert(d.pegs.every(p=>mountedOnSurface(p,d.walls)));
+});
 console.log(`${count} Gear Lab test groups passed.`);

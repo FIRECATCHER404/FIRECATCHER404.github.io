@@ -1,32 +1,51 @@
 # Gear Lab
 
-A buildless browser workbench for physical spur gears. Place pegs and gears, stack them on seven axial layers, and optionally lock gears on the same peg into a compound shaft. Choose teeth, module, thickness, material, motor speed/torque limit, and brake load. Start empty or load a pair, compound train, or overload example.
+A physical gear workbench with a floor, axis-aligned support walls, surface-mounted pegs, gears, separate motors, and hand cranks. Start empty or load a floor-mounted motor train, a wall-mounted train, a hand-cranked pair, a compound shaft, or an overload example.
 
-Motion is transferred by rigid-body **tooth contacts**, not by copying angular velocities or imposing a gear ratio. Pegs are fixed revolute bearings. A shaft lock is a fixed joint that preserves the initial angle difference. A torque-limited speed controller drives the selected gear; zero-speed joint motors provide static/dynamic brake resistance. Different modules need not mesh correctly.
+## Building
 
-The local Rapier 3D 0.21.0 WebAssembly engine runs at 240 Hz, with CCD and small contact tolerances. Shapes are sampled 20-degree involute profiles, assembled from convex tooth, rim, and hub pieces. The solver works in centimetres to avoid contact errors on millimetre features; positions, material density, forces, torque, mass and readouts are converted consistently to SI units. Rendering uses the existing local Three.js 0.187.0 modules. No runtime CDN is needed. These shared, unchanged dependencies and their licenses are documented under [Void Lab vendor](../void-lab/vendor/README.md) and [Isometric vendor](../isometric/vendor/README.md).
+The **floor already exists**, has a collision shape, and catches falling fragments. Gravity starts enabled.
 
-## Material failure
+1. **Wall:** choose XY, YZ, or XZ. Click the floor or a platform top to place it. Vertical walls sit flush on their support; XZ makes a horizontal platform. Width, height/depth, and elevation are editable. Select a wall to resize or delete it. Moving it carries its pegs and gears. Remove attached pegs before changing its plane.
+2. **Peg:** click a floor or wall face. Its shaft points out along that face's X, Y, or Z normal. All six wall-face directions work. The snap option adjusts new peg spacing to the pitch distance of a nearby compatible gear.
+3. **Gear:** click an **existing peg**. Clicking empty space never creates a peg. The chosen layer places it along the shaft. Stack a gear uses the next free layer; choose **Lock shaft to** to make a compound shaft. Stacked gears otherwise turn independently.
 
-Acetal, hardwood, glass, aluminium, and steel have different density, friction, nominal strength, and damage responses. Measured tooth-contact forces drive a cantilever-section stress estimate and accumulated overload damage. A failed tooth, or a rim sector during severe brittle overload, detaches into an independently simulated rigid fragment. The original colliders are removed, so the broken gear genuinely loses that part of its tooth profile. Fragment velocities inherit the original rigid body's velocity field; no arbitrary explosion impulse is added.
+Use the same module for meshing gears. Seven stack layers are 50 mm apart. Thicker motor housings need extra clearance; overlapping parts on a peg are rejected. A crank belongs on the outermost ordinary gear.
 
-This is an approximate failure model with predetermined tooth/rim crack boundaries. It does **not** solve finite-element elasticity, arbitrary crack propagation, plastic deformation, thermal wear, or grade-specific material behavior. Pegs and shaft locks remain ideal rigid supports. The material presets are illustrative, not manufacturing or safety data.
+Select and drag a peg along its mounting face to move its stack. Drag a wall along the floor to move the whole assembly. Front-view dragging keeps movement on the visible allowed axis. Right-drag or Shift-drag orbits; wheel zooms; Fit reframes the mechanism. Peg dragging stays on its supporting face; wall dragging keeps its base height.
 
-## Controls and files
+## Motors and hand cranks
 
-- Peg/Gear tools: click the work area. Gear placement can create a peg and snap to the pitch distance and starting tooth phase of a nearby gear with the same module.
-- Select: click a gear's face or a peg. Drag a peg/gear to move its entire peg stack. Changes pause and rebuild the intact mechanism.
-- Stack a gear adds a free gear on the next available layer. Choose a gear in **Lock shaft to** and Apply to couple it. Layer spacing is 50 mm.
-- Right-drag or Shift-drag orbits the camera. The front/3D view button and Fit reframe it; the wheel zooms.
-- Run/Pause, single Step, Reset, stress colors, gravity, Undo/Redo, Delete, and Space/Ctrl+Z/Ctrl+Shift+Z are supported. Losing focus pauses.
-- Save/Open `.gears` files and the local draft preserve the **intact design**, not a running fracture state. Reset repairs all runtime damage. Invalid files leave the current design intact.
+**Motor** places a separate housing with a rotating gear in its centre. It can mount on a surface with an integral shaft, or use an existing peg. Its default **Constant RPM** drive is a velocity-controlled kinematic rotor that holds the selected RPM while the simulation runs. Other gears receive motion through physical tooth contacts. The optional **Torque limited** mode preserves the earlier finite-torque behavior and can stall under load. Brake load applies to ordinary gears and torque-limited rotors.
 
-Limits: 24 gears, 48 pegs, 8–48 teeth, 5–30 mm module, 6–40 mm thickness, seven stack layers, ±240 RPM, 500 N·m motor/brake limits, and 192 detached fragments. High speeds, dense mechanisms, and badly overlapping initial geometry can exceed the useful accuracy or performance of this discrete rigid-body model.
+**Hand crank** attaches a lever and grip to an ordinary gear. Click the grip or **Latch handle**, then move the pointer around the shaft to crank it. Touch can latch and drag the same handle. Click again, press Escape, or choose Release to let go. Latching starts the simulation; release removes the hand torque and leaves it running. If the crank is edge-on, the camera turns enough to make it usable. The grip turns green while latched.
 
-## Validation
+To hand-drive a train that includes a motor, choose Torque limited and set its torque to zero.
 
-Run `node scripts/test-gear-lab.mjs` and the self-contained `scripts/test-gear-lab-browser.js` through the Playwright browser tool. Serve the checkout at port 8974 for its default URL, or pass `{baseURL: 'https://…/projects/gear-lab/'}` as the browser function's second argument.
+The crank applies limited torque through the physics solver, including to any meshing or shaft-linked gears. It does not directly change gear transforms. **Hand torque** sets the torque limit. The arm and grip have collision shapes and contribute mass. Remove crank detaches the accessory from the design.
 
-Core coverage includes real contact ratios at different modules/tooth counts, solver-scale regression, independent/locked stacks, static braking, motor limits, material overload versus steel resistance, disabled fracture, unloaded high-speed rotation, fragment mass/velocity conservation, strict files, and exact frame-time accumulation. Browser coverage exercises placement/snapping, controls, simulation, stacks/locks, examples, fracture, files/drafts, undo/redo, deletion, camera/movement and emulated touch/responsive layouts at 320, 390, and 768 px. Inspect the rendered app and verify deployed assets after Pages finishes. Physical devices and other browser engines need separate validation.
+Design edits pause and rebuild the intact mechanism. Run/Pause, single Step, Reset, stress colors, gravity, Undo/Redo, Delete, Space, Ctrl+Z, and Ctrl+Shift+Z remain available. Losing focus pauses and releases a latched crank.
 
-Implementation references: [Rapier joints](https://rapier.rs/docs/user_guides/javascript/joints/), [contact-force events](https://rapier.rs/docs/user_guides/javascript/advanced_collision_detection/), and [revolute joint motors](https://rapier.rs/javascript3d/classes/RevoluteImpulseJoint.html).
+## Physics and breakage
+
+Local Rapier 3D 0.21.0 runs at 240 Hz with CCD and small contact tolerances. Sampled 20-degree involute teeth transfer contact forces; gear ratios are not copied between objects. Pegs use oriented revolute bearings, and shaft locks use fixed joints. The solver works in centimetres with consistent SI conversions for dimensions, mass, forces, torque and readouts. Rendering uses local Three.js 0.187.0 modules. Dependency versions and licenses: [Rapier/Three vendor](../void-lab/vendor/README.md), [Three vendor](../isometric/vendor/README.md).
+
+Acetal, hardwood, glass, aluminium and steel differ in density, friction, nominal strength and overload response. Measured contacts drive a tooth-section stress estimate and accumulated damage. Failed teeth or rim sectors become separate colliding fragments with inherited rigid-body velocity. The gear loses the corresponding collision shapes and visible geometry. The floor and walls remain physical obstacles to these pieces.
+
+Fracture is an approximation with predefined tooth/rim boundaries. Finite-element elasticity, arbitrary cracks, plastic deformation, thermal wear, and grade-specific material behavior are not modeled. Pegs, walls, motor housings and shaft locks are rigid supports. Material presets are illustrative, not manufacturing data.
+
+## Files and limits
+
+Save/Open `.gears` files and the local draft preserve the **intact design**, including walls, mounted axes, motors, crank attachments and shaft links. They do not store running fracture state. Reset repairs damage. Invalid files preserve the current mechanism and history.
+
+Version 2 files store the 3D mounts. Version 1 files and drafts acquire a support wall behind their original XY mechanism and retain finite-torque motor settings. Mechanisms below the new floor are translated upward together while retaining their relative layout. Old draft storage is left intact; new drafts use `neoj-gear-lab-v2`.
+
+Limits: 24 gears/motors, 48 pegs, 24 walls, 8–48 teeth, 5–30 mm module, 6–40 mm gear thickness, seven stack layers, ±240 RPM, 500 N·m torque/brake limits, 0.1–50 N·m hand torque, and 192 detached fragments. High speeds, dense mechanisms, and badly interfering tooth layouts can exceed this discrete rigid-body model's useful accuracy or performance.
+
+## Regression checks
+
+Run `node scripts/test-gear-lab.mjs`. Run `scripts/test-gear-lab-browser.js` through the Playwright browser tool after serving the checkout on port 8975, or pass `{baseURL: 'https://…/projects/gear-lab/'}` as its second argument. The browser suite also accepts a `groups` array for focused retries; run it without filters for the final regression.
+
+Coverage includes the original ratios, braking, material failure, mass conservation, files and histories, plus floor collision, all six mounting directions, XY/YZ/XZ wall placement, mandatory peg placement, constant-RPM motors, crank torque and coupling, actual mouse/touch handle gestures, edge-on crank visibility, wall resizing/movement/deletion, housing clearance, legacy migration, and 320/390/768 px layouts. Check the rendered scene, wait for Pages deployment, compare deployed files and repeat browser checks on the public page. Physical devices and non-Chromium browsers need separate validation.
+
+References: [Rapier rigid-body types](https://rapier.rs/docs/user_guides/javascript/rigid_bodies/), [joints](https://rapier.rs/docs/user_guides/javascript/joints/), [contact-force events](https://rapier.rs/docs/user_guides/javascript/advanced_collision_detection/).

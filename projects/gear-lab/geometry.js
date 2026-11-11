@@ -1,3 +1,4 @@
+import{mountedOnSurface,wallSize,FLOOR_Y}from'./space.js?v=2';
 export const TAU=Math.PI*2;
 export const MATERIALS={
  acetal:{name:'Acetal',density:1410,strength:65e6,friction:.12,color:'#d7dfdf',ductile:true},
@@ -22,13 +23,21 @@ export function gearParts(teeth,module){
 export function hullVertices(p,thickness){return new Float32Array([-thickness/2,thickness/2].flatMap(z=>p.flatMap(v=>[v.x,v.y,z])));}
 export function meshPhase(host,newTeeth,phi,hostAngle=host.angle||0){return(host.teeth*(phi-hostAngle)+newTeeth*(phi+Math.PI)-Math.PI)/newTeeth;}
 export function toothStress(force,teeth,module,thickness){const d=dimensions(teeth,module),rootWidth=Math.PI*module*.58;return Math.abs(force)*.94*6*(d.outer-d.root)/(thickness*rootWidth**2);}
+export function axialEnvelope(g){const z=.06+g.layer*.05;return{min:z-g.thickness/2-(g.kind==='motor'?.037:0),max:z+g.thickness/2+(g.crank?.056:0)};}
 export function checkedScene(raw){
- const d=structuredClone(raw),num=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b,int=(v,a,b)=>Number.isInteger(v)&&num(v,a,b),fail=()=>{throw Error('Invalid Gear Lab file.');};
- if(!d||d.format!=='gear-lab'||d.version!==1||!Array.isArray(d.pegs)||d.pegs.length>48||!Array.isArray(d.gears)||d.gears.length>24||!int(d.nextId,1,1000000))fail();const ids=new Set();
- for(const p of d.pegs){if(!int(p.id,1,d.nextId-1)||ids.has(p.id)||!num(p.x,-5,5)||!num(p.y,-5,5))fail();ids.add(p.id);}
- for(const g of d.gears){if(!int(g.id,1,d.nextId-1)||ids.has(g.id)||!d.pegs.some(p=>p.id===g.peg)||!int(g.teeth,8,48)||!num(g.module,.005,.03)||!num(g.thickness,.006,.04)||!int(g.layer,0,6)||!Object.hasOwn(MATERIALS,g.material)||!num(g.angle,-1e6,1e6)||!num(g.rpm,-240,240)||!num(g.torque,0,500)||!num(g.brake,0,500)||typeof g.motor!=='boolean'||!(g.link===null||int(g.link,1,d.nextId-1)))fail();ids.add(g.id);}
- for(const g of d.gears){if(g.link!==null&&!d.gears.some(other=>other.id===g.link&&other.peg===g.peg&&other.layer!==g.layer))fail();if(d.gears.some(other=>other.id!==g.id&&other.peg===g.peg&&other.layer===g.layer))fail();}
+ const d=structuredClone(raw),num=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b,int=(v,a,b)=>Number.isInteger(v)&&num(v,a,b),fail=(message='Invalid Gear Lab file.')=>{throw Error(message);};
+ if(!d||d.format!=='gear-lab'||![1,2].includes(d.version)||!Array.isArray(d.pegs)||d.pegs.length>48||!Array.isArray(d.gears)||d.gears.length>24||!int(d.nextId,1,1000000))fail();
+ if(d.version===1){if(d.pegs.some(p=>!p||!num(p.x,-5,5)||!num(p.y,-5,5)))fail();
+  const maxRadius=Math.max(.15,...d.gears.map(g=>dimensions(g.teeth,g.module).outer)),lift=Math.max(0,FLOOR_Y+.06+maxRadius-Math.min(0,...d.pegs.map(p=>p.y)));for(const p of d.pegs)p.y+=lift;const xs=d.pegs.map(p=>p.x),ys=d.pegs.map(p=>p.y),maxY=Math.max(.5,...ys),bottom=FLOOR_Y,top=maxY+maxRadius+.1;
+  d.walls=[];if(d.pegs.length){const id=d.nextId++;d.walls.push({id,axis:'xy',x:(Math.min(...xs)+Math.max(...xs))/2,y:(bottom+top)/2,z:-.03,width:Math.max(1.6,Math.max(...xs)-Math.min(...xs)+2*maxRadius+.2),height:top-bottom});for(const p of d.pegs)Object.assign(p,{z:0,axis:'z',sign:1,surface:id});}
+  for(const g of d.gears)Object.assign(g,{kind:g.motor?'motor':'gear',drive:'torque',crank:false,handTorque:5});d.version=2;
+ }
+ if(!Array.isArray(d.walls)||d.walls.length>24)fail();const ids=new Set(),claim=id=>{if(!int(id,1,d.nextId-1)||ids.has(id))fail();ids.add(id);};
+ for(const w of d.walls){claim(w.id);if(!['xy','yz','xz'].includes(w.axis)||!['x','y','z'].every(k=>num(w[k],-20,20))||!num(w.width,.2,20)||!num(w.height,.2,20))fail('Walls need valid axis-aligned dimensions.');}
+ for(const p of d.pegs){claim(p.id);if(!['x','y','z'].every(k=>num(p[k],-20,20))||!['x','y','z'].includes(p.axis)||![1,-1].includes(p.sign)||!mountedOnSurface(p,d.walls))fail('Each peg must sit flush on the floor or a wall face.');}
+ for(const g of d.gears){claim(g.id);if(!d.pegs.some(p=>p.id===g.peg)||!int(g.teeth,8,48)||!num(g.module,.005,.03)||!num(g.thickness,.006,.04)||!int(g.layer,0,6)||!Object.hasOwn(MATERIALS,g.material)||!num(g.angle,-1e6,1e6)||!num(g.rpm,-240,240)||!num(g.torque,0,500)||!num(g.brake,0,500)||typeof g.motor!=='boolean'||!['gear','motor'].includes(g.kind)||!['ideal','torque'].includes(g.drive)||typeof g.crank!=='boolean'||!num(g.handTorque,.1,50)||!(g.link===null||int(g.link,1,d.nextId-1)))fail();if(g.kind==='gear'&&g.motor||g.kind==='motor'&&!g.motor||g.crank&&g.kind==='motor')fail('A motor and a hand crank are separate parts.');}
+ for(const g of d.gears){if(g.link!==null&&!d.gears.some(other=>other.id===g.link&&other.peg===g.peg&&other.layer!==g.layer))fail();if(d.gears.some(other=>other.id!==g.id&&other.peg===g.peg&&other.layer===g.layer))fail('That peg already has a part on this layer.');if(g.crank&&d.gears.some(other=>other.peg===g.peg&&other.layer>g.layer))fail('Put the hand crank on the outermost gear.');const a=axialEnvelope(g);for(const other of d.gears){if(other.id===g.id||other.peg!==g.peg)continue;const b=axialEnvelope(other);if(Math.min(a.max,b.max)-Math.max(a.min,b.min)>.00001)fail('These parts overlap along the peg. Leave more space around the motor housing.');}}
  return d;
 }
-export const blankScene=()=>({format:'gear-lab',version:1,nextId:1,pegs:[],gears:[]});
-export const defaultGear=()=>({teeth:20,module:.012,thickness:.012,layer:0,material:'acetal',angle:0,motor:false,rpm:30,torque:1,brake:0,link:null});
+export const blankScene=()=>({format:'gear-lab',version:2,nextId:1,walls:[],pegs:[],gears:[]});
+export const defaultGear=()=>({teeth:20,module:.012,thickness:.012,layer:0,material:'acetal',angle:0,kind:'gear',drive:'ideal',motor:false,rpm:30,torque:1,brake:0,link:null,crank:false,handTorque:5});
