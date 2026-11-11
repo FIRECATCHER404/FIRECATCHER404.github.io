@@ -1,4 +1,4 @@
-import{CameraRig,CAMERA_FOV}from'./camera.js?v=6';
+import{CameraRig,CAMERA_FOV}from'./camera.js?v=7';
 import*as T from'../isometric/vendor/three.module.js';
 import{MATERIALS,dimensions}from'./geometry.js?v=6';
 import{SCALE}from'./physics.js?v=6';

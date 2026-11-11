@@ -1,6 +1,6 @@
 import{stepperExample,stepperInfo}from'./stepper.js?v=6';
 import{GearSimulation,ready}from'./physics.js?v=6';
-import{GearView}from'./view.js?v=6';
+import{GearView}from'./view.js?v=7';
 import{MATERIALS,dimensions,defaultGear,blankScene,checkedScene,meshPhase,nextStackLayer,connectParts,disconnectParts,connections}from'./geometry.js?v=6';
 import{V,add,sub,mul,dot,length,rotate,inverse,normal,mountRotation,mountPoint,gearPoint,wallSize,wallOnFloor,sameMountPlane,moveMount,wrap,FLOOR_Y}from'./space.js?v=6';
 import{installTouchButtons}from'../svg-shared/touch.js?v=2';

@@ -14,7 +14,7 @@ export class CameraRig{
  get zoom(){return DEFAULT_DISTANCE/this.distance;}
  isFront(){return Math.abs(this.rotation.w)>1-1e-8;}
  look(start,end,initial=this.snapshot()){
-  this.orient(initial.yaw-(end.x-start.x)*LOOK_SPEED,initial.pitch+(end.y-start.y)*LOOK_SPEED);
+  this.orient(initial.yaw+(end.x-start.x)*LOOK_SPEED,initial.pitch-(end.y-start.y)*LOOK_SPEED);
   this.center=sub(initial.position,mul(this.backward,this.distance));
  }
  pan(dx,dy,height,initial=this.center){const scale=2*this.distance*Math.tan(CAMERA_FOV*Math.PI/360)/Math.max(1,height);this.center=add(initial,add(mul(this.right,-dx*scale),mul(this.up,dy*scale)));}
