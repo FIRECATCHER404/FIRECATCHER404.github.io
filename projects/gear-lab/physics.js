@@ -1,6 +1,6 @@
 import R from'../void-lab/vendor/rapier.js';
-import{MATERIALS,dimensions,gearParts,hullVertices,polygonProperties,toothStress,checkedScene}from'./geometry.js?v=2';
-import{V,Q,rotate,inverse,multiply,add,sub,mul,cross,dot,wrap,normal,mountRotation,gearPoint,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=2';
+import{MATERIALS,dimensions,gearParts,hullVertices,polygonProperties,toothStress,checkedScene,connections}from'./geometry.js?v=3';
+import{V,Q,rotate,inverse,multiply,add,sub,mul,cross,dot,wrap,normal,mountRotation,gearPoint,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=3';
 export const ready=R.init(),DT=1/240,SCALE=100;
 
 export class GearSimulation{
@@ -18,10 +18,17 @@ export class GearSimulation{
   for(const p of this.design.pegs)this.pegs.set(p.id,this.world.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(p.x*SCALE,p.y*SCALE,p.z*SCALE).setRotation(mountRotation(p))));
   for(const config of this.design.gears)this.addGear(config);
   const linked=new Set();
-  for(const g of this.gears.values())if(g.config.link!==null){
-   const other=this.gears.get(g.config.link),key=[g.config.id,other.config.id].sort().join(':');if(linked.has(key))continue;linked.add(key);
-   const dz=(g.config.layer-other.config.layer)*.05*SCALE,da=g.config.angle-other.config.angle;
-   const joint=this.world.createImpulseJoint(R.JointData.fixed(V(0,0,dz),Q(da),V(),Q(0)),other.rb,g.rb,true);joint.setContactsEnabled(false);
+  for(const c of connections(this.design)){
+   const a=this.gears.get(c.a),b=this.gears.get(c.b),key=[c.a,c.b].sort().join(':');if(linked.has(key))continue;linked.add(key);
+   if(c.kind==='fuse'){
+    const dz=(b.config.layer-a.config.layer)*.05*SCALE,da=b.config.angle-a.config.angle;
+    const joint=this.world.createImpulseJoint(R.JointData.fixed(V(0,0,dz),Q(da),V(),Q(0)),a.rb,b.rb,true);joint.setContactsEnabled(false);
+   }else{
+    // Only relative twist is locked. Bearing constraints keep each centre on its own peg.
+    // Joint X is the shaft's local Z. Cancel starting angles to preserve their phase offset.
+    const joint=this.world.createImpulseJoint(R.JointData.generic(V(),V(),V(0,0,1),R.JointAxesMask.AngX),a.rb,b.rb,true),xToZ={x:0,y:-Math.SQRT1_2,z:0,w:Math.SQRT1_2};
+    joint.setLocalFrame1(V(),multiply(Q(-a.config.angle),xToZ));joint.setLocalFrame2(V(),multiply(Q(-b.config.angle),xToZ));
+   }
   }
  }
  addGear(config){

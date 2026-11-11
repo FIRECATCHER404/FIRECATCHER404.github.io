@@ -1,7 +1,7 @@
 import*as T from'../isometric/vendor/three.module.js';
-import{MATERIALS,dimensions}from'./geometry.js?v=2';
-import{SCALE}from'./physics.js?v=2';
-import{V,rotate,mountRotation,gearPoint,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=2';
+import{MATERIALS,dimensions}from'./geometry.js?v=3';
+import{SCALE}from'./physics.js?v=3';
+import{V,rotate,mountRotation,gearPoint,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=3';
 
 function dispose(group){for(const child of[...group.children]){group.remove(child);child.traverse(o=>{o.geometry?.dispose();for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[])m.dispose();});}}
 const material=(color,metalness=.15)=>new T.MeshStandardMaterial({color,metalness,roughness:.55});
@@ -40,16 +40,16 @@ export class GearView{
   group.userData={type:'gear',id:g.config.id,revision:g.revision};return group;
  }
  draw(selected=null,stress=false,latched=null){
-  if(!this.sim)return;
+  if(!this.sim)return;const has=id=>selected instanceof Set?selected.has(id):selected===id;
   for(const g of this.sim.gears.values()){
    let mesh=this.gearMeshes.get(g.config.id);if(mesh.userData.revision!==g.revision){this.rotors.remove(mesh);dispose(mesh);mesh=this.rotor(g);this.gearMeshes.set(g.config.id,mesh);this.rotors.add(mesh);}
    const p=g.rb.translation();mesh.position.set(p.x/SCALE,p.y/SCALE,p.z/SCALE);mesh.quaternion.copy(g.rb.rotation());
-   const body=mesh.children[0];body.material.color.set(MATERIALS[g.config.material].color);if(stress){const ratio=Math.min(1,g.stress/MATERIALS[g.config.material].strength);body.material.color.setHSL(.33*(1-ratio),.65,.5);}body.material.emissive.set(g.config.id===selected?'#35290f':'#000000');
+   const body=mesh.children[0];body.material.color.set(MATERIALS[g.config.material].color);if(stress){const ratio=Math.min(1,g.stress/MATERIALS[g.config.material].strength);body.material.color.setHSL(.33*(1-ratio),.65,.5);}body.material.emissive.set(has(g.config.id)?'#76531a':'#000000');
    const handle=mesh.children.find(m=>m.userData.type==='crank');if(handle)handle.material.color.set(latched===g.config.id?'#80c89b':'#b79958');
   }
   for(const f of this.sim.fragments){let mesh=this.fragmentMeshes.get(f.id);if(!mesh){mesh=bodyMesh(f.parts,f.thickness,MATERIALS[f.material].color);this.fragmentMeshes.set(f.id,mesh);this.fragments.add(mesh);}const p=f.rb.translation();mesh.position.set(p.x/SCALE,p.y/SCALE,p.z/SCALE);mesh.quaternion.copy(f.rb.rotation());}
-  for(const wall of this.environment.children)if(wall.userData.type==='wall')wall.material.emissive.set(wall.userData.id===selected?'#2b2719':'#000000');
-  this.renderer.render(this.scene,this.camera);
+  for(const wall of this.environment.children)if(wall.userData.type==='wall')wall.material.emissive.set(has(wall.userData.id)?'#55451e':'#000000');
+  for(const mount of this.mounts.children)mount.traverse(o=>{if(o.material)o.material.emissive.set(has(mount.userData.id)?'#55451e':'#000000');});this.highlighted=[...this.design.gears,...this.design.pegs,...this.design.walls].filter(p=>has(p.id)).map(p=>p.id);this.renderer.render(this.scene,this.camera);
  }
  ray(event){const r=this.canvas.getBoundingClientRect();this.mouse.set((event.clientX-r.left)/r.width*2-1,-(event.clientY-r.top)/r.height*2+1);this.raycaster.setFromCamera(this.mouse,this.camera);return this.raycaster;}
  hits(event){return this.ray(event).intersectObjects([...this.environment.children,...this.mounts.children,...this.rotors.children],true).map(hit=>{let o=hit.object;while(o&&!o.userData.type)o=o.parent;if(!o)return null;return{type:o.userData.type,id:o.userData.id,point:{x:hit.point.x,y:hit.point.y,z:hit.point.z},normal:hit.face?new T.Vector3().copy(hit.face.normal).transformDirection(hit.object.matrixWorld):null,distance:hit.distance};}).filter(Boolean);}
@@ -65,5 +65,5 @@ export class GearView{
   for(const g of this.design.gears){const p=gearPoint(this.design.pegs.find(p=>p.id===g.peg),g),r=dimensions(g.teeth,g.module).outer;points.push(new T.Vector3(p.x-r,p.y-r,p.z-r),new T.Vector3(p.x+r,p.y+r,p.z+r));}
   if(!points.length){this.center.set(0,-.15,0);this.zoom=1;}else{const b=new T.Box3().setFromPoints(points),size=b.getSize(new T.Vector3());b.getCenter(this.center);const extent=Math.max(.6,size.length()+.18);this.zoom=Math.max(.15,Math.min(5,2.24/extent));}this.resize();
  }
- stats(){return{gears:this.gearMeshes.size,fragments:this.fragmentMeshes.size,walls:this.design.walls.length,floor:true};}
+ stats(){return{gears:this.gearMeshes.size,fragments:this.fragmentMeshes.size,walls:this.design.walls.length,floor:true,highlighted:this.highlighted||[]};}
 }

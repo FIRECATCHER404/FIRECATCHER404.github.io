@@ -8,11 +8,23 @@ The **floor already exists**, has a collision shape, and catches falling fragmen
 
 1. **Wall:** choose XY, YZ, or XZ. Click the floor or a platform top to place it. Vertical walls sit flush on their support; XZ makes a horizontal platform. Width, height/depth, and elevation are editable. Select a wall to resize or delete it. Moving it carries its pegs and gears. Remove attached pegs before changing its plane.
 2. **Peg:** click a floor or wall face. Its shaft points out along that face's X, Y, or Z normal. All six wall-face directions work. The snap option adjusts new peg spacing to the pitch distance of a nearby compatible gear.
-3. **Gear:** click an **existing peg**. Clicking empty space never creates a peg. The chosen layer places it along the shaft. Stack a gear uses the next free layer; choose **Lock shaft to** to make a compound shaft. Stacked gears otherwise turn independently.
+3. **Gear:** click an **existing peg**. Clicking empty space never creates a peg. Click the peg again, or any gear already on it, to place another ordinary gear above the stack. Placement chooses the next clear outer slot automatically, including extra motor-housing clearance. There is no Stack button or manual layer input. Stacked gears turn independently until fused or synced.
 
 Use the same module for meshing gears. Seven stack layers are 50 mm apart. Thicker motor housings need extra clearance; overlapping parts on a peg are rejected. A crank belongs on the outermost ordinary gear.
 
-Select and drag a peg along its mounting face to move its stack. Drag a wall along the floor to move the whole assembly. Front-view dragging keeps movement on the visible allowed axis. Right-drag or Shift-drag orbits; wheel zooms; Fit reframes the mechanism. Peg dragging stays on its supporting face; wall dragging keeps its base height.
+Select and drag a peg along its mounting face to move its stack. Drag a wall along the floor to move the whole assembly. Front-view dragging keeps movement on the visible allowed axis. Right-drag or Shift-drag on empty space orbits; wheel zooms; Fit reframes the mechanism. Peg dragging stays on its supporting face; wall dragging keeps its base height.
+
+## Multiple selection and connections
+
+**Shift-click** a part to add or remove it. A normal click replaces the selection; clicking an already selected part keeps the group available for dragging. Selected gears, motor housings, pegs, and walls are highlighted. The **Parts** list also supports Shift-click and reaches gears covered by other stack layers. **Add selection** provides the same toggle behavior on touch screens. Ctrl+A selects all gears; Escape clears selection and Add selection mode.
+
+- **Fuse stack** joins selected gears on the same peg with rigid shaft joints. Different tooth counts can form a compound train while preserving their initial angular offsets.
+- **Sync 1:1** couples rotation on parallel shafts pointing in the same direction. Their centres remain on their own pegs, their starting phase offsets are preserved, and the solver transfers torque and braking load. Sync works with motors or hand cranks. It is an ideal rotational coupling; it does not create a visible belt or simulate a gearbox. Directly meshing gears normally need opposite rotation and should not also receive a same-direction Sync connection.
+- **Disconnect** removes connections incident to the selected parts, including older shaft links. Fuse or Sync reconnects selected parts and replaces their previous incident connections. Other parts and their connections remain intact.
+- **Apply to selected gears** changes geometry, material, and brake load together. Motor settings are applied together when every selected part is a motor; mixed gear/motor selections retain the motors' drive settings. Mount positions, layers, crank attachments, and connections are preserved.
+- **Drag** a selected part to move the selected mounts together. Each peg stack moves once; a selected wall carries its attached pegs once. Movement respects all selected mounting planes, and out-of-bounds changes are rejected. **Delete** removes every selected part, cascading from walls and pegs as usual. Undo/Redo restores the complete operation.
+
+Fuse requires a single peg; Sync requires parallel shaft directions. Invalid operations leave the design and history intact. Connection loops, duplicate connections, and inconsistent constant-RPM motor commands are rejected. Seven occupied slots or an attached outer hand crank prevent further stacking; remove the crank before extending its stack.
 
 ## Motors and hand cranks
 
@@ -36,9 +48,9 @@ Fracture is an approximation with predefined tooth/rim boundaries. Finite-elemen
 
 ## Files and limits
 
-Save/Open `.gears` files and the local draft preserve the **intact design**, including walls, mounted axes, motors, crank attachments and shaft links. They do not store running fracture state. Reset repairs damage. Invalid files preserve the current mechanism and history.
+Save/Open `.gears` files and the local draft preserve the **intact design**, including walls, mounted axes, motors, crank attachments, legacy shaft links, and new Fuse/Sync connections. They do not store running fracture state. Reset repairs damage. Invalid files preserve the current mechanism and history.
 
-Version 2 files store the 3D mounts. Version 1 files and drafts acquire a support wall behind their original XY mechanism and retain finite-torque motor settings. Mechanisms below the new floor are translated upward together while retaining their relative layout. Old draft storage is left intact; new drafts use `neoj-gear-lab-v2`.
+Version 2 files store the 3D mounts and an optional `couplings` array for Fuse/Sync. Earlier version 2 files without that array load with no new connections; their existing shaft links remain valid. Version 1 files and drafts acquire a support wall behind their original XY mechanism and retain finite-torque motor settings. Mechanisms below the new floor are translated upward together while retaining their relative layout. Old draft storage is left intact; new drafts use `neoj-gear-lab-v2`.
 
 Limits: 24 gears/motors, 48 pegs, 24 walls, 8–48 teeth, 5–30 mm module, 6–40 mm gear thickness, seven stack layers, ±240 RPM, 500 N·m torque/brake limits, 0.1–50 N·m hand torque, and 192 detached fragments. High speeds, dense mechanisms, and badly interfering tooth layouts can exceed this discrete rigid-body model's useful accuracy or performance.
 
@@ -46,6 +58,6 @@ Limits: 24 gears/motors, 48 pegs, 24 walls, 8–48 teeth, 5–30 mm module, 6–
 
 Run `node scripts/test-gear-lab.mjs`. Run `scripts/test-gear-lab-browser.js` through the Playwright browser tool after serving the checkout on port 8975, or pass `{baseURL: 'https://…/projects/gear-lab/'}` as its second argument. The browser suite also accepts a `groups` array for focused retries; run it without filters for the final regression.
 
-Coverage includes the original ratios, braking, material failure, mass conservation, files and histories, plus floor collision, all six mounting directions, XY/YZ/XZ wall placement, mandatory peg placement, constant-RPM motors, crank torque and coupling, actual mouse/touch handle gestures, edge-on crank visibility, wall resizing/movement/deletion, housing clearance, legacy migration, and 320/390/768 px layouts. Check the rendered scene, wait for Pages deployment, compare deployed files and repeat browser checks on the public page. Physical devices and non-Chromium browsers need separate validation.
+Coverage includes the original ratios, braking, material failure, mass conservation, files and histories, plus repeated peg/gear placement, stack capacity and crank obstruction, world/list Shift-selection, rendered highlights, bulk editing/movement/deletion, fused stacks, load-bearing Sync on all shaft directions, connection files/history, touch selection actions, floor collision, all six mounting directions, XY/YZ/XZ wall placement, mandatory peg placement, constant-RPM motors, crank torque and coupling, actual mouse/touch handle gestures, edge-on crank visibility, wall resizing/movement/deletion, housing clearance, legacy migration, and 320/390/768 px layouts. Check the rendered scene, wait for Pages deployment, compare deployed files and repeat browser checks on the public page. Physical devices and non-Chromium browsers need separate validation.
 
 References: [Rapier rigid-body types](https://rapier.rs/docs/user_guides/javascript/rigid_bodies/), [joints](https://rapier.rs/docs/user_guides/javascript/joints/), [contact-force events](https://rapier.rs/docs/user_guides/javascript/advanced_collision_detection/).

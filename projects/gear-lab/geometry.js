@@ -1,4 +1,4 @@
-import{mountedOnSurface,wallSize,FLOOR_Y}from'./space.js?v=2';
+import{mountedOnSurface,wallSize,FLOOR_Y}from'./space.js?v=3';
 export const TAU=Math.PI*2;
 export const MATERIALS={
  acetal:{name:'Acetal',density:1410,strength:65e6,friction:.12,color:'#d7dfdf',ductile:true},
@@ -24,6 +24,21 @@ export function hullVertices(p,thickness){return new Float32Array([-thickness/2,
 export function meshPhase(host,newTeeth,phi,hostAngle=host.angle||0){return(host.teeth*(phi-hostAngle)+newTeeth*(phi+Math.PI)-Math.PI)/newTeeth;}
 export function toothStress(force,teeth,module,thickness){const d=dimensions(teeth,module),rootWidth=Math.PI*module*.58;return Math.abs(force)*.94*6*(d.outer-d.root)/(thickness*rootWidth**2);}
 export function axialEnvelope(g){const z=.06+g.layer*.05;return{min:z-g.thickness/2-(g.kind==='motor'?.037:0),max:z+g.thickness/2+(g.crank?.056:0)};}
+export function nextStackLayer(scene,peg,part){
+ const stack=scene.gears.filter(g=>g.peg===peg);
+ if(stack.some(g=>g.crank))throw Error('Remove the outer hand crank before adding another gear.');
+ for(let layer=stack.length?Math.max(...stack.map(g=>g.layer))+1:0;layer<=6;layer++){
+  const a=axialEnvelope({...part,layer});if(stack.every(g=>{const b=axialEnvelope(g);return Math.min(a.max,b.max)-Math.max(a.min,b.min)<=.00001;}))return layer;
+ }
+ throw Error('This peg is full. Seven stack positions are available.');
+}
+export function connections(d){const seen=new Set(),legacy=d.gears.filter(g=>g.link!==null).map(g=>({a:g.id,b:g.link,kind:'fuse'})).filter(c=>{const key=[c.a,c.b].sort((a,b)=>a-b).join(':');if(seen.has(key))return false;seen.add(key);return true;});return[...legacy,...(d.couplings||[])];}
+export function disconnectParts(d,ids){const set=new Set(ids);for(const g of d.gears)if(set.has(g.id)||set.has(g.link))g.link=null;d.couplings=(d.couplings||[]).filter(c=>!set.has(c.a)&&!set.has(c.b));}
+export function connectParts(d,ids,kind){
+ const parts=[...new Set(ids)].map(id=>d.gears.find(g=>g.id===id));if(parts.length<2||parts.some(g=>!g))throw Error('Select at least two gears or motor rotors.');
+ if(kind==='fuse'&&parts.some(g=>g.peg!==parts[0].peg))throw Error('Fuse needs gears stacked on the same peg. Use Sync for parallel shafts.');
+ disconnectParts(d,ids);for(const g of parts.slice(1))d.couplings.push({a:parts[0].id,b:g.id,kind});
+}
 export function checkedScene(raw){
  const d=structuredClone(raw),num=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b,int=(v,a,b)=>Number.isInteger(v)&&num(v,a,b),fail=(message='Invalid Gear Lab file.')=>{throw Error(message);};
  if(!d||d.format!=='gear-lab'||![1,2].includes(d.version)||!Array.isArray(d.pegs)||d.pegs.length>48||!Array.isArray(d.gears)||d.gears.length>24||!int(d.nextId,1,1000000))fail();
@@ -37,7 +52,15 @@ export function checkedScene(raw){
  for(const p of d.pegs){claim(p.id);if(!['x','y','z'].every(k=>num(p[k],-20,20))||!['x','y','z'].includes(p.axis)||![1,-1].includes(p.sign)||!mountedOnSurface(p,d.walls))fail('Each peg must sit flush on the floor or a wall face.');}
  for(const g of d.gears){claim(g.id);if(!d.pegs.some(p=>p.id===g.peg)||!int(g.teeth,8,48)||!num(g.module,.005,.03)||!num(g.thickness,.006,.04)||!int(g.layer,0,6)||!Object.hasOwn(MATERIALS,g.material)||!num(g.angle,-1e6,1e6)||!num(g.rpm,-240,240)||!num(g.torque,0,500)||!num(g.brake,0,500)||typeof g.motor!=='boolean'||!['gear','motor'].includes(g.kind)||!['ideal','torque'].includes(g.drive)||typeof g.crank!=='boolean'||!num(g.handTorque,.1,50)||!(g.link===null||int(g.link,1,d.nextId-1)))fail();if(g.kind==='gear'&&g.motor||g.kind==='motor'&&!g.motor||g.crank&&g.kind==='motor')fail('A motor and a hand crank are separate parts.');}
  for(const g of d.gears){if(g.link!==null&&!d.gears.some(other=>other.id===g.link&&other.peg===g.peg&&other.layer!==g.layer))fail();if(d.gears.some(other=>other.id!==g.id&&other.peg===g.peg&&other.layer===g.layer))fail('That peg already has a part on this layer.');if(g.crank&&d.gears.some(other=>other.peg===g.peg&&other.layer>g.layer))fail('Put the hand crank on the outermost gear.');const a=axialEnvelope(g);for(const other of d.gears){if(other.id===g.id||other.peg!==g.peg)continue;const b=axialEnvelope(other);if(Math.min(a.max,b.max)-Math.max(a.min,b.min)>.00001)fail('These parts overlap along the peg. Leave more space around the motor housing.');}}
+ d.couplings??=[];if(!Array.isArray(d.couplings)||d.couplings.length>23)fail('Invalid gear connections.');
+ const parent=new Map(d.gears.map(g=>[g.id,g.id])),root=id=>{while(parent.get(id)!==id)id=parent.get(id);return id;},pairs=new Set();
+ for(const c of connections(d)){
+  const a=d.gears.find(g=>g.id===c?.a),b=d.gears.find(g=>g.id===c?.b);if(!a||!b||a===b||!['fuse','sync'].includes(c.kind))fail('Invalid gear connection.');
+  const pa=d.pegs.find(p=>p.id===a.peg),pb=d.pegs.find(p=>p.id===b.peg);if(c.kind==='fuse'&&a.peg!==b.peg)fail('Fuse needs gears on the same peg.');if(c.kind==='sync'&&(pa.axis!==pb.axis||pa.sign!==pb.sign))fail('Sync needs parallel shafts pointing in the same direction.');
+  const key=[a.id,b.id].sort((x,y)=>x-y).join(':');if(pairs.has(key))fail('Duplicate gear connection.');pairs.add(key);const ra=root(a.id),rb=root(b.id);if(ra===rb)fail('Gear connections cannot form a loop.');parent.set(rb,ra);
+ }
+ const motors=new Map();for(const g of d.gears.filter(g=>g.kind==='motor'&&g.drive==='ideal')){const key=root(g.id);if(motors.has(key)&&motors.get(key)!==g.rpm)fail('Connected constant-RPM motors must use the same RPM.');motors.set(key,g.rpm);}
  return d;
 }
-export const blankScene=()=>({format:'gear-lab',version:2,nextId:1,walls:[],pegs:[],gears:[]});
+export const blankScene=()=>({format:'gear-lab',version:2,nextId:1,walls:[],pegs:[],gears:[],couplings:[]});
 export const defaultGear=()=>({teeth:20,module:.012,thickness:.012,layer:0,material:'acetal',angle:0,kind:'gear',drive:'ideal',motor:false,rpm:30,torque:1,brake:0,link:null,crank:false,handTorque:5});

@@ -2,7 +2,7 @@ import assert from'node:assert/strict';
 import{ready,GearSimulation,DT}from'../projects/gear-lab/physics.js';
 import{blankScene,defaultGear,dimensions,meshPhase,gearParts,polygonProperties,checkedScene,MATERIALS,toothStress}from'../projects/gear-lab/geometry.js';
 import{V,add,rotate,mountRotation,normal,mountedOnSurface,wallSize,wallOnFloor,moveMount,FLOOR_Y}from'../projects/gear-lab/space.js';
-import{axialEnvelope}from'../projects/gear-lab/geometry.js';
+import{axialEnvelope,nextStackLayer,connectParts,disconnectParts,connections}from'../projects/gear-lab/geometry.js';
 await ready;let count=0;const test=(name,fn)=>{fn();console.log('PASS '+name);count++;},near=(a,b,e=1e-5)=>assert(Math.abs(a-b)<e,`${a} differs from ${b}`);
 function pair(n=20,m=30,module=.012){const d={...blankScene(),version:1},a={...defaultGear(),id:3,peg:1,teeth:n,module,motor:true},b={...defaultGear(),id:4,peg:2,teeth:m,module};b.angle=meshPhase(a,m,0);d.pegs=[{id:1,x:0,y:0},{id:2,x:(n+m)*module/2,y:0}];d.gears=[a,b];d.nextId=5;return d;}
 function run(d,fn,seconds=2){const s=new GearSimulation(d);s.gravity=false;try{for(let i=0;i<seconds/DT;i++)s.step();fn(s);}finally{s.dispose();}}
@@ -53,4 +53,25 @@ test('motor housings clear their rotors at all thicknesses and reject overlappin
 test('legacy mechanisms below the new floor are lifted together while preserving their layout',()=>{
  const old=pair();old.pegs[0].y=-5;old.pegs[1].y=5;const d=checkedScene(old);near(d.pegs[1].y-d.pegs[0].y,10);assert(d.pegs[0].y-dimensions(20,.012).outer>FLOOR_Y);assert(d.pegs.every(p=>mountedOnSurface(p,d.walls)));
 });
+test('placing on an occupied peg automatically chooses the next clear outer slot',()=>{
+ const d=mountedPair(),peg=d.pegs[0].id,part=defaultGear();near(nextStackLayer(d,peg,part),1);for(let layer=1;layer<=6;layer++){d.gears.push({...part,id:d.nextId++,peg,layer});}assert.throws(()=>nextStackLayer(d,peg,part),/full/);
+ const c=mountedPair();Object.assign(c.gears[0],{kind:'gear',motor:false,thickness:.04});near(nextStackLayer(c,c.pegs[0].id,{...part,kind:'motor',thickness:.04}),2);c.gears[0].crank=true;assert.throws(()=>nextStackLayer(c,c.pegs[0].id,part),/crank/);
+});
+test('multi-part fuse joins an entire stack while preserving angular offsets and file data',()=>{
+ const d=mountedPair();d.gears.pop();const a=d.gears[0];for(let layer=1;layer<=3;layer++)d.gears.push({...defaultGear(),id:d.nextId++,peg:a.peg,layer,angle:.2*layer});connectParts(d,d.gears.map(g=>g.id),'fuse');assert.deepEqual(checkedScene(JSON.parse(JSON.stringify(d))),d);const s=new GearSimulation(d);try{for(let i=0;i<480;i++)s.step();for(const g of s.snapshot().gears){near(g.rpm,30,.12);near(g.angle-s.snapshot().gears[0].angle,d.gears.find(c=>c.id===g.id).angle,.005);}}finally{s.dispose();}
+});
+test('sync preserves starting phase, transfers load and keeps separate centres fixed on all six shaft directions',()=>{
+ for(const axis of['x','y','z'])for(const sign of[-1,1]){const d=mountedPair(axis,sign);const a=d.gears[0],b=d.gears[1],pa=d.pegs[0],pb=d.pegs[1],delta=rotate(mountRotation(pa),V(.6,0,0));Object.assign(pb,add(pa,delta),{id:pb.id});a.rpm=-37;b.angle=.73;connectParts(d,[a.id,b.id],'sync');const s=new GearSimulation(d);try{s.breaking=false;const initial=s.snapshot().gears;for(let i=0;i<480;i++)s.step();const result=s.snapshot().gears;near(result[1].rpm,-37,.15);near(result[1].angle-result[0].angle,.73,.003);for(let i=0;i<2;i++)for(const k of['x','y','z'])near(result[i].position[k],initial[i].position[k],.0001);}finally{s.dispose();}}
+ const d=mountedPair();d.pegs[1].x+=.3;Object.assign(d.gears[0],{drive:'torque',torque:.01});d.gears[1].brake=2;connectParts(d,d.gears.map(g=>g.id),'sync');run(d,s=>{for(const g of s.snapshot().gears)assert(Math.abs(g.rpm)<.3);});
+});
+test('a hand crank drives synced shafts through the solver and disconnect restores independence',()=>{
+ const d=mountedPair();d.pegs[1].x+=.3;Object.assign(d.gears[0],{kind:'gear',motor:false,crank:true});connectParts(d,d.gears.map(g=>g.id),'sync');const s=new GearSimulation(d);try{s.latchCrank(d.gears[0].id);for(let i=0;i<480;i++){s.setCrankTarget(i/480*Math.PI*2);s.step();}const[a,b]=s.snapshot().gears;assert(a.angle>5.5);near(b.angle-a.angle,d.gears[1].angle,.003);}finally{s.dispose();}disconnectParts(d,d.gears.map(g=>g.id));run(d,s=>s.snapshot().gears.forEach(g=>near(g.rpm,0,.01)));
+});
+test('connections reject incompatible mounts, cycles, conflicting motors and malformed file data',()=>{
+ const fixture=()=>{const d=mountedPair();d.pegs[1].x+=.3;return d;};let d=fixture();connectParts(d,d.gears.map(g=>g.id),'sync');checkedScene(d);const valid=structuredClone(d);for(const c of[null,{a:999,b:4,kind:'sync'},{a:3,b:4,kind:'bad'},{a:3,b:3,kind:'sync'}]){d=structuredClone(valid);d.couplings=[c];assert.throws(()=>checkedScene(d));}d=fixture();assert.throws(()=>connectParts(d,d.gears.map(g=>g.id),'fuse'),/same peg/);d=structuredClone(valid);d.couplings.push({...d.couplings[0]});assert.throws(()=>checkedScene(d),/Duplicate/);d=structuredClone(valid);Object.assign(d.gears[1],{kind:'motor',motor:true,rpm:75});assert.throws(()=>checkedScene(d),/same RPM/);d=mountedPair('z');d.pegs[1].sign=-1;d.pegs[1].z=-.03;connectParts(d,d.gears.map(g=>g.id),'sync');assert.throws(()=>checkedScene(d),/parallel/);
+});
+test('reconnecting and deleting parts cleans legacy fuse links and saved sync references',()=>{
+ const d=mountedPair();d.gears.push({...defaultGear(),id:d.nextId++,peg:d.gears[0].peg,layer:1,link:d.gears[0].id});connectParts(d,[d.gears[0].id,d.gears[1].id],'sync');assert(d.gears.every(g=>g.link===null));assert.equal(connections(d).length,1);disconnectParts(d,[d.gears[0].id]);assert.equal(connections(d).length,0);checkedScene(d);
+});
+test('reciprocal legacy shaft links load once while added duplicate and cycle constraints are rejected',()=>{const d=mountedPair();d.gears[1].peg=d.gears[0].peg;d.gears[1].layer=1;d.gears[0].link=d.gears[1].id;d.gears[1].link=d.gears[0].id;checkedScene(d);assert.equal(connections(d).length,1);d.couplings.push({a:d.gears[0].id,b:d.gears[1].id,kind:'fuse'});assert.throws(()=>checkedScene(d),/Duplicate/);d.couplings=[];d.gears[0].link=null;d.gears[1].link=null;const g={...defaultGear(),id:d.nextId++,peg:d.gears[0].peg,layer:2};d.gears.push(g);connectParts(d,d.gears.map(g=>g.id),'fuse');d.couplings.push({a:d.gears[1].id,b:g.id,kind:'fuse'});assert.throws(()=>checkedScene(d),/loop/);});
 console.log(`${count} Gear Lab test groups passed.`);
