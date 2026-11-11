@@ -1,5 +1,5 @@
-import{blankScene,defaultGear,checkedScene,meshPhase,connections,dimensions}from'./geometry.js?v=4';
-import{FLOOR_Y,gearPoint,length,sub,wrap}from'./space.js?v=4';
+import{blankScene,defaultGear,checkedScene,meshPhase,connections,dimensions}from'./geometry.js?v=5';
+import{FLOOR_Y,gearPoint,length,sub,wrap}from'./space.js?v=5';
 
 export function stepperExample(stages=20){
  if(!Number.isInteger(stages)||stages<1||stages>20)throw Error('Choose 1 to 20 stepper stages.');

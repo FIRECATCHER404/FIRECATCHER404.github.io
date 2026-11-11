@@ -1,4 +1,4 @@
-import{mountedOnSurface,wallSize,FLOOR_Y}from'./space.js?v=4';
+import{mountedOnSurface,wallSize,FLOOR_Y}from'./space.js?v=5';
 export const TAU=Math.PI*2,MAX_GEARS=64,MAX_LAYER=31;
 export const MATERIALS={
  acetal:{name:'Acetal',density:1410,strength:65e6,friction:.12,color:'#d7dfdf',ductile:true},

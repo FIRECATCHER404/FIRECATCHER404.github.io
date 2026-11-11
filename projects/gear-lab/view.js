@@ -1,7 +1,8 @@
+import{CameraRig,CAMERA_FOV}from'./camera.js?v=5';
 import*as T from'../isometric/vendor/three.module.js';
-import{MATERIALS,dimensions}from'./geometry.js?v=4';
-import{SCALE}from'./physics.js?v=4';
-import{V,Q,multiply,rotate,mountRotation,gearPoint,pegLength,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=4';
+import{MATERIALS,dimensions}from'./geometry.js?v=5';
+import{SCALE}from'./physics.js?v=5';
+import{V,Q,multiply,rotate,mountRotation,gearPoint,pegLength,wallSize,FLOOR_Y,FLOOR_SIZE}from'./space.js?v=5';
 
 function dispose(group){for(const child of[...group.children]){group.remove(child);child.traverse(o=>{o.geometry?.dispose();for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[])m.dispose();});}}
 const material=(color,metalness=.15)=>new T.MeshStandardMaterial({color,metalness,roughness:.55});
@@ -14,14 +15,22 @@ function bodyMesh(parts,thickness,color){
 }
 export class GearView{
  constructor(canvas){
-  this.canvas=canvas;this.yaw=-.55;this.pitch=.62;this.zoom=1;this.center=new T.Vector3(0,-.15,0);
-  this.scene=new T.Scene();this.scene.background=new T.Color('#171b20');this.camera=new T.OrthographicCamera(-1.5,1.5,1,-1,.01,80);
+  this.canvas=canvas;this.rig=new CameraRig();
+  this.scene=new T.Scene();this.scene.background=new T.Color('#171b20');this.camera=new T.PerspectiveCamera(CAMERA_FOV,1,.005,1000);
   this.renderer=new T.WebGLRenderer({canvas,antialias:true});this.renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=T.PCFSoftShadowMap;
   this.scene.add(new T.HemisphereLight(0xe9f2ff,0x3b4149,2));const light=new T.DirectionalLight(0xfff1da,2.5);light.position.set(-3,5,4);light.castShadow=true;light.shadow.mapSize.set(2048,2048);light.shadow.camera.left=-4;light.shadow.camera.right=4;light.shadow.camera.top=4;light.shadow.camera.bottom=-4;light.shadow.normalBias=.002;this.scene.add(light);
   this.environment=new T.Group();this.mounts=new T.Group();this.rotors=new T.Group();this.fragments=new T.Group();this.scene.add(this.environment,this.mounts,this.rotors,this.fragments);
   this.gearMeshes=new Map();this.fragmentMeshes=new Map();this.raycaster=new T.Raycaster();this.mouse=new T.Vector2();this.resize();
  }
- resize(){const r=this.canvas.getBoundingClientRect(),aspect=Math.max(.1,r.width/r.height),h=1.12/this.zoom;this.camera.left=-h*aspect;this.camera.right=h*aspect;this.camera.top=h;this.camera.bottom=-h;this.camera.position.set(this.center.x+6*Math.sin(this.yaw)*Math.cos(this.pitch),this.center.y+6*Math.sin(this.pitch),this.center.z+6*Math.cos(this.yaw)*Math.cos(this.pitch));this.camera.up.set(0,1,0);this.camera.lookAt(this.center);this.camera.updateProjectionMatrix();this.camera.updateMatrixWorld();this.renderer.setSize(Math.max(1,r.width),Math.max(1,r.height),false);}
+ get yaw(){return this.rig.yaw;}get pitch(){return this.rig.pitch;}get zoom(){return this.rig.zoom;}
+ cameraState(){return this.rig.snapshot();}
+ updateCamera(){this.camera.position.copy(this.rig.position);this.camera.quaternion.copy(this.rig.rotation);this.camera.up.copy(this.rig.up);this.camera.updateMatrixWorld();}
+ orient(yaw,pitch){this.rig.orient(yaw,pitch);this.updateCamera();}
+ orbit(start,end,rect,initial){this.rig.orbit(start,end,rect,initial);this.updateCamera();}
+ pan(dx,dy,height,initial){this.rig.pan(dx,dy,height,initial);this.updateCamera();}
+ wheel(delta,mode,height){this.rig.wheel(delta,mode,height);this.updateCamera();}
+ dolly(factor){this.rig.dolly(factor);this.updateCamera();}
+ resize(){const r=this.canvas.getBoundingClientRect();this.camera.aspect=Math.max(.1,r.width/r.height);this.camera.updateProjectionMatrix();this.updateCamera();this.renderer.setSize(Math.max(1,r.width),Math.max(1,r.height),false);}
  setDesign(design,sim){
   this.design=design;this.sim=sim;for(const g of[this.environment,this.mounts,this.rotors,this.fragments])dispose(g);this.gearMeshes.clear();this.fragmentMeshes.clear();
   const floor=box(FLOOR_SIZE,.08,FLOOR_SIZE,'#2c333a');floor.position.y=FLOOR_Y-.04;floor.castShadow=false;floor.userData={type:'floor',id:'floor'};this.environment.add(floor);
@@ -56,14 +65,15 @@ export class GearView{
  surface(event){return this.hits(event).find(h=>h.type==='floor'||h.type==='wall')||null;}
  pick(event){return this.hits(event).find(h=>h.type!=='floor')||null;}
  planePoint(event,point,normal){return this.ray(event).ray.intersectPlane(new T.Plane().setFromNormalAndCoplanarPoint(new T.Vector3(normal.x,normal.y,normal.z),new T.Vector3(point.x,point.y,point.z)),new T.Vector3());}
- dragPlane(event,point,normal){const ray=this.ray(event).ray,n=new T.Vector3(normal.x,normal.y,normal.z),chosen=Math.abs(ray.direction.dot(n))<.02?this.camera.getWorldDirection(new T.Vector3()):n;return{point:this.planePoint(event,point,chosen),normal:{x:chosen.x,y:chosen.y,z:chosen.z}};}
- revealCrank(axis){const forward=this.camera.getWorldDirection(new T.Vector3());if(Math.abs(forward.dot(new T.Vector3(axis.x,axis.y,axis.z)))>=.15)return false;if(Math.abs(axis.y)>.9){this.pitch=axis.y*.95;this.yaw=-.55;}else{this.yaw=Math.atan2(axis.x,axis.z);this.pitch=.35;}this.resize();return true;}
+ dragPlane(event,point,normal){const ray=this.ray(event).ray,n=new T.Vector3(normal.x,normal.y,normal.z),forward=this.camera.getWorldDirection(new T.Vector3()),chosen=Math.abs(forward.dot(n))<.15||Math.abs(ray.direction.dot(n))<.05?forward:n;return{point:this.planePoint(event,point,chosen),normal:{x:chosen.x,y:chosen.y,z:chosen.z}};}
+ revealCrank(axis){if(Math.abs(this.rig.forward.x*axis.x+this.rig.forward.y*axis.y+this.rig.forward.z*axis.z)>=.15)return false;if(Math.abs(axis.y)>.9)this.orient(-.55,axis.y*.95);else this.orient(Math.atan2(axis.x,axis.z),.35);return true;}
  point(p){const v=new T.Vector3(p.x,p.y,p.z).project(this.camera),r=this.canvas.getBoundingClientRect();return{x:r.left+(v.x+1)*r.width/2,y:r.top+(1-v.y)*r.height/2};}
  fit(){
-  const points=[];for(const w of this.design.walls){const s=wallSize(w);points.push(new T.Vector3(w.x-s.x/2,w.y-s.y/2,w.z-s.z/2),new T.Vector3(w.x+s.x/2,w.y+s.y/2,w.z+s.z/2));}
-  for(const p of this.design.pegs){const tip=rotate(mountRotation(p),V(0,0,pegLength(this.design,p.id)));points.push(new T.Vector3(p.x,p.y,p.z),new T.Vector3(p.x+tip.x,p.y+tip.y,p.z+tip.z));}
-  for(const g of this.design.gears){const p=gearPoint(this.design.pegs.find(p=>p.id===g.peg),g),r=dimensions(g.teeth,g.module).outer;points.push(new T.Vector3(p.x-r,p.y-r,p.z-r),new T.Vector3(p.x+r,p.y+r,p.z+r));}
-  if(!points.length){this.center.set(0,-.15,0);this.zoom=1;}else{const b=new T.Box3().setFromPoints(points);b.getCenter(this.center);this.resize();const right=new T.Vector3(1,0,0).applyQuaternion(this.camera.quaternion),up=new T.Vector3(0,1,0).applyQuaternion(this.camera.quaternion),extent=points.map(p=>p.clone().sub(this.center)),width=Math.max(.6,2*Math.max(...extent.map(p=>Math.abs(p.dot(right))))+.12),height=Math.max(.6,2*Math.max(...extent.map(p=>Math.abs(p.dot(up))))+.12),rect=this.canvas.getBoundingClientRect(),aspect=Math.max(.1,rect.width/rect.height);this.zoom=Math.max(.15,Math.min(5,2.24/height,2.24*aspect/width));}this.resize();
+  const points=[],bounds=(p,s)=>{for(const x of[-1,1])for(const y of[-1,1])for(const z of[-1,1])points.push(V(p.x+x*s.x,p.y+y*s.y,p.z+z*s.z));};
+  for(const w of this.design.walls){const s=wallSize(w);bounds(w,V(s.x/2,s.y/2,s.z/2));}
+  for(const p of this.design.pegs){const tip=rotate(mountRotation(p),V(0,0,pegLength(this.design,p.id)));points.push(V(p.x,p.y,p.z),V(p.x+tip.x,p.y+tip.y,p.z+tip.z));}
+  for(const g of this.design.gears){const p=gearPoint(this.design.pegs.find(p=>p.id===g.peg),g),r=dimensions(g.teeth,g.module).outer;bounds(p,V(r,r,r));}
+  const r=this.canvas.getBoundingClientRect();this.rig.fit(points,r.width/r.height);this.updateCamera();
  }
  stats(){return{gears:this.gearMeshes.size,fragments:this.fragmentMeshes.size,walls:this.design.walls.length,floor:true,poses:[...this.gearMeshes].map(([id,m])=>({id,rotation:{x:m.quaternion.x,y:m.quaternion.y,z:m.quaternion.z,w:m.quaternion.w}})),pegLengths:this.design.pegs.map(p=>({id:p.id,length:pegLength(this.design,p.id)})),highlighted:this.highlighted||[]};}
 }

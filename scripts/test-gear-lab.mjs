@@ -1,7 +1,8 @@
+import{CameraRig,CAMERA_FOV}from'../projects/gear-lab/camera.js';
 import assert from'node:assert/strict';
 import{ready,GearSimulation,DT}from'../projects/gear-lab/physics.js';
 import{blankScene,defaultGear,dimensions,meshPhase,gearParts,polygonProperties,checkedScene,MATERIALS,toothStress}from'../projects/gear-lab/geometry.js';
-import{V,add,rotate,mountRotation,normal,mountedOnSurface,wallSize,wallOnFloor,moveMount,pegLength,FLOOR_Y}from'../projects/gear-lab/space.js';
+import{V,add,sub,dot,length,rotate,mountRotation,normal,mountedOnSurface,wallSize,wallOnFloor,moveMount,pegLength,FLOOR_Y}from'../projects/gear-lab/space.js';
 import{stepperExample,stepperInfo}from'../projects/gear-lab/stepper.js';
 import{axialEnvelope,MAX_LAYER,MAX_GEARS,nextStackLayer,connectParts,disconnectParts,connections}from'../projects/gear-lab/geometry.js';
 await ready;let count=0;const test=(name,fn)=>{fn();console.log('PASS '+name);count++;},near=(a,b,e=1e-5)=>assert(Math.abs(a-b)<e,`${a} differs from ${b}`);
@@ -86,5 +87,17 @@ test('full stepper runs finite measured physics without copying its ideal millio
 });
 test('larger designs retain bounded part/stack limits and shaft lengths cover upper layers',()=>{
  const d=stepperExample();assert(d.gears.length<MAX_GEARS);for(const g of d.gears)assert(pegLength(d,g.peg)>=.06+g.layer*.05+g.thickness/2+.039);const bad=structuredClone(d);bad.gears[0].layer=MAX_LAYER+1;assert.throws(()=>checkedScene(bad));const tooMany=structuredClone(d);tooMany.gears=Array(MAX_GEARS+1).fill(d.gears[0]);assert.throws(()=>checkedScene(tooMany));
+});
+test('camera wheel moves forward and backward along its viewing direction with fixed orientation and field of view',()=>{
+ const c=new CameraRig(),before=c.snapshot();c.wheel(-100);const after=c.snapshot(),delta=sub(after.position,before.position);assert(dot(delta,before.forward)>0);near(length(delta),dot(delta,before.forward));assert.deepEqual(after.rotation,before.rotation);assert.deepEqual(after.center,before.center);assert.equal(after.fov,CAMERA_FOV);c.wheel(100);for(const k of['x','y','z'])near(c.position[k],before.position[k]);const a=new CameraRig(),b=new CameraRig();a.wheel(1,1);b.wheel(16,0);near(a.distance,b.distance);for(let i=0;i<100;i++)c.wheel(-1e6);assert(c.distance>=.035&&Number.isFinite(c.distance));
+});
+test('camera pan stays in its current view plane and preserves direction, distance and rotation',()=>{
+ const c=new CameraRig(),before=c.snapshot();c.pan(80,-35,900);const delta=sub(c.position,before.position);near(dot(delta,before.forward),0);assert(dot(delta,c.right)<0&&dot(delta,c.up)<0);assert.deepEqual(c.rotation,before.rotation);near(c.distance,before.distance);const translated=sub(c.center,before.center);for(const k of['x','y','z'])near(delta[k],translated[k]);
+});
+test('trackball supports roll and movement through poles without clamping or invalid rotations',()=>{
+ const c=new CameraRig(),rect={left:0,top:0,width:800,height:800};c.orient(0,0);c.orbit({x:790,y:400},{x:400,y:10},rect);assert(Math.abs(c.rotation.z)>.2,'edge drag must roll');near(Math.hypot(...Object.values(c.rotation)),1);c.orient(0,0);for(let i=0;i<2;i++)c.orbit({x:400,y:400},{x:400,y:1600},rect);assert(c.up.y<-.8,'camera must pass the pole');for(let i=0;i<200;i++)c.orbit({x:400,y:400},{x:510,y:440},rect);near(Math.hypot(...Object.values(c.rotation)),1);for(const v of Object.values(c.position))assert(Number.isFinite(v));c.orient(0,0);assert(c.isFront());
+});
+test('perspective Fit contains long and tall bounds at narrow aspect ratios after arbitrary camera rotation',()=>{
+ const rect={left:0,top:0,width:800,height:800},points=[];for(const x of[-1.94,1.94])for(const y of[-.5,.75])for(const z of[-.14,.14])points.push(V(x,y,z));for(const aspect of[.55,1,1.8]){const c=new CameraRig();c.orbit({x:790,y:400},{x:400,y:15},rect);c.fit(points,aspect);for(const p of points){const delta=sub(p,c.position),depth=dot(delta,c.forward),tan=Math.tan(CAMERA_FOV*Math.PI/360);assert(depth>.005);assert(Math.abs(dot(delta,c.right))<depth*tan*aspect);assert(Math.abs(dot(delta,c.up))<depth*tan);}}
 });
 console.log(`${count} Gear Lab test groups passed.`);
